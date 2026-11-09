@@ -1,5 +1,5 @@
 .agents/
-docs/
+# docs/
 agents.md
 .venv/
 __pycache__/
