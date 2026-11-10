@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: intervuex-prod-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-intervuex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeInProduction123!}
+      POSTGRES_DB: ${POSTGRES_DB:-intervuex_prod}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intervuex} -d ${POSTGRES_DB:-intervuex_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  redis:
+    image: redis:7-alpine
+    container_name: intervuex-prod-redis
+    restart: always
+    volumes:
+      - prod_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intervuex-prod-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-intervuex}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-intervuex_prod}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-ProdSecretKeyMustBeSet32BytesLong}
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+  taskiq-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: intervuex-prod-worker
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-intervuex}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-intervuex_prod}
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: INFO
+    command: ["uv", "run", "taskiq", "worker", "app.tasks.eval_tasks:broker"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+
+volumes:
+  prod_postgres_data:
+  prod_redis_data:
+
+networks:
+  default:
+    name: intervuex-prod-network

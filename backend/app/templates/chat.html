@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IntervueX — Live Technical Interview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: ui-sans-serif, system-ui; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    @keyframes pulse-ring { 0% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.15); opacity: 0.4; } 100% { transform: scale(0.95); opacity: 0.8; } }
+    .recording-ring { animation: pulse-ring 1.5s infinite ease-in-out; }
+  </style>
+</head>
+<body class="h-screen flex flex-col justify-between max-w-4xl mx-auto px-4 py-6">
+  <!-- Header -->
+  <header class="flex items-center justify-between border-b border-slate-800 pb-4">
+    <div>
+      <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+        <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+        IntervueX Session
+      </h1>
+      <p class="text-xs text-slate-400 font-mono mt-1" id="session-id">ID: {{interview_id}}</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="voice-toggle-btn" onclick="toggleVoiceMode()"
+        class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700 hover:border-indigo-500 transition flex items-center gap-1.5">
+        <span id="voice-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        <span id="voice-btn-label">Enable Voice</span>
+      </button>
+      <span id="state-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+        Loading...
+      </span>
+      <span id="topic-badge" class="px-3 py-1 text-xs font-medium rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 hidden">
+        Topic: --
+      </span>
+    </div>
+  </header>
+
+  <!-- Live Transcript Messages Stream -->
+  <main id="chat-stream" class="flex-1 overflow-y-auto my-4 space-y-4 pr-2 scrollbar-thin flex flex-col">
+    <div id="start-prompt" class="my-auto text-center space-y-3">
+      <p class="text-slate-400 text-sm">Session ready. Click below to begin your interview.</p>
+      <button id="start-btn" onclick="startInterview()"
+        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-lg transition">
+        Start Interview
+      </button>
+    </div>
+  </main>
+
+  <!-- Live Audio & Partial Transcript Bar -->
+  <div id="partial-bar" class="hidden mb-2 px-4 py-2 bg-slate-900/90 border border-slate-700 rounded-lg text-xs text-slate-300 flex items-center justify-between">
+    <div class="flex items-center gap-2 overflow-hidden">
+      <span class="w-2 h-2 rounded-full bg-rose-500 recording-ring shrink-0"></span>
+      <span class="font-medium text-slate-400 shrink-0">Candidate Speaking:</span>
+      <span id="partial-text" class="italic truncate text-slate-200">Listening...</span>
+    </div>
+    <button onclick="interruptInterviewer()" class="px-2 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 ml-2">
+      Barge-in
+    </button>
+  </div>
+
+  <!-- Input Area -->
+  <footer class="border-t border-slate-800 pt-4">
+    <form id="turn-form" onsubmit="submitTurn(event)" class="flex gap-3">
+      <textarea id="turn-input" rows="2" placeholder="Type response here (or speak in Voice Mode)..."
+        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
+        onkeydown="handleKey(event)" disabled></textarea>
+      <button id="send-btn" type="submit" disabled
+        class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 active:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow transition flex items-center justify-center">
+        <span>Send</span>
+      </button>
+    </form>
+    <div class="flex justify-between items-center text-xs text-slate-500 mt-2">
+      <span>Shift + Enter for new line • Enter to send</span>
+      <span id="probe-counter">Probes: 0</span>
+    </div>
+  </footer>
+
+  <script>
+    const interviewId = "{{interview_id}}";
+    let token = "{{token}}" || localStorage.getItem("intervuex_token");
+    const stream = document.getElementById("chat-stream");
+    const turnInput = document.getElementById("turn-input");
+    const sendBtn = document.getElementById("send-btn");
+    const stateBadge = document.getElementById("state-badge");
+    const topicBadge = document.getElementById("topic-badge");
+    const probeCounter = document.getElementById("probe-counter");
+    const startPrompt = document.getElementById("start-prompt");
+    const partialBar = document.getElementById("partial-bar");
+    const partialText = document.getElementById("partial-text");
+    const voiceDot = document.getElementById("voice-dot");
+    const voiceBtnLabel = document.getElementById("voice-btn-label");
+
+    // WebSocket & Web Audio State
+    let ws = null;
+    let voiceActive = false;
+    let audioCtx = null;
+    let micStream = null;
+    let scriptProcessor = null;
+
+    function getHeaders() {
+      const h = { "Content-Type": "application/json" };
+      if (token) h["Authorization"] = `Bearer ${token}`;
+      return h;
+    }
+
+    async function refreshStatus() {
+      try {
+        const res = await fetch(`/api/v1/interviews/${interviewId}`, { headers: getHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          stateBadge.textContent = data.state;
+          if (data.current_topic) {
+            topicBadge.textContent = `Topic: ${data.current_topic}`;
+            topicBadge.classList.remove("hidden");
+          }
+          probeCounter.textContent = `Probes: ${data.consecutive_probes}`;
+
+          if (data.state !== "CREATED") {
+            if (startPrompt) startPrompt.remove();
+            turnInput.disabled = (data.state === "COMPLETED" || data.state === "ABORTED");
+            sendBtn.disabled = turnInput.disabled;
+            if (data.state === "COMPLETED" && !document.getElementById('dossier-banner')) {
+              renderDossierPrompt();
+            }
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadTurns() {
+      try {
+        const res = await fetch(`/api/v1/interviews/${interviewId}/turns`, { headers: getHeaders() });
+        if (res.ok) {
+          const turns = await res.json();
+          if (turns.length > 0 && startPrompt) startPrompt.remove();
+          turns.forEach(t => renderMessage(t.speaker, t.transcript, t.action_taken));
+          turnInput.disabled = false;
+          sendBtn.disabled = false;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderMessage(speaker, text, action) {
+      const isInterviewer = speaker === "INTERVIEWER";
+      const wrapper = document.createElement("div");
+      wrapper.className = `flex ${isInterviewer ? 'justify-start' : 'justify-end'}`;
+
+      const bubble = document.createElement("div");
+      bubble.className = `max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-md ${
+        isInterviewer
+          ? 'bg-slate-800 text-slate-100 border border-slate-700 rounded-tl-sm'
+          : 'bg-indigo-600 text-white rounded-tr-sm'
+      }`;
+
+      if (isInterviewer && action) {
+        const badge = document.createElement("span");
+        badge.className = "inline-block px-2 py-0.5 mb-2 text-[10px] font-mono uppercase font-bold rounded bg-slate-900/60 text-indigo-300 border border-indigo-900/50";
+        badge.textContent = action;
+        bubble.appendChild(badge);
+      }
+
+      const p = document.createElement("p");
+      p.textContent = text;
+      bubble.appendChild(p);
+      wrapper.appendChild(bubble);
+      stream.appendChild(wrapper);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function renderDossierPrompt() {
+      if (document.getElementById('dossier-banner')) return;
+      const banner = document.createElement("div");
+      banner.id = "dossier-banner";
+      banner.className = "p-4 my-4 rounded-xl bg-indigo-950/60 border border-indigo-500/40 text-center space-y-2";
+      banner.innerHTML = `
+        <h4 class="text-sm font-semibold text-white">Interview Concluded</h4>
+        <p class="text-xs text-slate-300">Your session has been recorded. The asynchronous rubric evaluator has compiled your grounded assessment dossier.</p>
+        <a href="/api/v1/interviews/${interviewId}/dossier${token ? '?token=' + token : ''}" class="inline-block mt-2 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-lg shadow-indigo-500/20">
+          View Assessment Dossier &amp; Radar Chart &rarr;
+        </a>
+      `;
+      stream.appendChild(banner);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    async function startInterview() {
+      const btn = document.getElementById("start-btn");
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch(`/api/v1/interviews/${interviewId}/start`, {
+          method: "POST",
+          headers: getHeaders()
+        });
+        if (res.ok) {
+          const turn0 = await res.json();
+          if (startPrompt) startPrompt.remove();
+          renderMessage(turn0.speaker, turn0.transcript, turn0.action_taken);
+          turnInput.disabled = false;
+          sendBtn.disabled = false;
+          turnInput.focus();
+          refreshStatus();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function submitTurn(e) {
+      if (e) e.preventDefault();
+      const text = turnInput.value.trim();
+      if (!text) return;
+
+      renderMessage("CANDIDATE", text, null);
+      turnInput.value = "";
+      turnInput.disabled = true;
+      sendBtn.disabled = true;
+
+      if (voiceActive && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "text_input", text }));
+      } else {
+        try {
+          const res = await fetch(`/api/v1/interviews/${interviewId}/turns`, {
+            method: "POST",
+            headers: getHeaders(),
+            body: JSON.stringify({ transcript: text })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            renderMessage(data.speaker, data.transcript, data.action_taken);
+            await refreshStatus();
+            if (data.session_state !== "COMPLETED") {
+              turnInput.disabled = false;
+              sendBtn.disabled = false;
+              turnInput.focus();
+            }
+          } else {
+            const err = await res.json();
+            alert("Error: " + (err.detail || "Failed to submit turn."));
+            turnInput.disabled = false;
+            sendBtn.disabled = false;
+          }
+        } catch (err) {
+          console.error(err);
+          turnInput.disabled = false;
+          sendBtn.disabled = false;
+        }
+      }
+    }
+
+    function handleKey(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        submitTurn();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Real-Time Voice Streaming & Web Audio Implementation
+    // -------------------------------------------------------------------------
+
+    async function toggleVoiceMode() {
+      if (!voiceActive) {
+        await enableVoiceMode();
+      } else {
+        disableVoiceMode();
+      }
+    }
+
+    async function enableVoiceMode() {
+      try {
+        const ticketRes = await fetch(`/api/v1/interviews/${interviewId}/ws-ticket`, {
+          method: "POST",
+          headers: getHeaders()
+        });
+        if (!ticketRes.ok) {
+          alert("Failed to acquire WebSocket ticket.");
+          return;
+        }
+        const ticketData = await ticketRes.json();
+
+        // Connect WebSocket
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.host}${ticketData.websocket_url}`;
+        ws = new WebSocket(wsUrl);
+        ws.binaryType = "arraybuffer";
+
+        ws.onopen = async () => {
+          voiceActive = true;
+          voiceDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+          voiceBtnLabel.textContent = "Voice Active";
+          await initAudioCapture();
+          refreshStatus();
+        };
+
+        ws.onmessage = async (event) => {
+          if (typeof event.data === "string") {
+            const msg = JSON.parse(event.data);
+            handleWsTextMessage(msg);
+          } else if (event.data instanceof ArrayBuffer) {
+            playPcmChunk(event.data);
+          }
+        };
+
+        ws.onclose = () => {
+          disableVoiceMode();
+        };
+
+        ws.onerror = (err) => {
+          console.error("WebSocket error:", err);
+          disableVoiceMode();
+        };
+      } catch (err) {
+        console.error("Failed to enable voice mode:", err);
+        disableVoiceMode();
+      }
+    }
+
+    function disableVoiceMode() {
+      voiceActive = false;
+      voiceDot.className = "w-2 h-2 rounded-full bg-slate-500";
+      voiceBtnLabel.textContent = "Enable Voice";
+      partialBar.classList.add("hidden");
+
+      if (ws) {
+        try { ws.close(); } catch (_) {}
+        ws = null;
+      }
+      if (scriptProcessor) {
+        try { scriptProcessor.disconnect(); } catch (_) {}
+        scriptProcessor = null;
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+    }
+
+    async function initAudioCapture() {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const source = audioCtx.createMediaStreamSource(micStream);
+
+      // Downsample to 16kHz and send 50ms (800 sample) chunks
+      const bufferSize = 2048;
+      scriptProcessor = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+      let pcmAccumulator = [];
+      const targetSampleRate = 16000;
+      const resampleRatio = targetSampleRate / audioCtx.sampleRate;
+
+      scriptProcessor.onaudioprocess = (e) => {
+        if (!voiceActive || !ws || ws.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+
+        // Simple downsampling
+        for (let i = 0; i < inputData.length; i += 1 / resampleRatio) {
+          const sample = inputData[Math.floor(i)];
+          const int16 = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
+          pcmAccumulator.push(int16);
+        }
+
+        // Emit 50ms chunks (800 samples = 1600 bytes)
+        while (pcmAccumulator.length >= 800) {
+          const chunk = pcmAccumulator.splice(0, 800);
+          const buffer = new ArrayBuffer(chunk.length * 2);
+          const view = new DataView(buffer);
+          for (let j = 0; j < chunk.length; j++) {
+            view.setInt16(j * 2, chunk[j], true); // little-endian
+          }
+          ws.send(buffer);
+        }
+      };
+
+      source.connect(scriptProcessor);
+      scriptProcessor.connect(audioCtx.destination);
+    }
+
+    function playPcmChunk(arrayBuffer) {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const pcm16 = new Int16Array(arrayBuffer);
+      const audioBuffer = audioCtx.createBuffer(1, pcm16.length, 16000);
+      const channel = audioBuffer.getChannelData(0);
+      for (let i = 0; i < pcm16.length; i++) {
+        channel[i] = pcm16[i] / 32768.0;
+      }
+      const sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.connect(audioCtx.destination);
+      sourceNode.start();
+    }
+
+    function handleWsTextMessage(msg) {
+      if (msg.type === "transcript_partial") {
+        partialBar.classList.remove("hidden");
+        partialText.textContent = msg.text;
+      } else if (msg.type === "transcript_final") {
+        partialBar.classList.add("hidden");
+        renderMessage("CANDIDATE", msg.text, null);
+      } else if (msg.type === "interviewer_speaking") {
+        renderMessage("INTERVIEWER", msg.question_text, msg.action);
+        refreshStatus();
+      } else if (msg.type === "interviewer_interrupted") {
+        // Confirmation that candidate barge-in aborted TTS playback
+        console.log("Interviewer interrupted at cutoff ms:", msg.cutoff_timestamp_ms);
+      } else if (msg.type === "state_change") {
+        stateBadge.textContent = msg.new_state;
+        refreshStatus();
+      }
+    }
+
+    function interruptInterviewer() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "speech_started", client_timestamp_ms: Date.now() }));
+      }
+    }
+
+    refreshStatus().then(loadTurns);
+  </script>
+</body>
+</html>

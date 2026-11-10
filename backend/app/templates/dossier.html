@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IntervueX — Candidate Assessment Dossier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .radar-polygon {
+      transition: all 0.5s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Header Navigation -->
+    <header class="flex flex-wrap items-center justify-between pb-6 border-b border-slate-800 gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-lg">
+          IX
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            IntervueX Assessment Dossier
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Verified</span>
+          </h1>
+          <p class="text-xs text-slate-400">Deterministic Rubric Grounding & Claim Provenance</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a id="btn-back-chat" href="#" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+          ← Back to Interview
+        </a>
+        <button id="btn-refresh" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh Dossier
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading / Error States -->
+    <div id="state-loading" class="py-16 text-center">
+      <div class="inline-block w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-4 text-sm text-slate-400">Loading evaluation report and rubric grounding...</p>
+    </div>
+
+    <div id="state-not-found" class="hidden py-16 text-center">
+      <div class="w-12 h-12 mx-auto rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl mb-3">!</div>
+      <h3 class="text-base font-semibold text-slate-200">Assessment Report Not Yet Generated</h3>
+      <p class="text-sm text-slate-400 max-w-md mx-auto mt-1">This interview has not been evaluated yet, or the asynchronous worker is still compiling scores.</p>
+      <button id="btn-evaluate-now" class="mt-4 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">
+        Trigger Evaluation Now
+      </button>
+    </div>
+
+    <!-- Main Dossier Content -->
+    <main id="dossier-content" class="hidden mt-8 space-y-8">
+      <!-- Top Overview Card -->
+      <section class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+        <div class="md:col-span-2 space-y-3">
+          <div class="flex items-center gap-2">
+            <span id="target-seniority" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">SENIOR</span>
+            <span id="role-title" class="text-sm font-medium text-slate-300">Software Engineering</span>
+            <span class="text-xs text-slate-500">•</span>
+            <span id="report-version" class="text-xs text-slate-400">Report v1</span>
+          </div>
+          <h2 id="summary-headline" class="text-lg font-semibold text-white leading-snug">
+            Executive Technical Summary
+          </h2>
+          <p id="summary-text" class="text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+        <div class="flex flex-col items-center justify-center p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl">
+          <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Composite Score</span>
+          <div class="flex items-baseline gap-1 mt-1">
+            <span id="overall-score-num" class="text-4xl font-extrabold text-white">0.0</span>
+            <span class="text-slate-500 text-lg">/ 4.0</span>
+          </div>
+          <span id="overall-tier-label" class="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">
+            Unassessed
+          </span>
+        </div>
+      </section>
+
+      <!-- Competency Radar & Dimension Breakdown -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <!-- SVG Radar Chart Container -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+            Competency Radar
+          </h3>
+          <div class="flex items-center justify-center p-2">
+            <svg id="radar-chart" class="w-full max-w-[380px] h-[340px]" viewBox="0 0 400 400"></svg>
+          </div>
+          <div class="mt-2 flex items-center justify-center gap-6 text-xs text-slate-400">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-indigo-500/40 border border-indigo-400 inline-block"></span> Candidate Score</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-slate-700 inline-block"></span> Baseline (3.0)</span>
+          </div>
+        </div>
+
+        <!-- Competency Scores List -->
+        <div class="space-y-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Competency Dimension Breakdown
+          </h3>
+          <div id="competency-cards-container" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <!-- Resume Claim Verification Ledger -->
+      <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Resume Claim Verification Ledger
+          </h3>
+          <span class="text-xs text-slate-400">Audited against spoken turns</span>
+        </div>
+        <div id="claim-verification-table" class="space-y-2"></div>
+      </section>
+
+      <!-- Strengths, Gaps & Study Recommendations -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Strengths -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+          <h4 class="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Key Strengths
+          </h4>
+          <ul id="strengths-list" class="space-y-2 text-sm text-slate-300"></ul>
+        </div>
+
+        <!-- Knowledge Gaps & Study Guide -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+          <h4 class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Knowledge Gaps & Recommended Reading
+          </h4>
+          <ul id="study-list" class="space-y-2 text-sm text-slate-300"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const interviewId = "{{interview_id}}";
+    const token = "{{token}}";
+    const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    // Elements
+    const stateLoading = document.getElementById('state-loading');
+    const stateNotFound = document.getElementById('state-not-found');
+    const dossierContent = document.getElementById('dossier-content');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const btnEvaluateNow = document.getElementById('btn-evaluate-now');
+    const btnBackChat = document.getElementById('btn-back-chat');
+
+    btnBackChat.href = `/api/v1/interviews/${interviewId}/chat${token ? '?token=' + token : ''}`;
+
+    async function fetchReport() {
+      stateLoading.classList.remove('hidden');
+      stateNotFound.classList.add('hidden');
+      dossierContent.classList.add('hidden');
+
+      try {
+        const res = await fetch(`/api/v1/interviews/${interviewId}/report`, {
+          headers: authHeader,
+        });
+
+        if (res.status === 404) {
+          stateLoading.classList.add('hidden');
+          stateNotFound.classList.remove('hidden');
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error(`HTTP error ${res.status}`);
+        }
+
+        const report = await res.json();
+        renderDossier(report);
+        stateLoading.classList.add('hidden');
+        dossierContent.classList.remove('hidden');
+      } catch (err) {
+        console.error('Failed to load dossier:', err);
+        stateLoading.classList.add('hidden');
+        stateNotFound.classList.remove('hidden');
+      }
+    }
+
+    async function triggerEvaluation() {
+      btnEvaluateNow.disabled = true;
+      btnEvaluateNow.textContent = "Evaluating...";
+      try {
+        const res = await fetch(`/api/v1/interviews/${interviewId}/evaluate`, {
+          method: 'POST',
+          headers: authHeader,
+        });
+        if (res.ok) {
+          await fetchReport();
+        } else {
+          alert('Failed to trigger evaluation. Check server logs.');
+        }
+      } catch (err) {
+        console.error('Trigger evaluation error:', err);
+      } finally {
+        btnEvaluateNow.disabled = false;
+        btnEvaluateNow.textContent = "Trigger Evaluation Now";
+      }
+    }
+
+    btnRefresh.addEventListener('click', fetchReport);
+    btnEvaluateNow.addEventListener('click', triggerEvaluation);
+
+    function renderDossier(report) {
+      document.getElementById('report-version').textContent = `Report v${report.version}`;
+      document.getElementById('summary-text').textContent = report.summary;
+
+      const scoreNum = document.getElementById('overall-score-num');
+      const tierLabel = document.getElementById('overall-tier-label');
+      if (report.overall_score !== null && report.overall_score !== undefined) {
+        scoreNum.textContent = report.overall_score.toFixed(1);
+        if (report.overall_score >= 3.5) {
+          tierLabel.textContent = "Tier 4: Advanced";
+          tierLabel.className = "mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        } else if (report.overall_score >= 2.5) {
+          tierLabel.textContent = "Tier 3: Proficient";
+          tierLabel.className = "mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+        } else {
+          tierLabel.textContent = "Tier 2: Basic";
+          tierLabel.className = "mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30";
+        }
+      } else {
+        scoreNum.textContent = "—";
+        tierLabel.textContent = "Insufficient Evidence";
+      }
+
+      // Render Radar Chart
+      renderRadarChart(report.competency_scores);
+
+      // Render Competency Cards
+      renderCompetencyCards(report.competency_scores);
+
+      // Render Claim Verification Table
+      renderClaimVerifications(report.claim_verifications);
+
+      // Render Strengths
+      const strengthsList = document.getElementById('strengths-list');
+      strengthsList.innerHTML = (report.strengths || []).map(s => `
+        <li class="flex items-start gap-2">
+          <span class="text-emerald-400 mt-1">✓</span>
+          <span>${escapeHtml(s)}</span>
+        </li>
+      `).join('') || '<li class="text-slate-500 text-xs">No explicit strengths highlighted.</li>';
+
+      // Render Gaps & Study Guide
+      const studyList = document.getElementById('study-list');
+      const items = [...(report.knowledge_gaps || []), ...(report.study_recommendations || [])];
+      studyList.innerHTML = items.map(g => `
+        <li class="flex items-start gap-2">
+          <span class="text-amber-400 mt-1">→</span>
+          <span>${escapeHtml(g)}</span>
+        </li>
+      `).join('') || '<li class="text-slate-500 text-xs">No gaps identified.</li>';
+    }
+
+    function renderRadarChart(scores) {
+      const svg = document.getElementById('radar-chart');
+      svg.innerHTML = '';
+      if (!scores || scores.length === 0) return;
+
+      const centerX = 200;
+      const centerY = 200;
+      const maxRadius = 140;
+      const totalAxes = scores.length;
+      const angleStep = (2 * Math.PI) / totalAxes;
+
+      // Draw concentric guide circles (1 to 4)
+      for (let level = 1; level <= 4; level++) {
+        const r = (level / 4) * maxRadius;
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', centerX);
+        circle.setAttribute('cy', centerY);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', 'none');
+        circle.setAttribute('stroke', level === 3 ? '#475569' : '#1e293b');
+        circle.setAttribute('stroke-width', level === 3 ? '1.5' : '1');
+        circle.setAttribute('stroke-dasharray', level === 3 ? '4 4' : 'none');
+        svg.appendChild(circle);
+      }
+
+      // Draw axis lines and labels
+      const points = [];
+      scores.forEach((cs, i) => {
+        const angle = i * angleStep - Math.PI / 2;
+        const lineEndX = centerX + maxRadius * Math.cos(angle);
+        const lineEndY = centerY + maxRadius * Math.sin(angle);
+
+        // Axis line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', centerX);
+        line.setAttribute('y1', centerY);
+        line.setAttribute('x2', lineEndX);
+        line.setAttribute('y2', lineEndY);
+        line.setAttribute('stroke', '#334155');
+        line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+
+        // Score position
+        const val = cs.score || 0;
+        const rVal = (val / 4) * maxRadius;
+        const ptX = centerX + rVal * Math.cos(angle);
+        const ptY = centerY + rVal * Math.sin(angle);
+        points.push(`${ptX},${ptY}`);
+
+        // Axis Label
+        const labelDistance = maxRadius + 24;
+        const labelX = centerX + labelDistance * Math.cos(angle);
+        const labelY = centerY + labelDistance * Math.sin(angle);
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelX);
+        text.setAttribute('y', labelY + 4);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', '#94a3b8');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('font-weight', '500');
+        text.textContent = cs.competency_name.length > 18 ? cs.competency_name.slice(0, 16) + '...' : cs.competency_name;
+        svg.appendChild(text);
+      });
+
+      // Polygon for Candidate Score
+      const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      polygon.setAttribute('points', points.join(' '));
+      polygon.setAttribute('fill', 'rgba(99, 102, 241, 0.25)');
+      polygon.setAttribute('stroke', '#818cf8');
+      polygon.setAttribute('stroke-width', '2');
+      polygon.classList.add('radar-polygon');
+      svg.appendChild(polygon);
+
+      // Data dots
+      points.forEach(pt => {
+        const [x, y] = pt.split(',');
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', x);
+        dot.setAttribute('cy', y);
+        dot.setAttribute('r', '4');
+        dot.setAttribute('fill', '#6366f1');
+        dot.setAttribute('stroke', '#ffffff');
+        dot.setAttribute('stroke-width', '1.5');
+        svg.appendChild(dot);
+      });
+    }
+
+    function renderCompetencyCards(scores) {
+      const container = document.getElementById('competency-cards-container');
+      container.innerHTML = (scores || []).map(cs => {
+        const isEval = cs.status === 'EVALUATED';
+        const badgeColor = cs.score >= 3 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                           cs.score === 2 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                           isEval ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                           'bg-slate-800 text-slate-400 border-slate-700';
+
+        const tierName = cs.score === 4 ? 'Tier 4: Advanced' :
+                         cs.score === 3 ? 'Tier 3: Proficient' :
+                         cs.score === 2 ? 'Tier 2: Basic' :
+                         cs.score === 1 ? 'Tier 1: Unsatisfactory' : 'Insufficient Evidence';
+
+        const evidenceHtml = (cs.evidence_items || []).map(ev => `
+          <div class="mt-2.5 p-3 rounded-lg bg-slate-950/70 border border-slate-800 text-xs space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span class="font-semibold text-indigo-400">Turn #${ev.turn_index} Citation (Offsets ${ev.start_char_offset}–${ev.end_char_offset})</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${ev.evidence_type}</span>
+            </div>
+            <blockquote class="italic text-slate-200 border-l-2 border-indigo-500/50 pl-2 my-1 font-mono text-[11px]">
+              "${escapeHtml(ev.transcript_excerpt)}"
+            </blockquote>
+            <p class="text-[11px] text-slate-400">${escapeHtml(ev.rationale)}</p>
+          </div>
+        `).join('');
+
+        return `
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-sm font-semibold text-white">${escapeHtml(cs.competency_name)}</h4>
+                <p class="text-xs text-slate-400 mt-0.5">${escapeHtml(cs.rationale)}</p>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeColor}">
+                  ${cs.score ? `Score: ${cs.score}/4` : 'Unassessed'}
+                </span>
+                <div class="text-[10px] text-slate-400 mt-0.5">${tierName}</div>
+              </div>
+            </div>
+            ${evidenceHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderClaimVerifications(claims) {
+      const container = document.getElementById('claim-verification-table');
+      if (!claims || claims.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-2">No candidate resume claims were registered for verification.</p>';
+        return;
+      }
+
+      container.innerHTML = claims.map(cv => {
+        const badge = cv.status === 'VERIFIED' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                      cv.status === 'CONTRADICTED' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+                      cv.status === 'VAGUE' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                      'bg-slate-800 text-slate-400 border-slate-700';
+
+        return `
+          <div class="flex flex-wrap items-center justify-between p-3 rounded-lg bg-slate-950/60 border border-slate-800 gap-3 text-xs">
+            <div class="flex-1 min-w-[240px]">
+              <span class="text-white font-medium">"${escapeHtml(cv.claim_text)}"</span>
+              <p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(cv.auditor_notes || 'Audited by assessment grounder')}</p>
+            </div>
+            <div class="flex items-center gap-3">
+              ${cv.verified_turn_index !== null && cv.verified_turn_index !== undefined ?
+                `<span class="text-[11px] text-indigo-400 font-mono">Turn #${cv.verified_turn_index}</span>` : ''}
+              <span class="px-2 py-0.5 rounded text-[11px] font-semibold border ${badge}">
+                ${cv.status}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Auto-fetch on page load
+    fetchReport();
+  </script>
+</body>
+</html>

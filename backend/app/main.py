@@ -1,0 +1,70 @@
+"""IntervueX FastAPI Application Entrypoint."""
+
+import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.v1.endpoints.websocket import router as ws_router
+from app.api.v1.router import api_v1_router
+from app.core.config import get_settings
+from app.core.database import engine
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.tracing import CorrelationIdMiddleware
+
+settings = get_settings()
+logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+logger = logging.getLogger("intervuex")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application startup and shutdown lifecycle hooks."""
+    logger.info("Initializing IntervueX backend services in %s mode...", settings.environment)
+    yield
+    logger.info("Shutting down IntervueX backend services...")
+    await engine.dispose()
+    logger.info("Database engine connections cleanly closed.")
+
+
+app = FastAPI(
+    title="IntervueX API",
+    description="Adaptive AI-Powered Technical Interview Platform",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# Middlewares
+app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(RateLimitMiddleware)
+
+# CORS configuration for frontend dev server
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount API routers
+app.include_router(api_v1_router, prefix="/api/v1")
+app.include_router(ws_router, prefix="/ws/v1")
+
+
+@app.get("/", summary="Root health & metadata", tags=["Root"])
+async def root() -> dict[str, str]:
+    """Provide service identity and documentation pointers."""
+    return {
+        "service": "IntervueX API",
+        "version": "0.1.0",
+        "status": "online",
+        "docs": "/docs",
+    }
