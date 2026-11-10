@@ -18,16 +18,32 @@ body {
 
 /* Custom subtle developer scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #09090b;
 }
 ::-webkit-scrollbar-thumb {
   background: #27272a;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;
+}
+
+/* Touch-optimized horizontal scrolling utilities */
+.touch-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

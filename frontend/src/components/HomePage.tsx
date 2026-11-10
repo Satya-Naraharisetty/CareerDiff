@@ -20,6 +20,7 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) => {
   const { isAuthenticated } = useAuthStore();
   const [activePreviewTab, setActivePreviewTab] = useState<'interview' | 'provenance' | 'dossier'>('interview');
+  const [wrapPreviewText, setWrapPreviewText] = useState(true);
 
   const handleAction = () => {
     if (isAuthenticated) {
@@ -92,77 +93,96 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
         {/* Live Interactive Developer Workbench Preview */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-2xl backdrop-blur-sm overflow-hidden">
           {/* Workbench Top Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 px-4 py-2.5 bg-zinc-950/80">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-zinc-800 px-3.5 sm:px-4 py-2.5 bg-zinc-950/80">
+            <div className="flex items-center justify-between w-full sm:w-auto">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
+                </div>
+                <span className="text-[11px] sm:text-xs font-mono text-zinc-400 truncate">
+                  intervuex-session // alex-rivera-sr-backend
+                </span>
               </div>
-              <span className="text-xs font-mono text-zinc-400 ml-2">
-                intervuex-session // alex-rivera-sr-backend
-              </span>
+
+              {/* Mobile text wrap toggle button */}
+              {(activePreviewTab === 'dossier' || activePreviewTab === 'provenance') && (
+                <button
+                  type="button"
+                  onClick={() => setWrapPreviewText((prev) => !prev)}
+                  title={wrapPreviewText ? 'Switch to horizontal scroll view' : 'Switch to wrapped text view'}
+                  className="sm:hidden shrink-0 ml-2 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors"
+                >
+                  {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
+                </button>
+              )}
             </div>
 
-            {/* View Selector Tabs */}
-            <div className="flex items-center gap-1 self-start sm:self-auto bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
-              <button
-                type="button"
-                onClick={() => setActivePreviewTab('interview')}
-                className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                  activePreviewTab === 'interview'
-                    ? 'bg-zinc-800 text-white font-medium'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                live_session.log
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePreviewTab('provenance')}
-                className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                  activePreviewTab === 'provenance'
-                    ? 'bg-zinc-800 text-white font-medium'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                claim_provenance.json
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePreviewTab('dossier')}
-                className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                  activePreviewTab === 'dossier'
-                    ? 'bg-zinc-800 text-white font-medium'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                rubric_dossier.yaml
-              </button>
+            {/* View Selector Tabs - Fully responsive on all mobile viewports */}
+            <div className="w-full sm:w-auto touch-scroll-x no-scrollbar pb-0.5 sm:pb-0">
+              <div className="flex sm:inline-flex items-center justify-between sm:justify-start gap-1 bg-zinc-900 p-0.5 rounded-lg border border-zinc-800 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewTab('interview')}
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
+                    activePreviewTab === 'interview'
+                      ? 'bg-zinc-800 text-white font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="sm:hidden">session.log</span>
+                  <span className="hidden sm:inline">live_session.log</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewTab('provenance')}
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
+                    activePreviewTab === 'provenance'
+                      ? 'bg-zinc-800 text-white font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="sm:hidden">claims.json</span>
+                  <span className="hidden sm:inline">claim_provenance.json</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivePreviewTab('dossier')}
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
+                    activePreviewTab === 'dossier'
+                      ? 'bg-zinc-800 text-white font-medium'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="sm:hidden">dossier.yaml</span>
+                  <span className="hidden sm:inline">rubric_dossier.yaml</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Workbench Body */}
-          <div className="p-4 sm:p-6 font-mono text-xs">
+          <div className="p-3.5 sm:p-6 font-mono text-xs">
             {activePreviewTab === 'interview' && (
               <div className="space-y-4">
                 {/* State Machine Status Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-800/80 text-[11px] text-zinc-400">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800/80 text-[11px] text-zinc-400">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                     <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       FSM: IN_INTERVIEW
                     </span>
-                    <span className="text-zinc-600">|</span>
-                    <span>Track: Senior Distributed Systems</span>
-                    <span className="text-zinc-600">|</span>
-                    <span className="text-zinc-300">Active Topic: Kafka Concurrency &amp; Deduplication</span>
+                    <span className="text-zinc-600 hidden sm:inline">|</span>
+                    <span className="text-zinc-400">Track: Senior Distributed Systems</span>
+                    <span className="text-zinc-600 hidden sm:inline">|</span>
+                    <span className="text-zinc-300">Topic: Kafka Concurrency</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-zinc-300 border border-zinc-700/60">
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-zinc-300 border border-zinc-700/60 text-[10px]">
                       Probe 2/3
                     </span>
-                    <span className="text-zinc-400">Latency: 412ms</span>
+                    <span className="text-zinc-400 text-[10px]">Latency: 412ms</span>
                   </div>
                 </div>
 
@@ -193,8 +213,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                   {/* Grounded Evidence Tag */}
                   <div className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                     <span className="text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Verified Claim: "Kafka pipeline 50k events/sec with idempotency"
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>Verified Claim: "Kafka pipeline 50k events/sec with idempotency"</span>
                     </span>
                     <span className="text-zinc-400">
                       Evaluator Citation: Pos Mastery (Offset 48:192)
@@ -205,9 +225,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
             )}
 
             {activePreviewTab === 'provenance' && (
-              <div className="space-y-2 text-zinc-300 overflow-x-auto">
-                <div className="text-zinc-500">// Extracted Character-Offset Provenance from Candidate Resume</div>
-                <pre className="text-[11px] leading-relaxed text-zinc-300">
+              <div className="space-y-2 text-zinc-300">
+                <div className="flex items-center justify-between text-zinc-500 text-[11px]">
+                  <span>// Extracted Character-Offset Provenance from Candidate Resume</span>
+                  <button
+                    type="button"
+                    onClick={() => setWrapPreviewText((prev) => !prev)}
+                    className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
+                  >
+                    {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
+                  </button>
+                </div>
+                <div className={`rounded-lg bg-zinc-950/80 p-3 sm:p-4 border border-zinc-800/80 ${wrapPreviewText ? '' : 'touch-scroll-x'}`}>
+                  <pre className={`text-[11px] leading-relaxed text-zinc-300 font-mono ${wrapPreviewText ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}>
 {`{
   "provenance_id": "prov_89fa2bc",
   "document": "alex_rivera_resume.pdf",
@@ -229,14 +259,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
     }
   ]
 }`}
-                </pre>
+                  </pre>
+                </div>
               </div>
             )}
 
             {activePreviewTab === 'dossier' && (
-              <div className="space-y-2 text-zinc-300 overflow-x-auto">
-                <div className="text-zinc-500">// Decoupled 4-Tier Rubric Evaluation Output (Post-Interview Worker)</div>
-                <pre className="text-[11px] leading-relaxed text-zinc-300">
+              <div className="space-y-2 text-zinc-300">
+                <div className="flex items-center justify-between text-zinc-500 text-[11px]">
+                  <span>// Decoupled 4-Tier Rubric Evaluation Output (Post-Interview Worker)</span>
+                  <button
+                    type="button"
+                    onClick={() => setWrapPreviewText((prev) => !prev)}
+                    className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
+                  >
+                    {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
+                  </button>
+                </div>
+                <div className={`rounded-lg bg-zinc-950/80 p-3 sm:p-4 border border-zinc-800/80 ${wrapPreviewText ? '' : 'touch-scroll-x'}`}>
+                  <pre className={`text-[11px] leading-relaxed text-zinc-300 font-mono ${wrapPreviewText ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}>
 {`evaluation_report:
   overall_score: 3.8 / 4.0 (Staff / Senior Specialist)
   competency_scores:
@@ -251,7 +292,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
     - name: "Database Concurrency & Storage Architecture"
       rating: "L3_COMPETENT"
       rationale: "Articulated MVCC snapshot isolation and connection pooling tradeoffs clearly."`}
-                </pre>
+                  </pre>
+                </div>
               </div>
             )}
           </div>
