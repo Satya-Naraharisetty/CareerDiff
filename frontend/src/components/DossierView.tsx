@@ -10,7 +10,6 @@ import {
   Loader2,
   RotateCcw,
   ShieldAlert,
-  Sparkles,
   TrendingUp,
 } from 'lucide-react';
 import { interviewsApi } from '../lib/api';
@@ -171,35 +170,35 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   const getEvidenceBadge = (type: EvidenceType) => {
     switch (type) {
       case 'POSITIVE_MASTERY':
-        return <span className="rounded bg-emerald-950 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">Positive Mastery</span>;
+        return <span className="rounded bg-emerald-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-emerald-800/40">Positive Mastery</span>;
       case 'KNOWLEDGE_GAP':
-        return <span className="rounded bg-amber-950 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-800">Knowledge Gap</span>;
+        return <span className="rounded bg-amber-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-amber-400 border border-amber-800/40">Knowledge Gap</span>;
       case 'CONTRADICTION':
-        return <span className="rounded bg-rose-950 px-2 py-0.5 text-[10px] font-bold text-rose-300 border border-rose-800">Contradiction</span>;
+        return <span className="rounded bg-rose-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-rose-400 border border-rose-800/40">Contradiction</span>;
       case 'SUPERFICIAL_EXPLANATION':
-        return <span className="rounded bg-indigo-950 px-2 py-0.5 text-[10px] font-bold text-indigo-300 border border-indigo-800">Superficial</span>;
+        return <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-medium text-zinc-300 border border-zinc-700">Superficial</span>;
     }
   };
 
   const getClaimStatusBadge = (status: ClaimVerificationStatus) => {
     switch (status) {
       case 'VERIFIED':
-        return <span className="rounded-full bg-emerald-950 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-800">VERIFIED</span>;
+        return <span className="rounded-full bg-emerald-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 border border-emerald-800/40">VERIFIED</span>;
       case 'CONTRADICTED':
-        return <span className="rounded-full bg-rose-950 px-2.5 py-0.5 text-xs font-bold text-rose-400 border border-rose-800">CONTRADICTED</span>;
+        return <span className="rounded-full bg-rose-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-rose-400 border border-rose-800/40">CONTRADICTED</span>;
       case 'VAGUE':
-        return <span className="rounded-full bg-amber-950 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-800">VAGUE</span>;
+        return <span className="rounded-full bg-amber-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-amber-400 border border-amber-800/40">VAGUE</span>;
       case 'UNTESTED':
-        return <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-bold text-slate-400 border border-slate-700">UNTESTED</span>;
+        return <span className="rounded-full bg-zinc-900 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-zinc-400 border border-zinc-800">UNTESTED</span>;
     }
   };
 
   if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center p-6 text-center">
-        <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mb-4" />
-        <h2 className="text-xl font-bold text-white">Synthesizing Assessment Dossier</h2>
-        <p className="mt-2 text-sm text-slate-400 max-w-md">
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-4" />
+        <h2 className="text-lg font-bold text-white font-sans">Synthesizing Assessment Dossier</h2>
+        <p className="mt-1.5 text-xs text-zinc-400 max-w-md font-mono">
           Grounding scores with character-offset transcript evidence citations and auditing resume claims...
         </p>
       </div>
@@ -209,13 +208,13 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   if (error || !report) {
     return (
       <div className="mx-auto max-w-xl py-16 px-4 text-center">
-        <AlertTriangle className="mx-auto h-12 w-12 text-amber-400 mb-4" />
-        <h2 className="text-lg font-bold text-white">{error || 'No report found.'}</h2>
+        <AlertTriangle className="mx-auto h-8 w-8 text-amber-400 mb-4" />
+        <h2 className="text-base font-bold text-white">{error || 'No report found.'}</h2>
         <button
           onClick={onReset}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-indigo-500"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-sm"
         >
-          <RotateCcw className="h-4 w-4" /> Start New Session
+          <RotateCcw className="h-3.5 w-3.5" /> Start New Session
         </button>
       </div>
     );
@@ -234,25 +233,25 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-300">
       {/* Top Banner: Overall Score & Synthesis */}
-      <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-indigo-950/40 p-6 sm:p-8 shadow-2xl backdrop-blur-md">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8 shadow-sm backdrop-blur-md">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-950/80 border border-indigo-800/60 px-3 py-1 text-xs font-semibold text-indigo-300">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-xs font-mono text-zinc-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Technical Assessment Dossier (v{report.version})
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-sans">
               Candidate Competency Grounding
             </h1>
-            <p className="text-sm text-slate-300 leading-relaxed">{report.summary}</p>
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-sans">{report.summary}</p>
           </div>
 
           {/* Rating Badge */}
-          <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-950/80 border border-slate-800 px-6 py-4 shadow-inner shrink-0 min-w-[180px] w-full md:w-auto">
-            <Award className="h-8 w-8 text-indigo-400 mb-1" />
-            <div className="text-3xl font-black text-white">{overallRating.toFixed(1)} / 4.0</div>
-            <span className="text-xs font-bold text-indigo-300 mt-0.5">{ratingTier}</span>
-            <span className="text-[10px] text-slate-500 mt-1">Decoupled Rubric Engine</span>
+          <div className="flex flex-col items-center justify-center rounded-xl bg-zinc-950 border border-zinc-800 px-6 py-4 shrink-0 min-w-[180px] w-full md:w-auto font-mono">
+            <Award className="h-6 w-6 text-zinc-400 mb-1" />
+            <div className="text-3xl font-bold text-white">{overallRating.toFixed(1)} / 4.0</div>
+            <span className="text-xs font-semibold text-emerald-400 mt-0.5">{ratingTier}</span>
+            <span className="text-[10px] text-zinc-500 mt-1">Decoupled Rubric Engine</span>
           </div>
         </div>
       </div>
@@ -260,51 +259,51 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
       {/* Middle Grid: Radar Chart + Strengths & Gaps */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Radar Visualization */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 backdrop-blur-sm shadow-xl flex flex-col items-center justify-center">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 mb-2 flex items-center gap-1.5 self-start">
-            <TrendingUp className="h-4 w-4" /> Competency Topology
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 backdrop-blur-sm shadow-sm flex flex-col items-center justify-center">
+          <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-2 flex items-center gap-1.5 self-start">
+            <TrendingUp className="h-3.5 w-3.5 text-zinc-400" /> Competency Topology
           </h3>
           {renderRadarChart(report.competency_scores)}
         </div>
 
         {/* Strengths & Knowledge Gaps */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-5 shadow-lg">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
-              <CheckCircle2 className="h-4 w-4" /> Observed Technical Strengths
+          <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-5 shadow-sm">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Observed Technical Strengths
             </h3>
-            <ul className="space-y-2 text-xs sm:text-sm text-emerald-100">
+            <ul className="space-y-2 text-xs sm:text-sm text-emerald-200 font-sans">
               {report.strengths.map((s, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-emerald-400 mt-1">•</span>
+                  <span className="text-emerald-400 mt-1 font-mono">•</span>
                   <span>{s}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-amber-900/40 bg-amber-950/20 p-5 shadow-lg">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4" /> Technical Gaps & Risks
+          <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 shadow-sm">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
+              <ShieldAlert className="h-3.5 w-3.5" /> Technical Gaps &amp; Risks
             </h3>
-            <ul className="space-y-2 text-xs sm:text-sm text-amber-100">
+            <ul className="space-y-2 text-xs sm:text-sm text-amber-200 font-sans">
               {report.knowledge_gaps.map((g, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-1">•</span>
+                  <span className="text-amber-400 mt-1 font-mono">•</span>
                   <span>{g}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-indigo-900/40 bg-indigo-950/20 p-5 shadow-lg">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 mb-3 flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4" /> Targeted Study Plan
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 text-zinc-400" /> Targeted Study Plan
             </h3>
-            <ul className="space-y-2 text-xs sm:text-sm text-indigo-100">
+            <ul className="space-y-2 text-xs sm:text-sm text-zinc-300 font-sans">
               {report.study_recommendations.map((rec, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <span className="text-indigo-400 mt-1">→</span>
+                  <span className="text-zinc-500 mt-1 font-mono">→</span>
                   <span>{rec}</span>
                 </li>
               ))}
@@ -315,9 +314,9 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
       {/* Competency Evidence Grounding Cards */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <FileText className="h-5 w-5 text-indigo-400" />
-          Rubric Competency Grounding & Normalized Citations
+        <h2 className="text-sm font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+          <FileText className="h-4 w-4 text-zinc-400" />
+          Rubric Competency Grounding &amp; Normalized Citations
         </h2>
 
         <div className="grid grid-cols-1 gap-4">
@@ -326,65 +325,65 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             return (
               <div
                 key={cs.competency_id}
-                className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-md transition-all"
+                className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm transition-all hover:border-zinc-700"
               >
                 <div
                   className="flex items-center justify-between cursor-pointer"
                   onClick={() => setExpandedCompId(isExpanded ? null : cs.competency_id)}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="rounded-xl bg-indigo-950 border border-indigo-800/60 px-3 py-1 font-mono font-bold text-sm text-indigo-300">
+                    <span className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-1 font-mono font-semibold text-xs text-zinc-200">
                       {cs.score ? `L${cs.score}` : 'N/A'}
                     </span>
                     <div>
-                      <h4 className="font-semibold text-slate-100 text-sm">{cs.competency_name}</h4>
-                      <p className="text-xs text-slate-400 line-clamp-1">{cs.rationale}</p>
+                      <h4 className="font-semibold text-zinc-100 text-xs sm:text-sm font-sans">{cs.competency_name}</h4>
+                      <p className="text-xs text-zinc-400 line-clamp-1 font-sans">{cs.rationale}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <span className="hidden sm:inline text-xs text-slate-500">
-                      {cs.evidence_items.length} Grounded Excerpt{cs.evidence_items.length === 1 ? '' : 's'}
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 font-mono">
+                    <span className="hidden sm:inline text-xs text-zinc-500">
+                      {cs.evidence_items.length} Excerpt{cs.evidence_items.length === 1 ? '' : 's'}
                     </span>
                     {isExpanded ? (
-                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                      <ChevronUp className="h-4 w-4 text-zinc-400" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                      <ChevronDown className="h-4 w-4 text-zinc-400" />
                     )}
                   </div>
                 </div>
 
                 {/* Expanded Verbatim Citations */}
                 {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-slate-800 space-y-3 animate-in fade-in duration-200">
-                    <p className="text-xs text-slate-300 leading-relaxed">{cs.rationale}</p>
+                  <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3 animate-in fade-in duration-200">
+                    <p className="text-xs text-zinc-300 leading-relaxed font-sans">{cs.rationale}</p>
 
                     <div className="space-y-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        Normalized Evidence Records (Turn & Offset Anchors)
+                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
+                        Normalized Evidence Records (Turn &amp; Offset Anchors)
                       </span>
                       {cs.evidence_items.map((ev) => (
                         <div
                           key={ev.id}
-                          className="rounded-xl border border-slate-800 bg-slate-950 p-3.5 space-y-2 text-xs"
+                          className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 space-y-2 text-xs font-mono"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               {getEvidenceBadge(ev.evidence_type)}
-                              <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 font-mono">
+                              <span className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-300 border border-zinc-800">
                                 Turn #{ev.turn_index} [Offset {ev.start_char_offset}:{ev.end_char_offset}]
                               </span>
                             </div>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-[10px] text-zinc-500">
                               Confidence: {Math.round(ev.confidence * 100)}%
                             </span>
                           </div>
 
-                          <div className="rounded-lg bg-slate-900/90 border border-slate-800 p-2.5 font-mono text-[11px] text-indigo-200 italic">
+                          <div className="rounded bg-zinc-900 p-2.5 border border-zinc-800 text-xs text-zinc-200 italic font-mono">
                             "{ev.transcript_excerpt}"
                           </div>
 
-                          <p className="text-slate-400 text-[11px]">{ev.rationale}</p>
+                          <p className="text-zinc-400 text-[11px] font-sans">{ev.rationale}</p>
                         </div>
                       ))}
                     </div>
@@ -398,25 +397,25 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
       {/* Resume Claim Verification Table */}
       {report.claim_verifications && report.claim_verifications.length > 0 && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 shadow-xl space-y-4">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            Resume Claim Audit & Spoken Verification
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 shadow-sm space-y-4">
+          <h2 className="text-sm font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            Resume Claim Audit &amp; Spoken Verification
           </h2>
 
           {/* Mobile Card View (< sm) */}
           <div className="space-y-3 sm:hidden">
             {report.claim_verifications.map((cl: ClaimVerificationRead) => (
-              <div key={cl.claim_id} className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2.5">
+              <div key={cl.claim_id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] uppercase font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
                     {cl.category}
                   </span>
                   {getClaimStatusBadge(cl.status)}
                 </div>
-                <p className="text-xs font-semibold text-slate-200">{cl.claim_text}</p>
+                <p className="text-xs font-medium text-zinc-200 font-sans">{cl.claim_text}</p>
                 {cl.auditor_notes && (
-                  <p className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+                  <p className="text-[11px] text-zinc-400 italic bg-zinc-900/60 p-2.5 rounded border border-zinc-800 font-mono">
                     {cl.auditor_notes}
                   </p>
                 )}
@@ -426,8 +425,8 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
           {/* Desktop Table View (>= sm) */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400">
+            <table className="w-full text-left text-xs font-sans">
+              <thead className="border-b border-zinc-800 text-zinc-400 font-mono text-[11px]">
                 <tr>
                   <th className="pb-3 font-semibold">Claim Statement</th>
                   <th className="pb-3 font-semibold">Category</th>
@@ -435,13 +434,13 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                   <th className="pb-3 font-semibold">Auditor Rationale</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-zinc-800/80">
                 {report.claim_verifications.map((cl: ClaimVerificationRead) => (
                   <tr key={cl.claim_id}>
-                    <td className="py-3 pr-4 font-medium text-slate-200 max-w-xs">{cl.claim_text}</td>
-                    <td className="py-3 pr-4 text-slate-400 uppercase font-mono text-[10px]">{cl.category}</td>
+                    <td className="py-3 pr-4 font-medium text-zinc-200 max-w-xs">{cl.claim_text}</td>
+                    <td className="py-3 pr-4 text-zinc-400 uppercase font-mono text-[10px]">{cl.category}</td>
                     <td className="py-3 pr-4">{getClaimStatusBadge(cl.status)}</td>
-                    <td className="py-3 text-slate-400 max-w-sm">{cl.auditor_notes || '—'}</td>
+                    <td className="py-3 text-zinc-400 max-w-sm font-mono text-[11px]">{cl.auditor_notes || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -454,9 +453,9 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
       <div className="flex justify-center pt-4 pb-8">
         <button
           onClick={onReset}
-          className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-all active:scale-95"
+          className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-sm"
         >
-          <RotateCcw className="h-4 w-4" /> Start Another Technical Practice Session
+          <RotateCcw className="h-3.5 w-3.5" /> Start Another Technical Practice Session
         </button>
       </div>
     </div>

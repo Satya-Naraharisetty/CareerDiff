@@ -9,7 +9,7 @@ import { InterviewRoom } from './components/InterviewRoom';
 import { DossierView } from './components/DossierView';
 import { useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
-import { Layers, ShieldCheck, Sparkles, Terminal } from 'lucide-react';
+import { Cpu, Layers, ShieldCheck, Terminal } from 'lucide-react';
 import './App.css';
 
 const queryClient = new QueryClient({
@@ -71,7 +71,7 @@ export const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-zinc-800 selection:text-white">
       <Navbar
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
@@ -109,43 +109,45 @@ export const AppContent: React.FC = () => {
         )}
       </main>
 
-      {/* Semantic SEO & Accessibility Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 px-4 py-8 text-xs text-slate-500 sm:px-6 lg:px-8">
+      {/* Semantic High-Craft Developer Footer */}
+      <footer className="border-t border-zinc-850/80 bg-zinc-950 px-4 py-10 text-xs text-zinc-500 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
             {/* Brand column */}
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-white text-sm tracking-tight">Intervue<span className="text-indigo-400">X</span></span>
-                <span className="rounded bg-indigo-950 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-400 border border-indigo-800/40">AI Engine</span>
+                <span className="font-semibold text-white text-sm tracking-tight font-mono">IntervueX</span>
+                <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
+                  Engine v1.0
+                </span>
               </div>
-              <p className="text-slate-400 leading-relaxed text-[11px]">
-                Autonomous technical interview practice platform for software engineers. Calibrated directly to candidate resumes and target job descriptions.
+              <p className="text-zinc-400 leading-relaxed text-xs">
+                Autonomous technical interview practice platform for software engineers. Grounded in candidate resumes and calibrated to target job requirements.
               </p>
-              <div className="flex items-center gap-2 text-emerald-400 text-[11px] font-medium">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono">
                 <ShieldCheck className="h-3.5 w-3.5" /> Zero Biometrics • Strict Rubrics
               </div>
             </div>
 
             {/* Architecture Capabilities */}
             <div>
-              <h4 className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3 flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-indigo-400" /> Capabilities
+              <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+                <Terminal className="h-3 w-3 text-zinc-400" /> Capabilities
               </h4>
-              <ul className="space-y-2 text-[11px]">
-                <li><span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => setCurrentView('setup')}>Resume Claim Grounding</span></li>
-                <li><span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => setCurrentView('setup')}>Job Description Calibration</span></li>
-                <li><span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => setCurrentView('interview')}>Adaptive State Machine Probing</span></li>
-                <li><span className="text-slate-400 hover:text-slate-200 cursor-pointer" onClick={() => setCurrentView('dossier')}>Decoupled Rubric Scoring</span></li>
+              <ul className="space-y-2 text-xs">
+                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('setup')}>Resume Claim Grounding</span></li>
+                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('setup')}>Job Description Calibration</span></li>
+                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('interview')}>Adaptive State Machine Probing</span></li>
+                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('dossier')}>Decoupled Rubric Scoring</span></li>
               </ul>
             </div>
 
             {/* Target Disciplines */}
             <div>
-              <h4 className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3 flex items-center gap-1.5">
-                <Terminal className="h-3 w-3 text-indigo-400" /> Disciplines
+              <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+                <Cpu className="h-3 w-3 text-zinc-400" /> Disciplines
               </h4>
-              <ul className="space-y-2 text-[11px] text-slate-400">
+              <ul className="space-y-2 text-xs text-zinc-400">
                 <li>Distributed Systems Architecture</li>
                 <li>Backend Engineering &amp; Concurrency</li>
                 <li>Database Modeling &amp; MVCC Tuning</li>
@@ -155,10 +157,10 @@ export const AppContent: React.FC = () => {
 
             {/* Invariants & Compliance */}
             <div>
-              <h4 className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3 flex items-center gap-1.5">
-                <Layers className="h-3 w-3 text-indigo-400" /> System Invariants
+              <h4 className="font-mono text-xs uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+                <Layers className="h-3 w-3 text-zinc-400" /> System Invariants
               </h4>
-              <ul className="space-y-2 text-[11px] text-slate-400">
+              <ul className="space-y-2 text-xs text-zinc-400">
                 <li>Normalized Character-Offset Citations</li>
                 <li>Deterministic Guardrails &amp; FSM</li>
                 <li>PostgreSQL Transactional Outbox</li>
@@ -167,14 +169,14 @@ export const AppContent: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-            <p>© 2026 IntervueX. Autonomous Technical Interview Simulator &amp; Decoupled Rubric Engine.</p>
-            <div className="flex items-center gap-4">
-              <span className="hover:text-slate-400 cursor-pointer">Privacy &amp; Data Minimization</span>
+          <div className="mt-8 pt-6 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
+            <p>© 2026 IntervueX. Grounded Technical Practice &amp; Decoupled Evaluation.</p>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="hover:text-zinc-300 cursor-pointer transition-colors">Privacy &amp; Data Minimization</span>
               <span>•</span>
-              <span className="hover:text-slate-400 cursor-pointer">Security Standards</span>
+              <span className="hover:text-zinc-300 cursor-pointer transition-colors">Security Standards</span>
               <span>•</span>
-              <span className="hover:text-slate-400 cursor-pointer">API v1 Protocol</span>
+              <span className="hover:text-zinc-300 cursor-pointer transition-colors">API v1 Protocol</span>
             </div>
           </div>
         </div>

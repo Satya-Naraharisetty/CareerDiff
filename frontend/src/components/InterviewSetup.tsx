@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Mic,
   ShieldCheck,
-  Sparkles,
   Upload,
 } from 'lucide-react';
 import { interviewsApi, resumesApi, rolesApi } from '../lib/api';
@@ -263,29 +262,29 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 animate-in fade-in duration-200">
       {/* Header */}
-      <div className="text-center sm:text-left">
-        <div className="inline-flex items-center gap-2 rounded-full bg-indigo-950/60 border border-indigo-800/40 px-3 py-1 text-xs font-semibold text-indigo-300 mb-3">
-          <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-          Autonomous Technical Interview Simulator
+      <div className="text-center sm:text-left space-y-2">
+        <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/90 px-3 py-1 text-xs font-mono text-zinc-300 shadow-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          <span>Calibration Studio • Target &amp; Provenance Setup</span>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Candidate Intelligence & Target Calibration
+        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white font-sans">
+          Candidate Intelligence &amp; Target Calibration
         </h1>
-        <p className="mt-2 text-sm sm:text-base text-slate-400 max-w-2xl">
-          Upload your resume, then paste your target Job Description (or choose an engineering discipline) to generate an interview blueprint tailored specifically to your background and the role requirements.
+        <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl leading-relaxed">
+          Upload your resume and paste your target Job Description (or choose a standardized discipline) to compile an interview blueprint grounded in verified experience claims.
         </p>
       </div>
 
       {!isAuthenticated && (
-        <div className="rounded-xl border border-amber-800/60 bg-amber-950/40 p-4 text-sm text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 p-3.5 text-xs text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-2.5">
-            <Lock className="h-5 w-5 shrink-0 text-amber-400" />
-            <span>You are viewing the calibration studio in preview mode. Please sign in to analyze your resume and start live interview sessions.</span>
+            <Lock className="h-4 w-4 shrink-0 text-amber-400" />
+            <span>You are viewing the calibration studio in preview mode. Sign in to analyze your resume and start live interview sessions.</span>
           </div>
           <button
             type="button"
             onClick={onOpenAuth}
-            className="shrink-0 rounded-lg bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400 transition-colors shadow-sm"
+            className="shrink-0 rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors shadow-sm"
           >
             Sign In Now
           </button>
@@ -293,21 +292,21 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       )}
 
       {error && (
-        <div className="rounded-xl border border-rose-800/60 bg-rose-950/40 p-4 text-sm text-rose-300">
+        <div className="rounded-lg border border-red-900/60 bg-red-950/40 p-3.5 text-xs text-red-300 font-mono">
           {error}
         </div>
       )}
 
       {resumeSuccessMsg && (
-        <div className="rounded-xl border border-emerald-800/60 bg-emerald-950/40 p-4 text-sm text-emerald-300 flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+        <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 p-3.5 text-xs text-emerald-300 flex items-center gap-2 font-mono">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
           <span>{resumeSuccessMsg}</span>
         </div>
       )}
 
       {jdSuccessMsg && (
-        <div className="rounded-xl border border-indigo-800/60 bg-indigo-950/40 p-4 text-sm text-indigo-300 flex items-center gap-2">
-          <Briefcase className="h-5 w-5 shrink-0 text-indigo-400" />
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 text-xs text-zinc-200 flex items-center gap-2 font-mono">
+          <Briefcase className="h-4 w-4 shrink-0 text-zinc-400" />
           <span>{jdSuccessMsg}</span>
         </div>
       )}
@@ -316,20 +315,20 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* STEP 1: RESUME INGESTION (DEFAULT OPTION IS UPLOAD) */}
-          <div className="rounded-2xl border border-indigo-900/60 bg-slate-900/80 p-5 sm:p-6 backdrop-blur-sm shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 mb-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                <FileText className="h-4 w-4" /> 1. Upload Candidate Resume (Default)
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80 mb-4">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-zinc-400" /> 1. Upload Candidate Resume (Default)
               </h2>
 
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 self-start sm:self-auto">
+              <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-800 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setResumeTab('upload')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     resumeTab === 'upload'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-zinc-800 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Upload File
@@ -337,10 +336,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setResumeTab('paste')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     resumeTab === 'paste'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-zinc-800 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Paste Text
@@ -350,13 +349,13 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
             {resumeTab === 'upload' ? (
               <div className="space-y-3">
-                <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/60 p-6 text-center hover:border-indigo-500 transition-colors">
-                  <Upload className="h-8 w-8 text-indigo-400 mb-2" />
-                  <p className="text-xs font-medium text-slate-200">
+                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-950/40 p-6 text-center hover:border-zinc-700 transition-colors">
+                  <Upload className="h-6 w-6 text-zinc-400 mb-2" />
+                  <p className="text-xs font-medium text-zinc-200">
                     Upload your resume document (PDF, DOCX, or TXT)
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Maximum file size 10MB. Text & claims are extracted with character-offset provenance.
+                  <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
+                    Maximum file size 10MB • Text &amp; claims extracted with character-offset provenance.
                   </p>
                   <input
                     type="file"
@@ -366,10 +365,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                         setSelectedFile(e.target.files[0]);
                       }
                     }}
-                    className="mt-3 text-xs text-slate-400 max-w-full file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
+                    className="mt-3 text-xs text-zinc-400 max-w-full file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700"
                   />
                   {selectedFile && (
-                    <span className="mt-2 text-xs font-medium text-emerald-400 flex items-center gap-1">
+                    <span className="mt-2 text-xs font-mono text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                     </span>
@@ -378,12 +377,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-400">
-                  <span>Candidate resume markdown / plain text:</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-zinc-400">
+                  <span>Candidate resume plain text / markdown:</span>
                   <button
                     type="button"
                     onClick={() => setResumeText(SAMPLE_RESUME_TEXT)}
-                    className="text-indigo-400 hover:text-indigo-300 underline font-medium self-start sm:self-auto"
+                    className="text-zinc-300 hover:text-white underline font-mono text-[11px] self-start sm:self-auto"
                   >
                     Load Sample Senior Resume
                   </button>
@@ -393,20 +392,20 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   value={resumeText}
                   onChange={(e) => setResumeText(e.target.value)}
                   placeholder="Paste candidate resume here (work history, technologies, achievements)..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600"
                 />
               </div>
             )}
 
             <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-zinc-500 font-mono">
                 Grounds interview questions and blueprint topics in your verified claims.
               </span>
               <button
                 type="button"
                 disabled={isAnalyzingResume}
                 onClick={handleAnalyzeResume}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95 shrink-0"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-white py-2 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98] shrink-0 shadow-sm"
               >
                 {isAnalyzingResume ? (
                   <>
@@ -416,7 +415,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 ) : (
                   <>
                     <Code2 className="h-3.5 w-3.5" />
-                    Analyze Resume & Claims
+                    Analyze Resume &amp; Claims
                   </>
                 )}
               </button>
@@ -424,40 +423,40 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
             {/* Resume Analysis Output Card */}
             {resumeAnalysis && (
-              <div className="mt-5 rounded-xl border border-indigo-800/40 bg-indigo-950/20 p-4 space-y-3">
+              <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/70 p-4 space-y-3 font-mono">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white">Parsed Profile:</span>
-                    <span className="rounded bg-indigo-900/80 px-2 py-0.5 text-xs font-bold text-indigo-200 border border-indigo-700">
+                    <span className="text-xs font-semibold text-zinc-300">Parsed Profile:</span>
+                    <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs font-medium text-white border border-zinc-700">
                       {resumeAnalysis.detected_seniority}
                     </span>
-                    <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                    <span className="rounded bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300 border border-zinc-800">
                       {resumeAnalysis.primary_discipline} Track
                     </span>
-                    <span className="text-xs text-slate-400">
-                      ~{resumeAnalysis.years_experience} Years Exp
+                    <span className="text-xs text-zinc-400">
+                      ~{resumeAnalysis.years_experience} YOE
                     </span>
                   </div>
-                  <span className="text-xs text-emerald-400 font-semibold">
+                  <span className="text-xs text-emerald-400 font-medium">
                     {resumeAnalysis.claims.length} Claims Indexed
                   </span>
                 </div>
 
                 {resumeAnalysis.summary && (
-                  <p className="text-xs text-slate-300 italic bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                  <p className="text-xs text-zinc-300 bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 leading-relaxed font-sans">
                     "{resumeAnalysis.summary}"
                   </p>
                 )}
 
                 <div>
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
                     Extracted Technical Keywords
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {resumeAnalysis.verified_skills.map((skill, sIdx) => (
                       <span
                         key={sIdx}
-                        className="rounded bg-slate-900 px-2 py-0.5 text-[11px] font-medium text-indigo-300 border border-slate-800"
+                        className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] text-zinc-300 border border-zinc-800"
                       >
                         {skill}
                       </span>
@@ -469,20 +468,20 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           </div>
 
           {/* STEP 2: PASTE JD OR CHOOSE DISCIPLINE */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 backdrop-blur-sm shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 mb-4">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                <Briefcase className="h-4 w-4" /> 2. Target Calibration: Paste JD or Pick Discipline
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80 mb-4">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5 text-zinc-400" /> 2. Target Calibration: Paste JD or Pick Discipline
               </h2>
 
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 self-start sm:self-auto">
+              <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-800 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setTargetTab('jd')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     targetTab === 'jd'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-zinc-800 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Paste JD (Recommended)
@@ -490,10 +489,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setTargetTab('discipline')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     targetTab === 'discipline'
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-zinc-800 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Choose Discipline
@@ -504,12 +503,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             {targetTab === 'jd' ? (
               /* TAB A: PASTE JOB DESCRIPTION */
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-zinc-400">
                   <span>Paste any target Job Description (JD) text:</span>
                   <button
                     type="button"
                     onClick={() => setJdText(SAMPLE_JD_TEXT)}
-                    className="text-indigo-400 hover:text-indigo-300 underline font-medium self-start sm:self-auto"
+                    className="text-zinc-300 hover:text-white underline font-mono text-[11px] self-start sm:self-auto"
                   >
                     Load Sample Senior Payments JD
                   </button>
@@ -519,18 +518,18 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   value={jdText}
                   onChange={(e) => setJdText(e.target.value)}
                   placeholder="Paste Job Description (requirements, responsibilities, required technologies)..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600"
                 />
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-zinc-500 font-mono">
                     Extracts required competencies, seniority, and matches against your resume claims.
                   </span>
                   <button
                     type="button"
                     disabled={isAnalyzingJd || !jdText.trim()}
                     onClick={handleAnalyzeJd}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95 shrink-0"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-white py-2 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98] shrink-0 shadow-sm"
                   >
                     {isAnalyzingJd ? (
                       <>
@@ -540,7 +539,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     ) : (
                       <>
                         <Compass className="h-3.5 w-3.5" />
-                        Analyze JD & Tailor Competencies
+                        Analyze JD &amp; Tailor Competencies
                       </>
                     )}
                   </button>
@@ -548,33 +547,33 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
                 {/* JD Analysis Results Card */}
                 {jdAnalysis && (
-                  <div className="mt-4 rounded-xl border border-indigo-800/40 bg-indigo-950/20 p-4 space-y-3">
+                  <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/70 p-4 space-y-3 font-mono">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <h4 className="text-sm font-bold text-white">{jdAnalysis.extracted_title}</h4>
+                        <h4 className="text-sm font-semibold text-white font-sans">{jdAnalysis.extracted_title}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="rounded bg-indigo-900/80 px-2 py-0.5 text-xs font-bold text-indigo-200 border border-indigo-700">
+                          <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs font-medium text-white border border-zinc-700">
                             {jdAnalysis.detected_seniority}
                           </span>
-                          <span className="rounded bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">
+                          <span className="rounded bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300 border border-zinc-800">
                             {jdAnalysis.primary_discipline} Track
                           </span>
                         </div>
                       </div>
-                      <span className="text-xs text-indigo-300 font-semibold bg-indigo-950 px-2.5 py-1 rounded-lg border border-indigo-800">
+                      <span className="text-xs text-emerald-400 font-medium bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-800/40">
                         Active Interview Role
                       </span>
                     </div>
 
                     {jdAnalysis.key_requirements.length > 0 && (
                       <div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                           Key JD Requirements
                         </span>
-                        <ul className="text-xs text-slate-300 space-y-1">
+                        <ul className="text-xs text-zinc-300 space-y-1 font-sans">
                           {jdAnalysis.key_requirements.slice(0, 3).map((req, rIdx) => (
                             <li key={rIdx} className="flex items-start gap-1.5">
-                              <span className="text-indigo-400">•</span>
+                              <span className="text-zinc-500">•</span>
                               <span className="line-clamp-1">{req}</span>
                             </li>
                           ))}
@@ -583,17 +582,17 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     )}
 
                     <div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
                         Tailored Blueprint Competencies
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {jdAnalysis.tailored_competencies.map((comp) => (
                           <div
                             key={comp.id}
-                            className="rounded-lg bg-slate-900/90 p-2 text-xs border border-slate-800"
+                            className="rounded bg-zinc-900/90 p-2 text-xs border border-zinc-800"
                           >
-                            <span className="font-semibold text-slate-200 block">{comp.name}</span>
-                            <span className="text-[11px] text-slate-400 line-clamp-1">{comp.description}</span>
+                            <span className="font-medium text-zinc-200 block font-sans">{comp.name}</span>
+                            <span className="text-[11px] text-zinc-400 line-clamp-1 font-sans">{comp.description}</span>
                           </div>
                         ))}
                       </div>
@@ -604,11 +603,11 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             ) : (
               /* TAB B: CHOOSE TARGET DISCIPLINE */
               <div className="space-y-3">
-                <span className="text-xs text-slate-400 block mb-2">
+                <span className="text-xs text-zinc-400 block mb-2 font-mono">
                   Select a standardized engineering discipline from our rubric catalog:
                 </span>
                 {isLoadingRoles ? (
-                  <div className="h-24 rounded-lg bg-slate-800/40 animate-pulse flex items-center justify-center text-xs text-slate-500">
+                  <div className="h-24 rounded-lg bg-zinc-900/40 animate-pulse flex items-center justify-center text-xs text-zinc-500 font-mono">
                     Loading role catalog...
                   </div>
                 ) : (
@@ -623,21 +622,21 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                             setSelectedRole(role);
                             setJdAnalysis(null);
                           }}
-                          className={`text-left rounded-xl p-3.5 border transition-all ${
+                          className={`text-left rounded-lg p-3.5 border transition-all ${
                             isSelected
-                              ? 'border-indigo-500 bg-indigo-950/40 shadow-sm shadow-indigo-500/10'
-                              : 'border-slate-800 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-800/50'
+                              ? 'border-zinc-500 bg-zinc-800/90 text-white ring-1 ring-zinc-500/20'
+                              : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 hover:bg-zinc-900/50'
                           }`}
                         >
-                          <div className="font-semibold text-slate-100 text-sm">{role.name}</div>
-                          <p className="mt-1 text-xs text-slate-400 line-clamp-2">
+                          <div className="font-semibold text-zinc-100 text-xs sm:text-sm">{role.name}</div>
+                          <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
                             {role.description || 'Core technical interview evaluation.'}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-1">
+                          <div className="mt-2 flex flex-wrap gap-1 font-mono">
                             {role.competencies.slice(0, 3).map((comp) => (
                               <span
                                 key={comp.id}
-                                className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300"
+                                className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-300 border border-zinc-800"
                               >
                                 {comp.name}
                               </span>
@@ -653,9 +652,9 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           </div>
 
           {/* STEP 3: SENIORITY & DURATION */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6 backdrop-blur-sm">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400 mb-4 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" /> 3. Target Seniority Level
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-4 flex items-center gap-2">
+              <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" /> 3. Target Seniority Level
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {SENIORITY_LEVELS.map((lvl) => {
@@ -665,19 +664,19 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     key={lvl.id}
                     type="button"
                     onClick={() => setSeniority(lvl.id)}
-                    className={`text-left rounded-xl p-3.5 border transition-all ${
+                    className={`text-left rounded-lg p-3.5 border transition-all ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-950/40 shadow-sm shadow-indigo-500/10'
-                        : 'border-slate-800 bg-slate-900/80 hover:border-slate-700 hover:bg-slate-800/50'
+                        ? 'border-zinc-500 bg-zinc-800/90 text-white ring-1 ring-zinc-500/20'
+                        : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 hover:bg-zinc-900/50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-100 text-sm">{lvl.title}</span>
-                      <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-indigo-300">
+                      <span className="font-semibold text-zinc-100 text-xs sm:text-sm">{lvl.title}</span>
+                      <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono font-medium text-zinc-300 border border-zinc-800">
                         {lvl.id}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">{lvl.desc}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{lvl.desc}</p>
                   </button>
                 );
               })}
@@ -686,9 +685,9 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
           {/* STEP 4: INTERACTION & DURATION */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3 flex items-center gap-1.5">
-                <Clock className="h-4 w-4" /> Duration Budget
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 backdrop-blur-sm">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-zinc-400" /> Duration Budget
               </h2>
               <div className="grid grid-cols-4 gap-2">
                 {[15, 30, 45, 60].map((mins) => (
@@ -696,10 +695,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     key={mins}
                     type="button"
                     onClick={() => setDuration(mins)}
-                    className={`rounded-lg py-2 text-xs font-bold border transition-all ${
+                    className={`rounded-lg py-2 text-xs font-mono font-semibold border transition-all ${
                       duration === mins
-                        ? 'border-indigo-500 bg-indigo-600 text-white'
-                        : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                        ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
+                        : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
                     }`}
                   >
                     {mins}m
@@ -708,18 +707,18 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-3 flex items-center gap-1.5">
-                <Mic className="h-4 w-4" /> Interaction Protocol
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 backdrop-blur-sm">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
+                <Mic className="h-3.5 w-3.5 text-zinc-400" /> Interaction Protocol
               </h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setMode('VOICE')}
-                  className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-bold border transition-all ${
+                  className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-mono font-semibold border transition-all ${
                     mode === 'VOICE'
-                      ? 'border-indigo-500 bg-indigo-600 text-white'
-                      : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                      ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
+                      : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
                   }`}
                 >
                   <Mic className="h-3.5 w-3.5" />
@@ -728,10 +727,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setMode('TEXT')}
-                  className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-bold border transition-all ${
+                  className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-mono font-semibold border transition-all ${
                     mode === 'TEXT'
-                      ? 'border-indigo-500 bg-indigo-600 text-white'
-                      : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600'
+                      ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
+                      : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
                   }`}
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
@@ -744,33 +743,36 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
         {/* Right Summary / Blueprint Preview Column */}
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl sticky top-24">
-            <h3 className="text-base font-bold text-white mb-4">Grounded Session Blueprint</h3>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 sm:p-6 shadow-xl sticky top-20">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-4 flex items-center justify-between">
+              <span>Grounded Session Blueprint</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            </h3>
 
             {createdBlueprint ? (
               <div className="space-y-4">
-                <div className="rounded-xl bg-emerald-950/40 border border-emerald-800/40 p-3 text-xs text-emerald-300">
+                <div className="rounded-lg bg-emerald-950/30 border border-emerald-900/50 p-3 text-xs text-emerald-300 font-mono">
                   Blueprint generated! Total allocated:{' '}
                   <span className="font-bold">{Math.round(createdBlueprint.total_allocated_seconds / 60)} minutes</span>
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Topic Timeline & Mapped Resume Claims
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
+                    Topic Timeline &amp; Mapped Resume Claims
                   </span>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                     {createdBlueprint.topics.map((t, idx) => (
                       <div
                         key={idx}
-                        className="rounded-lg bg-slate-950 p-2.5 text-xs border border-slate-800 space-y-1"
+                        className="rounded-lg bg-zinc-950 p-2.5 text-xs border border-zinc-800 space-y-1 font-mono"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-slate-200">{t.topic_name}</span>
-                          <span className="text-indigo-400 font-mono font-semibold">{t.allocated_seconds}s</span>
+                          <span className="font-semibold text-zinc-200">{t.topic_name}</span>
+                          <span className="text-zinc-400 font-mono text-[11px]">{t.allocated_seconds}s</span>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <div className="flex items-center justify-between text-[11px] text-zinc-400">
                           <span>Allocated budget</span>
-                          <span className="text-emerald-400 font-semibold">
+                          <span className="text-emerald-400 font-medium">
                             {t.mapped_claims_count} Claim{t.mapped_claims_count === 1 ? '' : 's'} Mapped
                           </span>
                         </div>
@@ -782,37 +784,38 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={onStartInterview}
-                  className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 py-3 px-4 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:from-emerald-500 hover:to-teal-400 transition-all active:scale-[0.98]"
+                  className="w-full mt-4 flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-sm"
                 >
-                  Enter Practice Room <ArrowRight className="h-4 w-4" />
+                  Enter Live Interview Room
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-xl bg-slate-950 p-4 border border-slate-800 space-y-2.5 text-xs">
-                  <div className="flex justify-between text-slate-400">
+                <div className="rounded-lg bg-zinc-950 p-4 border border-zinc-800 space-y-2.5 text-xs font-mono">
+                  <div className="flex justify-between text-zinc-400">
                     <span>Resume Context:</span>
-                    <span className="font-semibold text-emerald-400">
+                    <span className="font-medium text-emerald-400">
                       {resumeAnalysis ? `${resumeAnalysis.claims.length} Claims Loaded` : 'No Resume Uploaded'}
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-zinc-400">
                     <span>Target Role / JD:</span>
-                    <span className="font-semibold text-slate-200 max-w-[160px] truncate">
+                    <span className="font-medium text-zinc-200 max-w-[160px] truncate">
                       {selectedRole?.name || 'None'}
                     </span>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-zinc-400">
                     <span>Seniority Track:</span>
-                    <span className="font-semibold text-slate-200">{seniority}</span>
+                    <span className="font-medium text-zinc-200">{seniority}</span>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-zinc-400">
                     <span>Time Budget:</span>
-                    <span className="font-semibold text-slate-200">{duration} Minutes</span>
+                    <span className="font-medium text-zinc-200">{duration} Minutes</span>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-zinc-400">
                     <span>Protocol:</span>
-                    <span className="font-semibold text-indigo-400">{mode}</span>
+                    <span className="font-medium text-zinc-200">{mode}</span>
                   </div>
                 </div>
 
@@ -820,10 +823,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   type="button"
                   disabled={isCreating || !selectedRole}
                   onClick={handleCreate}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 px-4 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
                 >
                   {isCreating ? 'Compiling Blueprint...' : 'Initialize Session Blueprint'}
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
