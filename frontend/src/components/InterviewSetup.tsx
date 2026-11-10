@@ -317,12 +317,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         <div className="lg:col-span-2 space-y-6">
           {/* STEP 1: RESUME INGESTION (DEFAULT OPTION IS UPLOAD) */}
           <div className="rounded-2xl border border-indigo-900/60 bg-slate-900/80 p-5 sm:p-6 backdrop-blur-sm shadow-xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
                 <FileText className="h-4 w-4" /> 1. Upload Candidate Resume (Default)
               </h2>
 
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setResumeTab('upload')}
@@ -366,7 +366,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                         setSelectedFile(e.target.files[0]);
                       }
                     }}
-                    className="mt-3 text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
+                    className="mt-3 text-xs text-slate-400 max-w-full file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
                   />
                   {selectedFile && (
                     <span className="mt-2 text-xs font-medium text-emerald-400 flex items-center gap-1">
@@ -378,12 +378,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex justify-between items-center text-xs text-slate-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-400">
                   <span>Candidate resume markdown / plain text:</span>
                   <button
                     type="button"
                     onClick={() => setResumeText(SAMPLE_RESUME_TEXT)}
-                    className="text-indigo-400 hover:text-indigo-300 underline font-medium"
+                    className="text-indigo-400 hover:text-indigo-300 underline font-medium self-start sm:self-auto"
                   >
                     Load Sample Senior Resume
                   </button>
@@ -398,7 +398,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             )}
 
-            <div className="mt-4 flex items-center justify-between">
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-xs text-slate-500">
                 Grounds interview questions and blueprint topics in your verified claims.
               </span>
@@ -406,7 +406,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 type="button"
                 disabled={isAnalyzingResume}
                 onClick={handleAnalyzeResume}
-                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95 shrink-0"
               >
                 {isAnalyzingResume ? (
                   <>
@@ -470,12 +470,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
           {/* STEP 2: PASTE JD OR CHOOSE DISCIPLINE */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 backdrop-blur-sm shadow-xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 mb-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
                 <Briefcase className="h-4 w-4" /> 2. Target Calibration: Paste JD or Pick Discipline
               </h2>
 
-              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+              <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setTargetTab('jd')}
@@ -504,12 +504,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             {targetTab === 'jd' ? (
               /* TAB A: PASTE JOB DESCRIPTION */
               <div className="space-y-4">
-                <div className="flex justify-between items-center text-xs text-slate-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-slate-400">
                   <span>Paste any target Job Description (JD) text:</span>
                   <button
                     type="button"
                     onClick={() => setJdText(SAMPLE_JD_TEXT)}
-                    className="text-indigo-400 hover:text-indigo-300 underline font-medium"
+                    className="text-indigo-400 hover:text-indigo-300 underline font-medium self-start sm:self-auto"
                   >
                     Load Sample Senior Payments JD
                   </button>
@@ -522,7 +522,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 font-mono text-xs text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <span className="text-xs text-slate-500">
                     Extracts required competencies, seniority, and matches against your resume claims.
                   </span>
@@ -530,7 +530,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     type="button"
                     disabled={isAnalyzingJd || !jdText.trim()}
                     onClick={handleAnalyzeJd}
-                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 py-2.5 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/20 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95 shrink-0"
                   >
                     {isAnalyzingJd ? (
                       <>

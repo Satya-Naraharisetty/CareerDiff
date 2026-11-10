@@ -204,7 +204,51 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
             </p>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Comparison Cards (< sm) */}
+          <div className="space-y-4 sm:hidden">
+            {[
+              {
+                capability: 'Interview Control',
+                engine: 'Deterministic state machine with time & probe guardrails',
+                generic: 'Unconstrained LLM hallucinates topics and ends randomly',
+              },
+              {
+                capability: 'Target Calibration',
+                engine: 'Custom competencies and 4-tier rubrics synthesized from your JD',
+                generic: 'Generic textbook questions (e.g. "Explain OOP")',
+              },
+              {
+                capability: 'Resume Grounding',
+                engine: 'Character-offset claim indexing with verbatim verification turns',
+                generic: 'Ignored or superficial token mention',
+              },
+              {
+                capability: 'Evaluation Integrity',
+                engine: 'Decoupled outbox worker with normalized verbatim transcript citations',
+                generic: 'Vague subjective summary ("Good job, 8/10")',
+              },
+              {
+                capability: 'Privacy & Biometrics',
+                engine: 'Strict Zero Biometrics Invariant — technical merit only',
+                generic: 'Face tracking, pitch analysis, emotional scanning',
+              },
+            ].map((item, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+                <div className="text-xs font-bold text-white uppercase tracking-wider">{item.capability}</div>
+                <div className="rounded-xl bg-emerald-950/40 border border-emerald-800/40 p-3 text-xs space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">IntervueX Engine</span>
+                  <p className="text-emerald-200">{item.engine}</p>
+                </div>
+                <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-3 text-xs space-y-1">
+                  <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider block">Generic Chatbots</span>
+                  <p className="text-slate-400">{item.generic}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Comparison Table (>= sm) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">

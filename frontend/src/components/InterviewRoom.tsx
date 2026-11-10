@@ -98,9 +98,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   return (
     <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-6xl flex-col px-4 py-4 sm:px-6">
       {/* Session Top Status Bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur-md shadow-lg">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur-md shadow-lg">
         {/* Left: Active topic & state */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <span className="relative flex h-3 w-3">
               <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -110,14 +110,14 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 sessionState === 'COMPLETED' ? 'bg-slate-400' : 'bg-emerald-500'
               }`} />
             </span>
-            <span className="font-semibold text-sm text-slate-100">{targetSeniority} Track</span>
+            <span className="font-semibold text-xs sm:text-sm text-slate-100">{targetSeniority} Track</span>
           </div>
 
           <div className="h-4 w-px bg-slate-800" />
 
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <span>Topic:</span>
-            <span className="font-medium text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40">
+            <span className="font-medium text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40 max-w-[150px] sm:max-w-none truncate">
               {currentTopic || 'Session Warmup'}
             </span>
             {blueprint?.topics?.find((t) => t.topic_name === currentTopic && t.mapped_claims_count > 0) && (
@@ -128,46 +128,48 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             )}
           </div>
 
-          <span className="hidden sm:inline-flex rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-slate-300 border border-slate-700">
+          <span className="hidden md:inline-flex rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-slate-300 border border-slate-700">
             {sessionState}
           </span>
         </div>
 
-        {/* Center: Countdown timer */}
-        <div className="flex items-center gap-2 rounded-xl bg-slate-950 px-3.5 py-1.5 border border-slate-800">
-          <Clock className={`h-4 w-4 ${remainingSeconds < 300 ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
-          <span className="font-mono text-sm font-bold tracking-wider text-slate-100">
-            {formatTimer(remainingSeconds)}
-          </span>
-        </div>
+        {/* Right Section: Countdown Timer & Conclude Action */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          {/* Countdown timer */}
+          <div className="flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-1.5 border border-slate-800">
+            <Clock className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${remainingSeconds < 300 ? 'text-amber-400 animate-pulse' : 'text-indigo-400'}`} />
+            <span className="font-mono text-xs sm:text-sm font-bold tracking-wider text-slate-100">
+              {formatTimer(remainingSeconds)}
+            </span>
+          </div>
 
-        {/* Right: Actions (Conclude interview) */}
-        <div className="flex items-center gap-2">
-          {mode === 'VOICE' && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 mr-2">
-              <Radio className={`h-3.5 w-3.5 ${wsStatus === 'connected' ? 'text-emerald-400' : 'text-amber-400'}`} />
-              <span className="capitalize">{wsStatus}</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleConclude}
-            disabled={isSubmitting}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-md hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Compiling...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-3.5 w-3.5" />
-                Conclude & Score
-              </>
+          <div className="flex items-center gap-2">
+            {mode === 'VOICE' && (
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 mr-2">
+                <Radio className={`h-3.5 w-3.5 ${wsStatus === 'connected' ? 'text-emerald-400' : 'text-amber-400'}`} />
+                <span className="capitalize">{wsStatus}</span>
+              </div>
             )}
-          </button>
+
+            <button
+              type="button"
+              onClick={handleConclude}
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-md hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 transition-all active:scale-95"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Compiling...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Conclude & Score
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -203,7 +205,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               )}
 
               <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
+                className={`max-w-[90%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
                   isInterviewer
                     ? 'rounded-tl-none border border-slate-800 bg-slate-900 text-slate-200'
                     : 'rounded-tr-none bg-gradient-to-tr from-indigo-700 to-indigo-600 text-white shadow-indigo-600/10'
@@ -275,12 +277,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
           /* Voice Mode Controls */
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             {/* Mic Button & State */}
-            <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-4">
               <button
                 type="button"
                 onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
                 disabled={wsStatus !== 'connected'}
-                className={`flex items-center justify-center gap-2 rounded-xl py-3 px-6 text-sm font-bold shadow-lg transition-all active:scale-95 ${
+                className={`flex items-center justify-center gap-2 rounded-xl py-3 px-3 sm:px-6 text-xs sm:text-sm font-bold shadow-lg transition-all active:scale-95 ${
                   isRecording
                     ? 'bg-rose-600 text-white shadow-rose-600/30 pulsing-recording hover:bg-rose-500'
                     : 'bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-500'
@@ -288,13 +290,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               >
                 {isRecording ? (
                   <>
-                    <MicOff className="h-5 w-5" />
-                    Stop Speaking
+                    <MicOff className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Stop</span>
                   </>
                 ) : (
                   <>
-                    <Mic className="h-5 w-5" />
-                    Speak (16kHz PCM)
+                    <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Speak</span>
                   </>
                 )}
               </button>
@@ -304,10 +306,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 type="button"
                 onClick={bargeIn}
                 title="Interrupt Interviewer Speech (<150ms preemption)"
-                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-3 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-all active:scale-95"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3 sm:px-4 py-3 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-all active:scale-95"
               >
                 <Hand className="h-4 w-4 text-amber-400" />
-                Barge-In / Interrupt
+                <span>Barge-In</span>
               </button>
             </div>
 
@@ -331,15 +333,15 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               onChange={(e) => setTextInput(e.target.value)}
               placeholder="Type your technical response here (e.g. explain architecture, tradeoffs, failure modes)..."
               disabled={isSubmitting || sessionState === 'COMPLETED'}
-              className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition-all"
+              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3 sm:px-4 py-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition-all"
             />
             <button
               type="submit"
               disabled={isSubmitting || !textInput.trim() || sessionState === 'COMPLETED'}
-              className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+              className="shrink-0 flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 sm:px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
             >
               <Send className="h-4 w-4" />
-              Submit
+              <span className="hidden xs:inline">Submit</span>
             </button>
           </form>
         )}

@@ -94,8 +94,11 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
       .join(' ');
 
     return (
-      <div className="flex flex-col items-center justify-center p-4">
-        <svg width={size} height={size} className="overflow-visible">
+      <div className="flex flex-col items-center justify-center p-4 w-full">
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className="w-full max-w-[260px] h-auto overflow-visible"
+        >
           {/* Background concentric reference rings (4 levels) */}
           {[0.25, 0.5, 0.75, 1.0].map((ringLevel, rIdx) => (
             <circle
@@ -245,7 +248,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
           </div>
 
           {/* Rating Badge */}
-          <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-950/80 border border-slate-800 px-6 py-4 shadow-inner shrink-0 min-w-[180px]">
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-slate-950/80 border border-slate-800 px-6 py-4 shadow-inner shrink-0 min-w-[180px] w-full md:w-auto">
             <Award className="h-8 w-8 text-indigo-400 mb-1" />
             <div className="text-3xl font-black text-white">{overallRating.toFixed(1)} / 4.0</div>
             <span className="text-xs font-bold text-indigo-300 mt-0.5">{ratingTier}</span>
@@ -339,8 +342,8 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <span className="hidden sm:inline text-xs text-slate-500">
                       {cs.evidence_items.length} Grounded Excerpt{cs.evidence_items.length === 1 ? '' : 's'}
                     </span>
                     {isExpanded ? (
@@ -395,13 +398,34 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
       {/* Resume Claim Verification Table */}
       {report.claim_verifications && report.claim_verifications.length > 0 && (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl space-y-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 shadow-xl space-y-4">
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             Resume Claim Audit & Spoken Verification
           </h2>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (< sm) */}
+          <div className="space-y-3 sm:hidden">
+            {report.claim_verifications.map((cl: ClaimVerificationRead) => (
+              <div key={cl.claim_id} className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] uppercase font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                    {cl.category}
+                  </span>
+                  {getClaimStatusBadge(cl.status)}
+                </div>
+                <p className="text-xs font-semibold text-slate-200">{cl.claim_text}</p>
+                {cl.auditor_notes && (
+                  <p className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+                    {cl.auditor_notes}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View (>= sm) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-800 text-slate-400">
                 <tr>
