@@ -13,6 +13,7 @@ import {
   Mic,
   ShieldCheck,
   Upload,
+  X,
 } from 'lucide-react';
 import { interviewsApi, resumesApi, rolesApi } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
@@ -95,6 +96,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   // Step 1: Resume Ingestion State (DEFAULT OPTION IS UPLOAD FILE)
   const [resumeTab, setResumeTab] = useState<'upload' | 'paste'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [resumeText, setResumeText] = useState(SAMPLE_RESUME_TEXT);
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysisResponse | null>(null);
@@ -146,6 +148,35 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
     }
     initData();
   }, [isAuthenticated]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const validExts = ['.pdf', '.docx', '.txt'];
+      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (validExts.includes(fileExt)) {
+        setSelectedFile(file);
+        setError(null);
+      } else {
+        setError('Please drop a valid resume file (.pdf, .docx, or .txt).');
+      }
+    }
+  };
 
   const handleAnalyzeResume = async () => {
     if (!isAuthenticated) {
@@ -311,6 +342,110 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         </div>
       )}
 
+      {/* 3-Stage Workflow Stepper */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 backdrop-blur-sm shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono">
+          {/* Stage 1 */}
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
+                resumeAnalysis
+                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
+                  : isAnalyzingResume
+                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
+                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+              }`}
+            >
+              {resumeAnalysis ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : isAnalyzingResume ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                '01'
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-zinc-200 truncate">
+                {resumeAnalysis ? 'Resume Ingested' : 'Ingest Resume'}
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate">
+                {resumeAnalysis
+                  ? `${resumeAnalysis.claims.length} claims extracted`
+                  : 'Upload file or paste text'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stage 2 */}
+          <div className="flex items-center gap-3 sm:border-l sm:border-zinc-800/80 sm:pl-4">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
+                jdAnalysis || selectedRole
+                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
+                  : isAnalyzingJd
+                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
+                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+              }`}
+            >
+              {jdAnalysis || selectedRole ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : isAnalyzingJd ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                '02'
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-zinc-200 truncate">
+                {jdAnalysis
+                  ? 'JD Calibrated'
+                  : selectedRole
+                  ? 'Role Selected'
+                  : 'Target Calibration'}
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate">
+                {jdAnalysis
+                  ? jdAnalysis.extracted_title
+                  : selectedRole
+                  ? selectedRole.name
+                  : 'Paste JD or pick discipline'}
+              </div>
+            </div>
+          </div>
+
+          {/* Stage 3 */}
+          <div className="flex items-center gap-3 sm:border-l sm:border-zinc-800/80 sm:pl-4">
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
+                createdBlueprint
+                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
+                  : isCreating
+                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
+                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+              }`}
+            >
+              {createdBlueprint ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : isCreating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                '03'
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-semibold text-zinc-200 truncate">
+                {createdBlueprint ? 'Blueprint Compiled' : 'Compile Blueprint'}
+              </div>
+              <div className="text-[10px] text-zinc-500 truncate">
+                {createdBlueprint
+                  ? `${Math.round(createdBlueprint.total_allocated_seconds / 60)}m interview plan`
+                  : 'Adaptive rubric ready'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Main Configuration Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -349,29 +484,76 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
             {resumeTab === 'upload' ? (
               <div className="space-y-3">
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-zinc-800 bg-zinc-950/40 p-6 text-center hover:border-zinc-700 transition-colors">
-                  <Upload className="h-6 w-6 text-zinc-400 mb-2" />
-                  <p className="text-xs font-medium text-zinc-200">
-                    Upload your resume document (PDF, DOCX, or TXT)
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all ${
+                    isDraggingFile
+                      ? 'border-emerald-400 bg-emerald-950/20 ring-2 ring-emerald-500/20'
+                      : 'border-zinc-800 bg-zinc-950/40 hover:border-zinc-700 hover:bg-zinc-950/70'
+                  }`}
+                >
+                  <Upload
+                    className={`h-7 w-7 mb-2 transition-colors ${
+                      isDraggingFile ? 'text-emerald-400 animate-bounce' : 'text-zinc-400'
+                    }`}
+                  />
+                  <p className="text-xs font-semibold text-zinc-200">
+                    {isDraggingFile
+                      ? 'Drop your resume file to load'
+                      : 'Drag & drop your resume file here, or browse'}
                   </p>
                   <p className="text-[11px] text-zinc-500 mt-0.5 font-mono">
-                    Maximum file size 10MB • Text &amp; claims extracted with character-offset provenance.
+                    Text &amp; claims extracted with character-offset provenance • Max 10MB
                   </p>
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.txt"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setSelectedFile(e.target.files[0]);
-                      }
-                    }}
-                    className="mt-3 text-xs text-zinc-400 max-w-full file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700"
-                  />
+
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    {['PDF', 'DOCX', 'TXT'].map((ext) => (
+                      <span
+                        key={ext}
+                        className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-400 border border-zinc-800"
+                      >
+                        .{ext.toLowerCase()}
+                      </span>
+                    ))}
+                  </div>
+
+                  <label className="mt-3.5 inline-flex items-center gap-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3.5 py-1.5 text-xs font-semibold cursor-pointer border border-zinc-700 transition-colors shadow-sm">
+                    <FileText className="h-3.5 w-3.5 text-zinc-400" />
+                    <span>Select Resume File</span>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.txt"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedFile(e.target.files[0]);
+                          setError(null);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
                   {selectedFile && (
-                    <span className="mt-2 text-xs font-mono text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                    </span>
+                    <div className="mt-3.5 flex items-center gap-2 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs font-mono text-emerald-400 shadow-sm">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate max-w-[200px] sm:max-w-xs">{selectedFile.name}</span>
+                      <span className="text-zinc-500 text-[10px]">
+                        ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                        }}
+                        className="ml-1 text-zinc-500 hover:text-zinc-300 p-0.5"
+                        title="Remove file"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

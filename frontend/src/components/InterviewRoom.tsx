@@ -57,6 +57,57 @@ async def acquire_lock(redis, resource_id: str, ttl_ms: int = 5000):
   },
 ];
 
+const AudioEqualizer: React.FC<{
+  audioLevel: number;
+  isRecording: boolean;
+  isInterviewerSpeaking: boolean;
+}> = ({ audioLevel, isRecording, isInterviewerSpeaking }) => {
+  const bars = 16;
+  return (
+    <div className="flex items-center gap-2.5 h-9 px-3 py-1 rounded-lg bg-zinc-950 border border-zinc-800 shrink-0">
+      <div className="flex items-end gap-[3px] h-5 w-24 sm:w-28">
+        {Array.from({ length: bars }).map((_, i) => {
+          let heightPercent = 15;
+          if (isRecording) {
+            const factor = Math.sin((i / (bars - 1)) * Math.PI) * 0.7 + 0.3;
+            heightPercent = Math.min(100, Math.max(15, Math.round(audioLevel * 100 * factor + (i % 3) * 10)));
+          } else if (isInterviewerSpeaking) {
+            heightPercent = Math.min(100, Math.max(20, Math.round(50 + Math.sin(i * 1.5) * 35)));
+          }
+
+          return (
+            <div
+              key={i}
+              className={`flex-1 rounded-full transition-all duration-75 ${
+                isRecording
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-500/20'
+                  : isInterviewerSpeaking
+                  ? 'bg-indigo-400 animate-pulse'
+                  : 'bg-zinc-800'
+              }`}
+              style={{ height: `${heightPercent}%` }}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-col text-[10px] font-mono leading-tight">
+        <span
+          className={
+            isRecording
+              ? 'text-emerald-400 font-semibold'
+              : isInterviewerSpeaking
+              ? 'text-indigo-400 font-semibold'
+              : 'text-zinc-500'
+          }
+        >
+          {isRecording ? 'PCM STREAM' : isInterviewerSpeaking ? 'INTERVIEWER' : 'STANDBY'}
+        </span>
+        <span className="text-zinc-600 hidden sm:inline text-[9px]">16kHz Mono</span>
+      </div>
+    </div>
+  );
+};
+
 export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const {
     state: sessionState,
@@ -114,6 +165,34 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       stopVoiceRecording();
     };
   }, [stopVoiceRecording]);
+
+  // Global ergonomics keyboard listeners (Space = Mic, Esc = Barge-In, S = Scratchpad)
+  useEffect(() => {
+    const handleRoomKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.code === 'Space' && mode === 'VOICE' && wsStatus === 'connected') {
+        e.preventDefault();
+        if (isRecording) {
+          stopVoiceRecording();
+        } else {
+          startVoiceRecording();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        bargeIn();
+      } else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setShowScratchpad((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleRoomKeyDown);
+    return () => window.removeEventListener('keydown', handleRoomKeyDown);
+  }, [mode, wsStatus, isRecording, stopVoiceRecording, startVoiceRecording, bargeIn]);
 
   const handleSendText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -191,7 +270,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             <button
               type="button"
               onClick={() => setShowScratchpad((prev) => !prev)}
-              title="Toggle Architecture & Code Scratchpad"
+              title="Toggle Architecture & Code Scratchpad (Key: S)"
               className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
                 showScratchpad
                   ? 'border-zinc-500 bg-zinc-800 text-white shadow-sm'
@@ -200,6 +279,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             >
               <Code2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Scratchpad</span>
+              <kbd className="hidden md:inline-block px-1 py-0.5 text-[9px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-800">S</kbd>
               {scratchpadCode.trim() && (
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               )}
@@ -346,7 +426,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                     type="button"
                     onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
                     disabled={wsStatus !== 'connected'}
-                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-6 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
+                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
                       isRecording
                         ? 'bg-rose-600 text-white shadow-rose-600/20 hover:bg-rose-500'
                         : 'bg-white text-zinc-950 hover:bg-zinc-200 shadow-sm'
@@ -356,11 +436,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                       <>
                         <MicOff className="h-4 w-4" />
                         <span>Stop Recording</span>
+                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-rose-700 text-white rounded border border-rose-500/50">Space</kbd>
                       </>
                     ) : (
                       <>
                         <Mic className="h-4 w-4" />
                         <span>Speak</span>
+                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">Space</kbd>
                       </>
                     )}
                   </button>
@@ -369,24 +451,21 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   <button
                     type="button"
                     onClick={bargeIn}
-                    title="Interrupt Interviewer Speech (<150ms preemption)"
+                    title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
                     className="flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white transition-all active:scale-[0.98]"
                   >
                     <Hand className="h-3.5 w-3.5 text-amber-400" />
                     <span>Barge-In</span>
+                    <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-700">Esc</kbd>
                   </button>
                 </div>
 
-                {/* Audio VU-Meter Visualizer Bar */}
-                <div className="flex items-center gap-3 w-full sm:w-64 font-mono">
-                  <span className="text-[11px] text-zinc-400 shrink-0">Mic VU</span>
-                  <div className="h-2 flex-1 rounded-full bg-zinc-950 overflow-hidden border border-zinc-800">
-                    <div
-                      className="h-full bg-emerald-400 transition-all duration-75"
-                      style={{ width: `${Math.round(audioLevel * 100)}%` }}
-                    />
-                  </div>
-                </div>
+                {/* 16-Bar Responsive Equalizer */}
+                <AudioEqualizer
+                  audioLevel={audioLevel}
+                  isRecording={isRecording}
+                  isInterviewerSpeaking={isInterviewerSpeaking}
+                />
               </div>
             ) : (
               /* Text Mode Controls */
@@ -406,6 +485,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 >
                   <Send className="h-3.5 w-3.5" />
                   <span className="hidden xs:inline">Submit Turn</span>
+                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">↵</kbd>
                 </button>
               </form>
             )}

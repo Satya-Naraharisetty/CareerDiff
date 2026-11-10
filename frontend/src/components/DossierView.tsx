@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
-  Award,
   BookOpen,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Copy,
   Download,
   FileText,
   Loader2,
@@ -28,12 +29,108 @@ interface DossierViewProps {
   onReset: () => void;
 }
 
+const ScoreRingGauge: React.FC<{ score: number; maxScore?: number; tier: string }> = ({
+  score,
+  maxScore = 4.0,
+  tier,
+}) => {
+  const size = 110;
+  const strokeWidth = 7;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const normalizedScore = Math.min(maxScore, Math.max(0, score));
+  const progressPercent = normalizedScore / maxScore;
+  const strokeDashoffset = circumference - progressPercent * circumference;
+
+  return (
+    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 min-w-[160px] font-mono shadow-sm">
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="rotate-[-90deg]">
+          {/* Background Track Circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke="#27272a"
+            strokeWidth={strokeWidth}
+          />
+          {/* Animated Progress Ring */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke="#34d399"
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+
+        {/* Center Score Numbers */}
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
+            {score.toFixed(1)}
+          </span>
+          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ {maxScore.toFixed(1)}</span>
+        </div>
+      </div>
+      <div className="mt-2 text-center">
+        <span className="rounded bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-emerald-400 border border-zinc-800">
+          {tier}
+        </span>
+        <span className="block text-[10px] text-zinc-500 mt-1">Rubric Index</span>
+      </div>
+    </div>
+  );
+};
+
+const CompetencyLevelMeter: React.FC<{ score: number | null }> = ({ score }) => {
+  const currentLevel = score ?? 1;
+  const levels = [
+    { lvl: 1, label: 'L1' },
+    { lvl: 2, label: 'L2' },
+    { lvl: 3, label: 'L3' },
+    { lvl: 4, label: 'L4' },
+  ];
+
+  return (
+    <div className="flex items-center gap-1.5 w-24">
+      {levels.map((item) => {
+        const isActive = item.lvl <= currentLevel;
+        return (
+          <div key={item.lvl} className="flex-1 flex flex-col gap-0.5">
+            <div
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                isActive
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-500/20'
+                  : 'bg-zinc-800'
+              }`}
+            />
+            <span
+              className={`text-[8px] font-mono text-center ${
+                isActive ? 'text-zinc-300 font-semibold' : 'text-zinc-600'
+              }`}
+            >
+              {item.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   const { interviewId } = useInterviewStore();
   const [report, setReport] = useState<AssessmentReportRead | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedCompId, setExpandedCompId] = useState<string | null>(null);
+  const [copiedExcerptId, setCopiedExcerptId] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -258,13 +355,8 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             </div>
           </div>
 
-          {/* Rating Badge */}
-          <div className="flex flex-col items-center justify-center rounded-xl bg-zinc-950 border border-zinc-800 px-6 py-4 shrink-0 min-w-[180px] w-full md:w-auto font-mono">
-            <Award className="h-6 w-6 text-zinc-400 mb-1" />
-            <div className="text-3xl font-bold text-white">{overallRating.toFixed(1)} / 4.0</div>
-            <span className="text-xs font-semibold text-emerald-400 mt-0.5">{ratingTier}</span>
-            <span className="text-[10px] text-zinc-500 mt-1">Decoupled Rubric Engine</span>
-          </div>
+          {/* Circular Score Ring Gauge */}
+          <ScoreRingGauge score={overallRating} tier={ratingTier} />
         </div>
       </div>
 
@@ -366,7 +458,10 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 font-mono">
+                  <div className="flex items-center gap-2 sm:gap-4 shrink-0 font-mono">
+                    <div className="hidden sm:flex items-center">
+                      <CompetencyLevelMeter score={cs.score} />
+                    </div>
                     <span className="hidden sm:inline text-xs text-zinc-500">
                       {cs.evidence_items.length} Excerpt{cs.evidence_items.length === 1 ? '' : 's'}
                     </span>
@@ -404,8 +499,25 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                             </span>
                           </div>
 
-                          <div className="rounded bg-zinc-900 p-2.5 border border-zinc-800 text-xs text-zinc-200 italic font-mono">
+                          <div className="relative group rounded bg-zinc-900 p-2.5 pr-8 border border-zinc-800 text-xs text-zinc-200 italic font-mono">
                             "{ev.transcript_excerpt}"
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(ev.transcript_excerpt);
+                                setCopiedExcerptId(ev.id);
+                                setTimeout(() => setCopiedExcerptId(null), 2000);
+                              }}
+                              title="Copy quote"
+                              className="absolute top-2 right-2 p-1 rounded bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-opacity opacity-75 group-hover:opacity-100 focus:opacity-100"
+                            >
+                              {copiedExcerptId === ev.id ? (
+                                <Check className="h-3 w-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </button>
                           </div>
 
                           <p className="text-zinc-400 text-[11px] font-sans">{ev.rationale}</p>
