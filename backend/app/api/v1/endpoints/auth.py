@@ -18,6 +18,8 @@ from app.core.security import (
 )
 from app.models.user import CandidateProfile, User
 from app.schemas.auth import (
+    AccountDeletionRequest,
+    AccountDeletionResponse,
     BackupCodesRegenerateResponse,
     PasswordChangeRequest,
     PasswordChangeResponse,
@@ -275,3 +277,33 @@ async def change_password(
     await db.refresh(current_user)
 
     return PasswordChangeResponse(message="Password successfully updated.")
+
+
+@router.delete(
+    "/me",
+    response_model=AccountDeletionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Permanently delete user account and cascade all data (GDPR Right to Erasure)",
+)
+async def delete_current_user_account(
+    payload: AccountDeletionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AccountDeletionResponse:
+    """Permanently delete user record and cascade deletion across all associated data."""
+    if payload.confirmation_text.strip().upper() != "DELETE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="INVALID_CONFIRMATION_TEXT",
+        )
+
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="INVALID_CURRENT_PASSWORD",
+        )
+
+    await db.delete(current_user)
+    await db.commit()
+
+    return AccountDeletionResponse()

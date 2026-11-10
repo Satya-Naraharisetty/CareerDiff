@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Sparkles,
+  Trash2,
   User as UserIcon,
   X,
 } from 'lucide-react';
@@ -25,8 +26,8 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
-  const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'backup_codes'>('profile');
+  const { user, logout } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'backup_codes' | 'danger'>('profile');
 
   // Profile data
   const [profileData, setProfileData] = useState<UserProfileResponse | null>(null);
@@ -48,6 +49,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [copiedCodes, setCopiedCodes] = useState(false);
   const [codesError, setCodesError] = useState<string | null>(null);
 
+  // Danger zone (Account Deletion) state
+  const [deletePassword, setDeletePassword] = useState('');
+  const [confirmDeleteText, setConfirmDeleteText] = useState('');
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const handleCloseModal = useCallback(() => {
     setProfileData(null);
     setCurrentPassword('');
@@ -57,6 +65,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     setPasswordError(null);
     setNewBackupCodes(null);
     setCodesError(null);
+    setDeletePassword('');
+    setConfirmDeleteText('');
+    setShowDeletePassword(false);
+    setIsDeletingAccount(false);
+    setDeleteError(null);
     onClose();
   }, [onClose]);
 
@@ -181,6 +194,36 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     URL.revokeObjectURL(url);
   };
 
+  const handleDeleteAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleteError(null);
+
+    if (confirmDeleteText.trim().toUpperCase() !== 'DELETE') {
+      setDeleteError('You must type DELETE in all caps to confirm account erasure.');
+      return;
+    }
+
+    if (!deletePassword) {
+      setDeleteError('Please enter your current password to authorize account erasure.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await authApi.deleteAccount({
+        current_password: deletePassword,
+        confirmation_text: confirmDeleteText.trim(),
+      });
+      logout();
+      handleCloseModal();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete account. Please verify credentials.';
+      setDeleteError(msg);
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   // Password strength
   const hasMinLength = newPassword.length >= 8;
   const hasMixedChars = /\d/.test(newPassword) && /[a-zA-Z]/.test(newPassword);
@@ -189,44 +232,44 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby="profile-modal-title"
     >
-      <div className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl shadow-black/80">
+      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8 shadow-2xl shadow-black/80 font-sans">
         {/* Close Button */}
         <button
           type="button"
           onClick={handleCloseModal}
           aria-label="Close dialog"
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors focus-visible:outline-2 focus-visible:outline-zinc-500"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3.5 mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 shadow-md shadow-indigo-600/30">
-            <UserIcon className="h-6 w-6 text-white" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-800 border border-zinc-700 shadow-sm text-zinc-200">
+            <UserIcon className="h-5 w-5" />
           </div>
           <div>
-            <h2 id="profile-modal-title" className="text-xl font-bold text-white tracking-tight">
+            <h2 id="profile-modal-title" className="text-lg font-bold text-white tracking-tight">
               {profileData?.full_name || user?.full_name || 'Candidate Profile'}
             </h2>
-            <p className="text-xs text-slate-400">{profileData?.email || user?.email}</p>
+            <p className="text-xs text-zinc-400 font-mono">{profileData?.email || user?.email}</p>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-800 pb-2 mb-6">
+        <div className="flex border-b border-zinc-800 pb-2 mb-6 gap-1">
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 pb-2 text-xs sm:text-sm font-semibold transition-all border-b-2 -mb-[10px] ${
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
               activeTab === 'profile'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-white text-white'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
             Overview
@@ -234,24 +277,35 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           <button
             type="button"
             onClick={() => setActiveTab('password')}
-            className={`flex-1 pb-2 text-xs sm:text-sm font-semibold transition-all border-b-2 -mb-[10px] ${
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
               activeTab === 'password'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-white text-white'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Change Password
+            Password
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('backup_codes')}
-            className={`flex-1 pb-2 text-xs sm:text-sm font-semibold transition-all border-b-2 -mb-[10px] ${
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
               activeTab === 'backup_codes'
-                ? 'border-indigo-500 text-indigo-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-white text-white'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Backup Codes
+            Recovery
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('danger')}
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
+              activeTab === 'danger'
+                ? 'border-rose-500 text-rose-400'
+                : 'border-transparent text-zinc-500 hover:text-rose-400'
+            }`}
+          >
+            Danger Zone
           </button>
         </div>
 
@@ -561,6 +615,94 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               </button>
             )}
           </div>
+        )}
+
+        {/* Tab 4: Danger Zone - Permanent Account Deletion */}
+        {activeTab === 'danger' && (
+          <form onSubmit={handleDeleteAccountSubmit} className="space-y-4 animate-in fade-in duration-150">
+            <div className="rounded-xl border border-rose-900/60 bg-rose-950/30 p-4 text-xs text-rose-200 space-y-2">
+              <div className="flex items-center gap-2 text-rose-300 font-semibold font-mono">
+                <Trash2 className="h-4 w-4 shrink-0 text-rose-400" />
+                <span>Permanent Account Erasure (GDPR Right to Erasure)</span>
+              </div>
+              <p className="text-[11px] text-rose-300/80 leading-relaxed font-sans">
+                This operation is immediate and irreversible. All of your candidate intelligence—including uploaded resumes, extracted claims, past interview sessions, live transcripts, and rubric assessment reports—will be permanently purged from PostgreSQL.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-lg bg-rose-950/60 border border-rose-800/60 p-3 text-xs text-rose-300 animate-in fade-in font-mono"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            {/* Current Password confirmation */}
+            <div>
+              <label htmlFor="delete-account-password" className="block text-xs font-mono font-medium text-zinc-300 mb-1.5">
+                Current Password <span className="text-rose-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500 pointer-events-none" />
+                <input
+                  id="delete-account-password"
+                  name="deletePassword"
+                  type={showDeletePassword ? 'text' : 'password'}
+                  required
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Enter your current password"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 pl-9 pr-10 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowDeletePassword((prev) => !prev)}
+                  aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2.5 top-2 rounded p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
+                >
+                  {showDeletePassword ? <EyeOff className="h-4 w-4 text-zinc-200" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirmation text input */}
+            <div>
+              <label htmlFor="delete-account-confirm-text" className="block text-xs font-mono font-medium text-zinc-300 mb-1.5">
+                Type <span className="font-bold text-rose-400 font-mono">DELETE</span> to confirm <span className="text-rose-400">*</span>
+              </label>
+              <input
+                id="delete-account-confirm-text"
+                name="confirmDeleteText"
+                type="text"
+                required
+                value={confirmDeleteText}
+                onChange={(e) => setConfirmDeleteText(e.target.value)}
+                placeholder="Type DELETE in capital letters"
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2 px-3 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500 transition-all font-mono"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isDeletingAccount || confirmDeleteText.trim().toUpperCase() !== 'DELETE' || !deletePassword}
+              className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-rose-600 py-2.5 px-4 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Permanently Deleting Account...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Permanently Delete My Account &amp; Data
+                </>
+              )}
+            </button>
+          </form>
         )}
       </div>
     </div>

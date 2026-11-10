@@ -228,3 +228,83 @@ async def test_change_password_and_get_profile(async_client: AsyncClient) -> Non
         json={"email": unique_email, "password": new_password},
     )
     assert new_auth.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_delete_account_lifecycle(async_client: AsyncClient) -> None:
+    """Verify authenticated user can permanently erase their account and data cascades."""
+    unique_email = f"delete_{uuid.uuid4().hex[:8]}@example.com"
+    password = "DeletePassword123!"
+
+    # 1. Register candidate
+    reg_res = await async_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": unique_email,
+            "password": password,
+            "full_name": "Erasure Candidate",
+        },
+    )
+    assert reg_res.status_code == 201
+    token = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Deletion without auth header fails 401
+    no_auth_res = await async_client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        json={"current_password": password, "confirmation_text": "DELETE"},
+    )
+    assert no_auth_res.status_code == 401
+
+    # 3. Deletion with invalid confirmation text fails 400
+    bad_confirm = await async_client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        json={"current_password": password, "confirmation_text": "WRONG_TEXT"},
+        headers=headers,
+    )
+    assert bad_confirm.status_code == 400
+    assert bad_confirm.json()["detail"] == "INVALID_CONFIRMATION_TEXT"
+
+    # 4. Deletion with wrong password fails 401
+    wrong_pw = await async_client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        json={"current_password": "WrongPassword999!", "confirmation_text": "DELETE"},
+        headers=headers,
+    )
+    assert wrong_pw.status_code == 401
+    assert wrong_pw.json()["detail"] == "INVALID_CURRENT_PASSWORD"
+
+    # 5. Valid deletion succeeds with 200 OK
+    delete_res = await async_client.request(
+        "DELETE",
+        "/api/v1/auth/me",
+        json={"current_password": password, "confirmation_text": "DELETE"},
+        headers=headers,
+    )
+    assert delete_res.status_code == 200
+    assert "erased" in delete_res.json()["message"].lower()
+
+    # 6. User can no longer log in
+    login_after = await async_client.post(
+        "/api/v1/auth/login",
+        json={"email": unique_email, "password": password},
+    )
+    assert login_after.status_code == 401
+
+    # 7. Old JWT token cannot access protected /me endpoint
+    profile_after = await async_client.get("/api/v1/auth/me", headers=headers)
+    assert profile_after.status_code == 401
+
+    # 8. The email is completely freed up and can be re-registered
+    re_register = await async_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": unique_email,
+            "password": "BrandNewPassword123!",
+            "full_name": "Reborn Candidate",
+        },
+    )
+    assert re_register.status_code == 201

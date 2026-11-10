@@ -73,6 +73,15 @@ export interface PasswordChangeResponse {
   message: string;
 }
 
+export interface AccountDeletionRequest {
+  current_password: string;
+  confirmation_text: string;
+}
+
+export interface AccountDeletionResponse {
+  message: string;
+}
+
 export interface UserProfileResponse {
   id: string;
   email: string;

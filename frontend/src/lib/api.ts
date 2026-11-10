@@ -5,6 +5,8 @@
  */
 
 import type {
+  AccountDeletionRequest,
+  AccountDeletionResponse,
   AssessmentReportRead,
   BackupCodesRegenerateResponse,
   CandidateTurnRequest,
@@ -70,6 +72,8 @@ function formatApiErrorMessage(detail: string): string {
       return 'An account with this email address already exists. Please sign in instead.';
     case 'USER_INACTIVE':
       return 'This account is currently deactivated. Please contact support.';
+    case 'INVALID_CONFIRMATION_TEXT':
+      return 'Confirmation text does not match "DELETE". Please retype DELETE in all caps.';
     default:
       return detail;
   }
@@ -154,6 +158,12 @@ export const authApi = {
     }),
 
   getProfile: () => fetchApi<UserProfileResponse>('/api/v1/auth/me'),
+
+  deleteAccount: (payload: AccountDeletionRequest) =>
+    fetchApi<AccountDeletionResponse>('/api/v1/auth/me', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const rolesApi = {

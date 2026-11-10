@@ -104,3 +104,21 @@ class UserProfileResponse(BaseModel):
     primary_discipline: str
     years_experience: int
     remaining_backup_codes: int
+
+
+class AccountDeletionRequest(BaseModel):
+    """Payload for authenticated candidate requesting permanent account erasure."""
+
+    current_password: str = Field(
+        min_length=1,
+        description="Current plaintext password for re-authentication",
+    )
+    confirmation_text: str = Field(description="Must match 'DELETE' to confirm permanent erasure")
+
+
+class AccountDeletionResponse(BaseModel):
+    """Confirmation returned after permanently erasing candidate account."""
+
+    message: str = (
+        "Account and all associated candidate practice data have been permanently erased."
+    )
