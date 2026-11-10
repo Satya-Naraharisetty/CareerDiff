@@ -4,8 +4,9 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from app.api.v1.endpoints.websocket import router as ws_router
 from app.api.v1.router import api_v1_router
@@ -68,3 +69,32 @@ async def root() -> dict[str, str]:
         "status": "online",
         "docs": "/docs",
     }
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+async def robots_txt() -> str:
+    """Serve SEO robots exclusion standard for search crawlers."""
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        "Disallow: /ws/\n\n"
+        "Sitemap: https://intervuex.dev/sitemap.xml\n"
+    )
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml() -> Response:
+    """Serve XML sitemap for search engine indexing."""
+    xml_content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        "    <loc>https://intervuex.dev/</loc>\n"
+        "    <lastmod>2026-11-10</lastmod>\n"
+        "    <changefreq>weekly</changefreq>\n"
+        "    <priority>1.0</priority>\n"
+        "  </url>\n"
+        "</urlset>"
+    )
+    return Response(content=xml_content, media_type="application/xml")

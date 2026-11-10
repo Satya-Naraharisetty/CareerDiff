@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.interview import BlueprintTopic, Interview, InterviewBlueprint, InterviewTurn
-from app.models.resume import ResumeClaim
+from app.models.resume import Resume, ResumeClaim
+from app.models.user import CandidateProfile, User
 from app.schemas.adaptive import (
     CandidateTurnRequest,
     EngineAction,
@@ -62,8 +63,40 @@ class TurnService:
         interview.state = fsm.state.value
         interview.started_at = datetime.now(timezone.utc)
 
-        # Generate Turn 0: WARMUP Greeting
-        greeting_text = TurnGenerator.generate_warmup_greeting()
+        # Load candidate profile and latest resume for personalized greeting
+        stmt_prof = (
+            select(CandidateProfile)
+            .options(
+                selectinload(CandidateProfile.user),
+                selectinload(CandidateProfile.resumes).selectinload(Resume.claims),
+            )
+            .where(CandidateProfile.id == interview.candidate_profile_id)
+        )
+        profile = (await db.execute(stmt_prof)).scalar_one_or_none()
+        cand_name: str | None = None
+        key_claim: str | None = None
+        skills: list[str] = []
+        if profile:
+            cand_name = profile.user.full_name if profile.user else None
+            skills = profile.verified_skills or []
+            if profile.resumes:
+                latest_resume = sorted(profile.resumes, key=lambda r: r.created_at, reverse=True)[0]
+                if latest_resume.claims:
+                    for c in latest_resume.claims:
+                        if c.category == "EXPLICIT_FACT":
+                            key_claim = c.claim_text
+                            break
+                    if not key_claim and latest_resume.claims:
+                        key_claim = latest_resume.claims[0].claim_text
+
+        # Generate Turn 0: WARMUP Greeting grounded in candidate resume
+        greeting_text = TurnGenerator.generate_warmup_greeting(
+            candidate_name=cand_name,
+            target_seniority=interview.target_seniority,
+            primary_discipline=profile.primary_discipline if profile else "BACKEND",
+            top_skills=skills,
+            key_claim=key_claim,
+        )
         turn_0 = InterviewTurn(
             interview_id=interview.id,
             turn_index=0,
@@ -174,10 +207,29 @@ class TurnService:
             # Candidate answered warmup -> Advance to TECHNICAL_CORE and introduce first topic
             fsm.transition(InterviewState.TECHNICAL_CORE)
             approved_action = EngineAction.CHANGE_TOPIC
-            interviewer_text = TurnGenerator.generate_question(
-                action=approved_action,
+
+            # Fetch claims for this topic if available
+            first_claim_text: str | None = None
+            if active_topic.mapped_claim_ids:
+                claim_id = active_topic.mapped_claim_ids[0]
+                claim_res = await db.execute(
+                    select(ResumeClaim.claim_text).where(ResumeClaim.id == uuid.UUID(claim_id))
+                )
+                first_claim_text = claim_res.scalar_one_or_none()
+
+            stmt_user = (
+                select(User.full_name)
+                .join(CandidateProfile, CandidateProfile.user_id == User.id)
+                .where(CandidateProfile.id == interview.candidate_profile_id)
+            )
+            candidate_name = (await db.execute(stmt_user)).scalar_one_or_none()
+
+            interviewer_text = TurnGenerator.generate_warmup_transition_question(
                 topic_name=active_topic.topic_name,
+                candidate_warmup_answer=request.transcript,
                 target_seniority=interview.target_seniority,
+                claim_text=first_claim_text,
+                candidate_name=candidate_name,
             )
 
         elif fsm.state == InterviewState.TECHNICAL_CORE:

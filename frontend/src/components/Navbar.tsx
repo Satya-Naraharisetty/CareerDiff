@@ -1,23 +1,36 @@
 import React from 'react';
-import { Bot, LogIn, LogOut, Radio, Sparkles, User as UserIcon } from 'lucide-react';
+import { Bot, Home, LogIn, LogOut, Radio, Sparkles, User as UserIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 
 interface NavbarProps {
   onOpenAuth: () => void;
-  currentView: 'setup' | 'interview' | 'dossier';
-  onNavigate: (view: 'setup' | 'interview' | 'dossier') => void;
+  currentView: 'home' | 'setup' | 'interview' | 'dossier';
+  onNavigate: (view: 'home' | 'setup' | 'interview' | 'dossier') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavigate }) => {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { state: interviewState, wsStatus, mode } = useInterviewStore();
 
+  const handleLogout = () => {
+    logout();
+    onNavigate('home');
+  };
+
+  const handleGuardedNavigate = (view: 'setup' | 'interview' | 'dossier') => {
+    if (!isAuthenticated) {
+      onOpenAuth();
+    } else {
+      onNavigate(view);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('setup')}>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onNavigate('home')}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/20">
             <Bot className="h-6 w-6 text-white" />
           </div>
@@ -33,9 +46,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
         </div>
 
         {/* Center Navigation / Active Status Indicator */}
-        <div className="hidden md:flex items-center gap-2">
+        <nav className="hidden md:flex items-center gap-2" aria-label="Main Navigation">
           <button
-            onClick={() => onNavigate('setup')}
+            onClick={() => onNavigate('home')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+              currentView === 'home'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Home className="h-4 w-4 text-indigo-400" />
+            Home
+          </button>
+
+          <button
+            onClick={() => handleGuardedNavigate('setup')}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
               currentView === 'setup'
                 ? 'bg-slate-800 text-white shadow-sm'
@@ -46,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
           </button>
 
           <button
-            onClick={() => onNavigate('interview')}
+            onClick={() => handleGuardedNavigate('interview')}
             className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
               currentView === 'interview'
                 ? 'bg-indigo-950/80 text-indigo-200 border border-indigo-700/60 shadow-sm'
@@ -63,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
           </button>
 
           <button
-            onClick={() => onNavigate('dossier')}
+            onClick={() => handleGuardedNavigate('dossier')}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
               currentView === 'dossier'
                 ? 'bg-slate-800 text-white shadow-sm'
@@ -73,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
             <Sparkles className="h-4 w-4 text-amber-400" />
             Assessment Dossier
           </button>
-        </div>
+        </nav>
 
         {/* Right Section: Status Pill & Auth Controls */}
         <div className="flex items-center gap-3">
@@ -91,21 +116,30 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
                 <span className="text-xs font-medium text-slate-300">{user.full_name || user.email}</span>
               </div>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 title="Sign Out"
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-200 transition-colors"
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-900 hover:text-rose-400 transition-colors"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
             </div>
           ) : (
-            <button
-              onClick={onOpenAuth}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-indigo-500 transition-all active:scale-95"
-            >
-              <LogIn className="h-4 w-4" />
-              Sign In
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenAuth}
+                className="flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-900 transition-all"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </button>
+              <button
+                onClick={onOpenAuth}
+                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-indigo-500 transition-all active:scale-95"
+              >
+                Get Started Free
+              </button>
+            </div>
           )}
         </div>
       </div>

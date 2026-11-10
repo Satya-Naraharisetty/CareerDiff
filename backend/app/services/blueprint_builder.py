@@ -155,14 +155,18 @@ def calculate_topic_time_budgets(
 def match_claims_to_competency(
     competency_slug: str,
     claims: list[ResumeClaim],
+    competency_name: str | None = None,
 ) -> list[str]:
-    """Identify resume claims matching a competency's domain keywords."""
-    keywords = COMPETENCY_DOMAIN_KEYWORDS.get(competency_slug, [])
-    matched_ids: list[str] = []
+    """Identify resume claims matching a competency's domain keywords or title."""
+    keywords = list(COMPETENCY_DOMAIN_KEYWORDS.get(competency_slug, []))
+    if competency_name:
+        for word in re.findall(r"[a-zA-Z]{4,}", competency_name.lower()):
+            if word not in {"engineering", "architecture", "design", "level", "management"}:
+                keywords.append(word)
 
+    matched_ids: list[str] = []
     for claim in claims:
         claim_content = f"{claim.claim_text} {' '.join(claim.technologies)}".lower()
-        # Check if any domain keyword matches
         if any(re.search(r"\b" + re.escape(kw) + r"\b", claim_content) for kw in keywords):
             matched_ids.append(str(claim.id))
 
@@ -218,7 +222,7 @@ async def generate_interview_blueprint(
 
     for idx, comp in enumerate(selected_competencies):
         allocated_secs = time_budget.topic_budgets[idx]
-        mapped_claim_ids = match_claims_to_competency(comp.slug, claims)
+        mapped_claim_ids = match_claims_to_competency(comp.slug, claims, comp.name)
 
         topic = BlueprintTopic(
             blueprint_id=blueprint.id,

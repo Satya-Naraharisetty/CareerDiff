@@ -13,6 +13,10 @@ import type {
   InterviewDetailResponse,
   InterviewerTurnResponse,
   InterviewTurnRead,
+  JdAnalysisRequest,
+  JdAnalysisResponse,
+  ResumeAnalysisResponse,
+  ResumeTextUploadRequest,
   RoleListResponse,
   TokenResponse,
   UserLoginRequest,
@@ -105,6 +109,11 @@ export const authApi = {
 
 export const rolesApi = {
   list: () => fetchApi<RoleListResponse>('/api/v1/roles'),
+  analyzeJd: (payload: JdAnalysisRequest) =>
+    fetchApi<JdAnalysisResponse>('/api/v1/roles/analyze-jd', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const interviewsApi = {
@@ -143,4 +152,24 @@ export const interviewsApi = {
 
   getReport: (interviewId: string) =>
     fetchApi<AssessmentReportRead>(`/api/v1/interviews/${interviewId}/report`),
+};
+
+
+export const resumesApi = {
+  uploadFile: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchApi<ResumeAnalysisResponse>('/api/v1/resumes', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  uploadText: (payload: ResumeTextUploadRequest) =>
+    fetchApi<ResumeAnalysisResponse>('/api/v1/resumes/text', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getLatest: () => fetchApi<ResumeAnalysisResponse>('/api/v1/resumes/latest'),
 };

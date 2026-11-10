@@ -24,6 +24,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     state: sessionState,
     mode,
     targetSeniority,
+    blueprint,
     turns,
     partialTranscript,
     isSubmitting,
@@ -45,6 +46,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
   const [textInput, setTextInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const hasStartedRef = useRef(false);
+  const hasVoiceInitedRef = useRef(false);
 
   // Auto-scroll on turns or partial text updates
   useEffect(() => {
@@ -53,10 +56,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
   // Initialize session on mount
   useEffect(() => {
-    if (sessionState === 'CREATED') {
+    if (sessionState === 'CREATED' && !hasStartedRef.current) {
+      hasStartedRef.current = true;
       startInterview();
     }
-    if (mode === 'VOICE' && wsStatus === 'disconnected') {
+    if (mode === 'VOICE' && wsStatus === 'disconnected' && !hasVoiceInitedRef.current) {
+      hasVoiceInitedRef.current = true;
       initVoiceSession();
     }
   }, [sessionState, mode, wsStatus, startInterview, initVoiceSession]);
@@ -108,6 +113,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             <span className="font-medium text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40">
               {currentTopic || 'Session Warmup'}
             </span>
+            {blueprint?.topics?.find((t) => t.topic_name === currentTopic && t.mapped_claims_count > 0) && (
+              <span className="hidden lg:inline-flex items-center gap-1 rounded bg-emerald-950/80 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-800/60">
+                <CheckCircle className="h-3 w-3 text-emerald-400" />
+                Resume Claim Grounded
+              </span>
+            )}
           </div>
 
           <span className="hidden sm:inline-flex rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-slate-300 border border-slate-700">

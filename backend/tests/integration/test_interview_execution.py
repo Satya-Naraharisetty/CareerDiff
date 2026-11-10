@@ -197,3 +197,86 @@ async def test_chat_interface_endpoint(async_client: AsyncClient) -> None:
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
     assert "IntervueX — Live Technical Interview" in res.text
+
+
+@pytest.mark.asyncio
+async def test_resume_grounded_warmup_and_transition(async_client: AsyncClient) -> None:
+    """Verify Turn 0 cites resume claims and Turn 1 incorporates warmup response."""
+    email = f"resume_cand_{uuid.uuid4().hex[:8]}@example.com"
+    reg_res = await async_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": email,
+            "password": "SecurePassword123!",
+            "full_name": "Jordan Lee",
+        },
+    )
+    assert reg_res.status_code == 201
+    token: str = reg_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Ingest candidate resume text with explicit claims
+    resume_text = (
+        "Jordan Lee - Senior Backend Systems Engineer\n"
+        "Experience\n"
+        "• Architected low-latency Kafka pipeline processing 50k events/sec\n"
+        "• Scaled PostgreSQL database using read replicas and Redis caching\n"
+        "• Implemented distributed locking with Redlock algorithm\n"
+    )
+    res_upload = await async_client.post(
+        "/api/v1/resumes/text",
+        json={"raw_text": resume_text, "filename": "jordan_resume.txt"},
+        headers=headers,
+    )
+    assert res_upload.status_code == 202
+    res_data = res_upload.json()
+    assert res_data["detected_seniority"] == "SENIOR"
+    assert len(res_data["claims"]) >= 2
+
+    # 2. Schedule interview
+    roles_res = await async_client.get("/api/v1/roles", headers=headers)
+    roles = roles_res.json()["items"]
+    backend_role = next(r for r in roles if r["slug"] == "backend-engineering")
+
+    create_res = await async_client.post(
+        "/api/v1/interviews",
+        json={
+            "role_id": backend_role["id"],
+            "target_seniority": "SENIOR",
+            "duration_minutes": 30,
+            "mode": "TEXT",
+        },
+        headers=headers,
+    )
+    assert create_res.status_code == 201
+    interview_id = create_res.json()["interview_id"]
+
+    # 3. Start interview -> Turn 0 greeting MUST cite resume and Jordan's name
+    start_res = await async_client.post(f"/api/v1/interviews/{interview_id}/start", headers=headers)
+    assert start_res.status_code == 200
+    turn_0 = start_res.json()
+    assert "Jordan Lee" in turn_0["transcript"]
+    assert "reviewed your resume" in turn_0["transcript"]
+    # Check that a technology or claim from resume is woven into Turn 0
+    assert any(tech in turn_0["transcript"] for tech in ["Kafka", "PostgreSQL", "Senior"])
+
+    # 4. Candidate answers warmup about their role & experience
+    warmup_answer = (
+        "At my recent company, I led the core payments gateway engineering team. "
+        "We built a high-throughput event streaming pipeline using Kafka and PostgreSQL, "
+        "handling distributed ledger transactions under intense traffic spikes."
+    )
+    turn_1_res = await async_client.post(
+        f"/api/v1/interviews/{interview_id}/turns",
+        json={"transcript": warmup_answer},
+        headers=headers,
+    )
+    assert turn_1_res.status_code == 200
+    turn_1 = turn_1_res.json()
+    assert turn_1["session_state"] == "TECHNICAL_CORE"
+    # Turn 1 must acknowledge Jordan and their stated role experience or pipeline!
+    assert "Jordan Lee" in turn_1["transcript"] or "Thank you" in turn_1["transcript"]
+    assert any(
+        term in turn_1["transcript"].lower()
+        for term in ["pipeline", "kafka", "distributed", "stream", "background"]
+    )

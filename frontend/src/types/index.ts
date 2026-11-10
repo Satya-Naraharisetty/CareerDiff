@@ -62,6 +62,40 @@ export interface UserProfile {
 }
 
 // ---------------------------------------------------------------------------
+// Resume & Profile Intelligence
+// ---------------------------------------------------------------------------
+export interface ResumeClaimRead {
+  id: string;
+  claim_text: string;
+  category: string;
+  source_section: string;
+  start_offset: number;
+  end_offset: number;
+  technologies: string[];
+  confidence_score: number;
+  created_at?: string;
+}
+
+export interface ResumeTextUploadRequest {
+  raw_text: string;
+  filename?: string;
+}
+
+export interface ResumeAnalysisResponse {
+  resume_id: string;
+  status: string;
+  filename: string;
+  detected_seniority: SeniorityLevel;
+  primary_discipline: string;
+  years_experience: number;
+  summary: string;
+  verified_skills: string[];
+  claims: ResumeClaimRead[];
+  recommended_role_id: string | null;
+  recommended_role_name: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Roles & Competencies
 // ---------------------------------------------------------------------------
 export interface CompetencyRead {
@@ -82,6 +116,21 @@ export interface JobRoleRead {
 
 export interface RoleListResponse {
   items: JobRoleRead[];
+}
+
+export interface JdAnalysisRequest {
+  jd_text: string;
+  job_title?: string | null;
+}
+
+export interface JdAnalysisResponse {
+  role: JobRoleRead;
+  extracted_title: string;
+  detected_seniority: SeniorityLevel;
+  primary_discipline: string;
+  key_requirements: string[];
+  matched_technologies: string[];
+  tailored_competencies: CompetencyRead[];
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,7 @@
+# IntervueX Robots Configuration
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /ws/
+
+Sitemap: https://intervuex.dev/sitemap.xml
