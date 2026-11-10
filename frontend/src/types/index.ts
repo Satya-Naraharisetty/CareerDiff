@@ -42,6 +42,46 @@ export interface UserRegisterResponse {
   full_name: string;
   access_token: string;
   token_type: string;
+  backup_codes?: string[];
+}
+
+export interface PasswordRecoveryRequest {
+  email: string;
+  backup_code: string;
+  new_password: string;
+}
+
+export interface PasswordRecoveryResponse {
+  message: string;
+  access_token: string;
+  token_type: string;
+  remaining_backup_codes: number;
+}
+
+export interface BackupCodesRegenerateResponse {
+  backup_codes: string[];
+  count: number;
+  message: string;
+}
+
+export interface PasswordChangeRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export interface PasswordChangeResponse {
+  message: string;
+}
+
+export interface UserProfileResponse {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  target_seniority: string;
+  primary_discipline: string;
+  years_experience: number;
+  remaining_backup_codes: number;
 }
 
 export interface UserLoginRequest {

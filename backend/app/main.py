@@ -1,6 +1,7 @@
 """IntervueX FastAPI Application Entrypoint."""
 
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -43,13 +44,21 @@ app = FastAPI(
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-# CORS configuration for frontend dev server
+# CORS configuration for frontend dev server and production deployments
+default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+env_cors = os.getenv("CORS_ORIGINS")
+cors_origins = (
+    [o.strip() for o in env_cors.split(",") if o.strip()] if env_cors else default_origins
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

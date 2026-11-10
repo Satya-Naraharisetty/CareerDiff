@@ -1,5 +1,8 @@
 """Cryptographic security utilities for password hashing and JWT lifecycle."""
 
+import hashlib
+import hmac
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -32,6 +35,71 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception:
         return False
+
+
+def hash_backup_code(code: str) -> str:
+    """Normalize and hash a backup recovery code using HMAC-SHA256."""
+    normalized = code.strip().upper().replace("-", "").replace(" ", "")
+    return hmac.new(
+        settings.jwt_secret_key.encode("utf-8"),
+        normalized.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def generate_backup_codes(
+    count: int = 8,
+) -> tuple[list[str], list[dict[str, str | None]]]:
+    """Generate cryptographically secure single-use recovery codes.
+
+    Returns:
+        tuple of (plain_codes, hashed_records)
+    """
+    alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    plain_codes: list[str] = []
+    hashed_records: list[dict[str, str | None]] = []
+
+    for _ in range(count):
+        part1 = "".join(secrets.choice(alphabet) for _ in range(4))
+        part2 = "".join(secrets.choice(alphabet) for _ in range(4))
+        plain = f"{part1}-{part2}"
+        plain_codes.append(plain)
+        hashed_records.append(
+            {
+                "code_hash": hash_backup_code(plain),
+                "used_at": None,
+            }
+        )
+
+    return plain_codes, hashed_records
+
+
+def verify_and_consume_backup_code(
+    candidate_code: str,
+    hashed_records: list[dict[str, str | None]],
+) -> tuple[bool, list[dict[str, str | None]]]:
+    """Verify a candidate backup code and mark it consumed if valid and unused."""
+    cand_hash = hash_backup_code(candidate_code)
+    updated_records: list[dict[str, str | None]] = []
+    matched = False
+
+    for record in hashed_records:
+        rec_copy = dict(record)
+        is_unused = rec_copy.get("used_at") is None
+        code_hash = rec_copy.get("code_hash") or ""
+        if is_unused and hmac.compare_digest(code_hash, cand_hash) and not matched:
+            matched = True
+            rec_copy["used_at"] = datetime.now(timezone.utc).isoformat()
+        updated_records.append(rec_copy)
+
+    return matched, updated_records
+
+
+def count_remaining_backup_codes(
+    hashed_records: list[dict[str, str | None]],
+) -> int:
+    """Return count of unused backup recovery codes."""
+    return sum(1 for r in hashed_records if r.get("used_at") is None)
 
 
 def create_access_token(

@@ -12,8 +12,14 @@ from app.schemas.adaptive import (
     Speaker,
 )
 from app.schemas.auth import (
+    BackupCodesRegenerateResponse,
+    PasswordChangeRequest,
+    PasswordChangeResponse,
+    PasswordRecoveryRequest,
+    PasswordRecoveryResponse,
     TokenResponse,
     UserLoginRequest,
+    UserProfileResponse,
     UserRegisterRequest,
     UserRegisterResponse,
 )
@@ -64,6 +70,12 @@ __all__ = [
     "UserRegisterResponse",
     "UserLoginRequest",
     "TokenResponse",
+    "PasswordRecoveryRequest",
+    "PasswordRecoveryResponse",
+    "PasswordChangeRequest",
+    "PasswordChangeResponse",
+    "UserProfileResponse",
+    "BackupCodesRegenerateResponse",
     "ResumeUploadResponse",
     "ResumeClaimRead",
     "ResumeRead",

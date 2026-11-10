@@ -46,6 +46,11 @@ class User(Base):
         default=True,
         nullable=False,
     )
+    hashed_backup_codes: Mapped[list[dict[str, str | None]]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

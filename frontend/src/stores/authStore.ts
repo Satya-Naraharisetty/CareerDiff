@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { authApi } from '../lib/api';
-import type { UserLoginRequest, UserProfile, UserRegisterRequest } from '../types';
+import type {
+  PasswordRecoveryRequest,
+  PasswordRecoveryResponse,
+  UserLoginRequest,
+  UserProfile,
+  UserRegisterRequest,
+  UserRegisterResponse,
+} from '../types';
 
 interface AuthState {
   token: string | null;
@@ -9,7 +16,8 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (credentials: UserLoginRequest) => Promise<void>;
-  register: (payload: UserRegisterRequest) => Promise<void>;
+  register: (payload: UserRegisterRequest) => Promise<UserRegisterResponse>;
+  recoverPassword: (payload: PasswordRecoveryRequest) => Promise<PasswordRecoveryResponse>;
   logout: () => void;
   clearError: () => void;
 }
@@ -77,7 +85,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (payload: UserRegisterRequest) => {
+  register: async (payload: UserRegisterRequest): Promise<UserRegisterResponse> => {
     set({ isLoading: true, error: null });
     try {
       const res = await authApi.register(payload);
@@ -93,8 +101,33 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      return res;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  recoverPassword: async (payload: PasswordRecoveryRequest): Promise<PasswordRecoveryResponse> => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.recoverPassword(payload);
+      const user: UserProfile = {
+        id: 'recovered-user',
+        email: payload.email,
+        full_name: payload.email.split('@')[0],
+      };
+      savePersistedAuth(res.access_token, user);
+      set({
+        token: res.access_token,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      return res;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Password recovery failed';
       set({ error: message, isLoading: false });
       throw err;
     }

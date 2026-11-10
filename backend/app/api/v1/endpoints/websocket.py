@@ -32,6 +32,8 @@ async def interview_voice_gateway(
 ) -> None:
     """Real-time voice streaming endpoint multiplexing 16kHz PCM audio and JSON control frames."""
     redis = get_redis_client()
+    current_tts_task: asyncio.Task[None] | None = None
+    tts_abort_event = asyncio.Event()
     try:
         # 1. Ticket Handshake Authentication
         if not ticket:
@@ -103,8 +105,6 @@ async def interview_voice_gateway(
 
         # 4. Initialize Stream Handlers
         vad = AudioVadProcessor()
-        current_tts_task: asyncio.Task[None] | None = None
-        tts_abort_event = asyncio.Event()
         active_interviewer_turn_index: int = 0
 
         # Spawn initial Turn 0 TTS streaming in background with preemption support
@@ -310,4 +310,7 @@ async def interview_voice_gateway(
         except Exception:
             pass
     finally:
+        if current_tts_task and not current_tts_task.done():
+            tts_abort_event.set()
+            current_tts_task.cancel()
         await redis.aclose()

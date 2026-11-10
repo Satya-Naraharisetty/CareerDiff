@@ -66,6 +66,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     }
   }, [sessionState, mode, wsStatus, startInterview, initVoiceSession]);
 
+  // Cleanup on unmount: guarantee hardware microphone is stopped when leaving room
+  useEffect(() => {
+    return () => {
+      stopVoiceRecording();
+    };
+  }, [stopVoiceRecording]);
+
   const handleSendText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!textInput.trim() || isSubmitting) return;

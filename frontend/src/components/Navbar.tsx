@@ -5,11 +5,12 @@ import { useInterviewStore } from '../stores/interviewStore';
 
 interface NavbarProps {
   onOpenAuth: () => void;
+  onOpenProfile: () => void;
   currentView: 'home' | 'setup' | 'interview' | 'dossier';
   onNavigate: (view: 'home' | 'setup' | 'interview' | 'dossier') => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onOpenProfile, currentView, onNavigate }) => {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { state: interviewState, wsStatus, mode } = useInterviewStore();
 
@@ -111,10 +112,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, currentView, onNavig
 
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 border border-slate-800">
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                title="View Profile & Security Settings"
+                className="flex items-center gap-2 rounded-lg bg-slate-900 hover:bg-slate-800 hover:border-slate-700 px-3 py-1.5 border border-slate-800 text-xs font-medium text-slate-300 hover:text-white transition-all focus-visible:outline-2 focus-visible:outline-indigo-500 cursor-pointer"
+              >
                 <UserIcon className="h-4 w-4 text-indigo-400" />
-                <span className="text-xs font-medium text-slate-300">{user.full_name || user.email}</span>
-              </div>
+                <span className="max-w-[140px] truncate sm:max-w-[200px]">{user.full_name || user.email}</span>
+              </button>
               <button
                 onClick={handleLogout}
                 title="Sign Out"

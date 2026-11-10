@@ -172,9 +172,19 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       // 1. Get single-use ephemeral ticket from Redis
       const ticketRes = await interviewsApi.getWsTicket(interviewId);
 
-      // 2. Build full WebSocket URL
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}${ticketRes.websocket_url}`;
+      // 2. Build full WebSocket URL with dynamic host support
+      let wsBase = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+      const configuredApi = import.meta.env.VITE_API_URL as string | undefined;
+      if (configuredApi) {
+        try {
+          const parsed = new URL(configuredApi);
+          const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsBase = `${wsProtocol}//${parsed.host}`;
+        } catch {
+          // Keep default location host
+        }
+      }
+      const wsUrl = `${wsBase}${ticketRes.websocket_url}`;
 
       if (activeWs) {
         activeWs.close();

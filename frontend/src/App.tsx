@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Navbar } from './components/Navbar';
 import { AuthModal } from './components/AuthModal';
+import { ProfileModal } from './components/ProfileModal';
 import { HomePage } from './components/HomePage';
 import { InterviewSetup } from './components/InterviewSetup';
 import { InterviewRoom } from './components/InterviewRoom';
@@ -26,6 +27,7 @@ export const AppContent: React.FC = () => {
     isAuthenticated ? 'setup' : 'home'
   );
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { reset: resetInterview } = useInterviewStore();
 
   const handleAuthSuccess = () => {
@@ -72,6 +74,7 @@ export const AppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       <Navbar
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
         currentView={currentView}
         onNavigate={(view) => setCurrentView(view)}
       />
@@ -181,6 +184,11 @@ export const AppContent: React.FC = () => {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onSuccess={handleAuthSuccess}
+      />
+
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
       />
     </div>
   );

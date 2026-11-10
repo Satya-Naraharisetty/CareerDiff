@@ -6,6 +6,7 @@
 
 import type {
   AssessmentReportRead,
+  BackupCodesRegenerateResponse,
   CandidateTurnRequest,
   EvaluationTriggerResponse,
   InterviewCreateRequest,
@@ -15,11 +16,16 @@ import type {
   InterviewTurnRead,
   JdAnalysisRequest,
   JdAnalysisResponse,
+  PasswordChangeRequest,
+  PasswordChangeResponse,
+  PasswordRecoveryRequest,
+  PasswordRecoveryResponse,
   ResumeAnalysisResponse,
   ResumeTextUploadRequest,
   RoleListResponse,
   TokenResponse,
   UserLoginRequest,
+  UserProfileResponse,
   UserRegisterRequest,
   UserRegisterResponse,
   WsTicketResponse,
@@ -48,6 +54,27 @@ const getAuthToken = (): string | null => {
   }
 };
 
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '';
+
+function formatApiErrorMessage(detail: string): string {
+  switch (detail) {
+    case 'INVALID_CREDENTIALS':
+      return 'Incorrect email or password. Please check your credentials and try again.';
+    case 'INVALID_CURRENT_PASSWORD':
+      return 'The current password you entered is incorrect.';
+    case 'NEW_PASSWORD_SAME_AS_CURRENT':
+      return 'Your new password must be different from your current password.';
+    case 'INVALID_RECOVERY_CODE':
+      return 'Invalid or already consumed backup recovery code. Please check the code and try again.';
+    case 'USER_ALREADY_EXISTS':
+      return 'An account with this email address already exists. Please sign in instead.';
+    case 'USER_INACTIVE':
+      return 'This account is currently deactivated. Please contact support.';
+    default:
+      return detail;
+  }
+}
+
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
@@ -60,7 +87,8 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(endpoint, {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
+  const response = await fetch(url, {
     ...options,
     headers,
   });
@@ -73,11 +101,13 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
       if (typeof errorData === 'object' && errorData !== null) {
         const obj = errorData as Record<string, unknown>;
         if (typeof obj.detail === 'string') {
-          errorDetail = obj.detail;
+          errorDetail = formatApiErrorMessage(obj.detail);
         } else if (Array.isArray(obj.detail)) {
-          errorDetail = obj.detail.map((err) => (typeof err === 'object' && err?.msg ? err.msg : JSON.stringify(err))).join(', ');
+          errorDetail = obj.detail
+            .map((err) => (typeof err === 'object' && err?.msg ? err.msg : JSON.stringify(err)))
+            .join(', ');
         } else if (typeof obj.title === 'string') {
-          errorDetail = obj.title;
+          errorDetail = formatApiErrorMessage(obj.title);
         }
       }
     } catch {
@@ -105,6 +135,25 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  recoverPassword: (payload: PasswordRecoveryRequest) =>
+    fetchApi<PasswordRecoveryResponse>('/api/v1/auth/recover-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  regenerateBackupCodes: () =>
+    fetchApi<BackupCodesRegenerateResponse>('/api/v1/auth/backup-codes/regenerate', {
+      method: 'POST',
+    }),
+
+  changePassword: (payload: PasswordChangeRequest) =>
+    fetchApi<PasswordChangeResponse>('/api/v1/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getProfile: () => fetchApi<UserProfileResponse>('/api/v1/auth/me'),
 };
 
 export const rolesApi = {

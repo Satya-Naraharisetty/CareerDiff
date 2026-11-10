@@ -37,6 +37,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   useEffect(() => {
     let isMounted = true;
     let pollCount = 0;
+    let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchOrPollReport() {
       if (!interviewId) {
@@ -54,7 +55,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
         // If report is still compiling in background, poll every 2.5s for up to 30s
         if (pollCount < 12 && isMounted) {
           pollCount++;
-          setTimeout(fetchOrPollReport, 2500);
+          pollTimeoutId = setTimeout(fetchOrPollReport, 2500);
         } else if (isMounted) {
           setError('Evaluation report compilation is still pending. Please refresh in a moment.');
           setIsLoading(false);
@@ -65,6 +66,9 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     fetchOrPollReport();
     return () => {
       isMounted = false;
+      if (pollTimeoutId) {
+        clearTimeout(pollTimeoutId);
+      }
     };
   }, [interviewId]);
 
