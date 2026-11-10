@@ -36,6 +36,23 @@ def test_custom_environment_override() -> None:
         assert cfg.jwt_access_token_expire_minutes == 60
 
 
+def test_database_url_normalization() -> None:
+    """Verify standard postgres:// and postgresql:// URLs are normalized to postgresql+asyncpg://."""
+    with patch.dict(
+        os.environ,
+        {"DATABASE_URL": "postgres://user:secret@roundhouse.proxy.rlwy.net:1234/railway"},
+    ):
+        cfg = Settings()
+        assert cfg.database_url == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+
+    with patch.dict(
+        os.environ,
+        {"DATABASE_URL": "postgresql://user:secret@roundhouse.proxy.rlwy.net:1234/railway"},
+    ):
+        cfg = Settings()
+        assert cfg.database_url == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+
+
 def test_get_settings_cache() -> None:
     """Verify get_settings returns a singleton instance."""
     s1 = get_settings()

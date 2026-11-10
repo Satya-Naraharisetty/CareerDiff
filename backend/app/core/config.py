@@ -22,6 +22,15 @@ def _load_env_file(env_path: Path) -> None:
                 os.environ[key] = val
 
 
+def normalize_database_url(url: str) -> str:
+    """Normalize database URL for asyncpg driver compatibility in production."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 # Load backend/.env or root .env on import if present
 for potential_path in [
     Path(__file__).resolve().parent.parent.parent / ".env",
@@ -38,15 +47,19 @@ class Settings(BaseModel):
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
     database_url: str = Field(
-        default_factory=lambda: os.getenv(
-            "DATABASE_URL",
-            "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_dev",
+        default_factory=lambda: normalize_database_url(
+            os.getenv(
+                "DATABASE_URL",
+                "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_dev",
+            )
         )
     )
     test_database_url: str = Field(
-        default_factory=lambda: os.getenv(
-            "TEST_DATABASE_URL",
-            "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_test",
+        default_factory=lambda: normalize_database_url(
+            os.getenv(
+                "TEST_DATABASE_URL",
+                "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_test",
+            )
         )
     )
 
