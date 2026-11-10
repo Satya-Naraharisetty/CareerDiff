@@ -224,6 +224,7 @@ export interface InterviewDetailResponse {
 export interface CandidateTurnRequest {
   transcript: string;
   duration_ms?: number | null;
+  code_snippet?: string | null;
 }
 
 export interface InterviewerTurnResponse {

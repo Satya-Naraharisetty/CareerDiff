@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Navbar } from './components/Navbar';
+import { CommandPalette } from './components/CommandPalette';
 import { AuthModal } from './components/AuthModal';
 import { ProfileModal } from './components/ProfileModal';
 import { HomePage } from './components/HomePage';
@@ -28,7 +29,20 @@ export const AppContent: React.FC = () => {
   );
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const { reset: resetInterview } = useInterviewStore();
+
+  // Global Cmd+K / Ctrl+K keyboard shortcut listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const handleAuthSuccess = () => {
     setIsAuthOpen(false);
@@ -77,6 +91,7 @@ export const AppContent: React.FC = () => {
         onOpenProfile={() => setIsProfileOpen(true)}
         currentView={currentView}
         onNavigate={(view) => setCurrentView(view)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
 
       <main className="flex-1" id="main-content" role="main">
@@ -181,6 +196,14 @@ export const AppContent: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(view) => setCurrentView(view)}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
+      />
 
       <AuthModal
         isOpen={isAuthOpen}

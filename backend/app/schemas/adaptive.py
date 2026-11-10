@@ -78,6 +78,11 @@ class CandidateTurnRequest(BaseModel):
 
     transcript: str = Field(min_length=1, max_length=10000)
     duration_ms: int | None = Field(default=None, ge=0)
+    code_snippet: str | None = Field(
+        default=None,
+        max_length=15000,
+        description="Optional architecture diagram, SQL schema, or code snippet from scratchpad",
+    )
 
 
 class InterviewerTurnResponse(BaseModel):

@@ -35,9 +35,10 @@ interface InterviewStoreState {
     seniority: SeniorityLevel,
     blueprint: InterviewBlueprintRead
   ) => void;
+  setMode: (mode: InterviewMode) => void;
   loadTurns: (interviewId: string) => Promise<void>;
   startInterview: () => Promise<void>;
-  submitTextTurn: (text: string) => Promise<void>;
+  submitTextTurn: (text: string, codeSnippet?: string) => Promise<void>;
   initVoiceSession: () => Promise<void>;
   startVoiceRecording: () => Promise<void>;
   stopVoiceRecording: () => void;
@@ -84,6 +85,10 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     });
   },
 
+  setMode: (mode) => {
+    set({ mode });
+  },
+
   loadTurns: async (interviewId: string) => {
     try {
       const turns = await interviewsApi.getTurns(interviewId);
@@ -120,14 +125,18 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     }
   },
 
-  submitTextTurn: async (text: string) => {
+  submitTextTurn: async (text: string, codeSnippet?: string) => {
     const { interviewId, turns } = get();
     if (!interviewId || !text.trim()) return;
+
+    const displayedTranscript = codeSnippet && codeSnippet.trim()
+      ? `${text.trim()}\n\n[Attached Scratchpad Snippet]:\n\`\`\`\n${codeSnippet.trim()}\n\`\`\``
+      : text.trim();
 
     const candidateTurn: InterviewTurnRead = {
       turn_index: turns.length,
       speaker: 'CANDIDATE',
-      transcript: text.trim(),
+      transcript: displayedTranscript,
       created_at: new Date().toISOString(),
     };
 
@@ -140,6 +149,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     try {
       const res = await interviewsApi.submitTurn(interviewId, {
         transcript: text.trim(),
+        code_snippet: codeSnippet?.trim() || null,
       });
 
       const interviewerTurn: InterviewTurnRead = {

@@ -43,14 +43,20 @@ def test_database_url_normalization() -> None:
         {"DATABASE_URL": "postgres://user:secret@roundhouse.proxy.rlwy.net:1234/railway"},
     ):
         cfg = Settings()
-        assert cfg.database_url == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+        assert (
+            cfg.database_url
+            == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+        )
 
     with patch.dict(
         os.environ,
         {"DATABASE_URL": "postgresql://user:secret@roundhouse.proxy.rlwy.net:1234/railway"},
     ):
         cfg = Settings()
-        assert cfg.database_url == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+        assert (
+            cfg.database_url
+            == "postgresql+asyncpg://user:secret@roundhouse.proxy.rlwy.net:1234/railway"
+        )
 
 
 def test_get_settings_cache() -> None:

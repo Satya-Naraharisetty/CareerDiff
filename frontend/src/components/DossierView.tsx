@@ -6,11 +6,13 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Download,
   FileText,
   Loader2,
   RotateCcw,
   ShieldAlert,
   TrendingUp,
+  Zap,
 } from 'lucide-react';
 import { interviewsApi } from '../lib/api';
 import { useInterviewStore } from '../stores/interviewStore';
@@ -244,6 +246,16 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
               Candidate Competency Grounding
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-sans">{report.summary}</p>
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-mono font-medium text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors shadow-sm"
+              >
+                <Download className="h-3.5 w-3.5 text-zinc-400" />
+                Export / Print Dossier (PDF)
+              </button>
+            </div>
           </div>
 
           {/* Rating Badge */}
@@ -284,13 +296,26 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
           <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 shadow-sm">
             <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
-              <ShieldAlert className="h-3.5 w-3.5" /> Technical Gaps &amp; Risks
+              <ShieldAlert className="h-3.5 w-3.5" /> Technical Gaps &amp; Targeted Practice
             </h3>
-            <ul className="space-y-2 text-xs sm:text-sm text-amber-200 font-sans">
+            <ul className="space-y-2.5 text-xs sm:text-sm text-amber-200 font-sans">
               {report.knowledge_gaps.map((g, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-1 font-mono">•</span>
-                  <span>{g}</span>
+                <li
+                  key={idx}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-950/30 border border-amber-900/40"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-400 mt-0.5 font-mono">•</span>
+                    <span>{g}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onReset}
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold px-2.5 py-1 text-[11px] transition-colors shadow-sm self-start sm:self-auto"
+                  >
+                    <Zap className="h-3 w-3" />
+                    Practice Gap
+                  </button>
                 </li>
               ))}
             </ul>

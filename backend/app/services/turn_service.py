@@ -155,11 +155,18 @@ class TurnService:
 
         # 2. Durability Invariant: Commit candidate turn to PostgreSQL FIRST
         next_turn_index = len(interview.turns)
+        full_transcript = request.transcript
+        if request.code_snippet and request.code_snippet.strip():
+            full_transcript = (
+                f"{request.transcript}\n\n"
+                f"[Attached Scratchpad / Diagram]:\n```\n{request.code_snippet.strip()}\n```"
+            )
+
         candidate_turn = InterviewTurn(
             interview_id=interview.id,
             turn_index=next_turn_index,
             speaker="CANDIDATE",
-            transcript=request.transcript,
+            transcript=full_transcript,
             audio_duration_ms=request.duration_ms,
         )
         db.add(candidate_turn)
