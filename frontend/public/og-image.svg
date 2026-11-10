@@ -1,88 +1,130 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#030712"/>
-      <stop offset="50%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#020617"/>
-    </linearGradient>
-    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="50%" stop-color="#8b5cf6"/>
-      <stop offset="100%" stop-color="#a855f7"/>
-    </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+      <stop offset="0%" stop-color="#09090b"/>
+      <stop offset="50%" stop-color="#121215"/>
+      <stop offset="100%" stop-color="#09090b"/>
     </linearGradient>
   </defs>
 
   <!-- Background -->
   <rect width="1200" height="630" fill="url(#bg)"/>
 
-  <!-- Decorative Grid Overlay -->
-  <g opacity="0.08" stroke="#ffffff" stroke-width="1">
-    <line x1="100" y1="0" x2="100" y2="630"/>
-    <line x1="250" y1="0" x2="250" y2="630"/>
-    <line x1="400" y1="0" x2="400" y2="630"/>
-    <line x1="550" y1="0" x2="550" y2="630"/>
-    <line x1="700" y1="0" x2="700" y2="630"/>
-    <line x1="850" y1="0" x2="850" y2="630"/>
-    <line x1="1000" y1="0" x2="1000" y2="630"/>
-    <line x1="1150" y1="0" x2="1150" y2="630"/>
+  <!-- Decorative Technical Dot Grid Overlay -->
+  <g opacity="0.12" fill="#71717a">
+    <circle cx="100" cy="100" r="1.5"/>
+    <circle cx="200" cy="100" r="1.5"/>
+    <circle cx="300" cy="100" r="1.5"/>
+    <circle cx="400" cy="100" r="1.5"/>
+    <circle cx="500" cy="100" r="1.5"/>
+    <circle cx="600" cy="100" r="1.5"/>
+    <circle cx="700" cy="100" r="1.5"/>
+    <circle cx="800" cy="100" r="1.5"/>
+    <circle cx="900" cy="100" r="1.5"/>
+    <circle cx="1000" cy="100" r="1.5"/>
+    <circle cx="1100" cy="100" r="1.5"/>
 
-    <line x1="0" y1="100" x2="1200" y2="100"/>
-    <line x1="0" y1="200" x2="1200" y2="200"/>
-    <line x1="0" y1="300" x2="1200" y2="300"/>
-    <line x1="0" y1="400" x2="1200" y2="400"/>
-    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <circle cx="100" cy="200" r="1.5"/>
+    <circle cx="200" cy="200" r="1.5"/>
+    <circle cx="300" cy="200" r="1.5"/>
+    <circle cx="400" cy="200" r="1.5"/>
+    <circle cx="500" cy="200" r="1.5"/>
+    <circle cx="600" cy="200" r="1.5"/>
+    <circle cx="700" cy="200" r="1.5"/>
+    <circle cx="800" cy="200" r="1.5"/>
+    <circle cx="900" cy="200" r="1.5"/>
+    <circle cx="1000" cy="200" r="1.5"/>
+    <circle cx="1100" cy="200" r="1.5"/>
+
+    <circle cx="100" cy="300" r="1.5"/>
+    <circle cx="200" cy="300" r="1.5"/>
+    <circle cx="300" cy="300" r="1.5"/>
+    <circle cx="400" cy="300" r="1.5"/>
+    <circle cx="500" cy="300" r="1.5"/>
+    <circle cx="600" cy="300" r="1.5"/>
+    <circle cx="700" cy="300" r="1.5"/>
+    <circle cx="800" cy="300" r="1.5"/>
+    <circle cx="900" cy="300" r="1.5"/>
+    <circle cx="1000" cy="300" r="1.5"/>
+    <circle cx="1100" cy="300" r="1.5"/>
+
+    <circle cx="100" cy="400" r="1.5"/>
+    <circle cx="200" cy="400" r="1.5"/>
+    <circle cx="300" cy="400" r="1.5"/>
+    <circle cx="400" cy="400" r="1.5"/>
+    <circle cx="500" cy="400" r="1.5"/>
+    <circle cx="600" cy="400" r="1.5"/>
+    <circle cx="700" cy="400" r="1.5"/>
+    <circle cx="800" cy="400" r="1.5"/>
+    <circle cx="900" cy="400" r="1.5"/>
+    <circle cx="1000" cy="400" r="1.5"/>
+    <circle cx="1100" cy="400" r="1.5"/>
+
+    <circle cx="100" cy="500" r="1.5"/>
+    <circle cx="200" cy="500" r="1.5"/>
+    <circle cx="300" cy="500" r="1.5"/>
+    <circle cx="400" cy="500" r="1.5"/>
+    <circle cx="500" cy="500" r="1.5"/>
+    <circle cx="600" cy="500" r="1.5"/>
+    <circle cx="700" cy="500" r="1.5"/>
+    <circle cx="800" cy="500" r="1.5"/>
+    <circle cx="900" cy="500" r="1.5"/>
+    <circle cx="1000" cy="500" r="1.5"/>
+    <circle cx="1100" cy="500" r="1.5"/>
   </g>
 
-  <!-- Glowing Radial Accent -->
-  <circle cx="200" cy="150" r="280" fill="#6366f1" opacity="0.15" filter="blur(80px)"/>
-  <circle cx="1000" cy="450" r="240" fill="#10b981" opacity="0.1" filter="blur(80px)"/>
+  <!-- Ambient Subtle Emerald Glow -->
+  <circle cx="150" cy="120" r="220" fill="#10b981" opacity="0.06" filter="blur(70px)"/>
 
   <!-- Logo Pill Badge -->
-  <rect x="100" y="90" width="220" height="42" rx="21" fill="#1e1b4b" stroke="#4338ca" stroke-width="1"/>
-  <circle cx="122" cy="111" r="6" fill="#10b981"/>
-  <text x="140" y="116" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#c7d2fe" letter-spacing="1">INTERVUEX AI ENGINE</text>
+  <g transform="translate(100, 80)">
+    <rect width="250" height="42" rx="10" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <!-- IntervueX Monogram -->
+    <path d="M20 14L25 21L20 28" stroke="#f4f4f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M34 14L29 21L34 28" stroke="#f4f4f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="27" cy="21" r="1.8" fill="#34d399"/>
+    <text x="44" y="26" font-family="'JetBrains Mono', monospace, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#f4f4f5" letter-spacing="1.5">INTERVUEX</text>
+    <rect x="160" y="10" width="76" height="22" rx="5" fill="#27272a"/>
+    <text x="168" y="25" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="600" fill="#a1a1aa">ENGINE v1.0</text>
+  </g>
 
   <!-- Main Headline -->
-  <text x="100" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="54" font-weight="900" fill="#ffffff" letter-spacing="-1">
-    Autonomous Technical
+  <text x="100" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#ffffff" letter-spacing="-1.5">
+    Autonomous Technical Interview Practice
   </text>
-  <text x="100" y="280" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="54" font-weight="900" fill="url(#brandGrad)" letter-spacing="-1">
-    Interview Simulator &amp; Rubric Engine
+  <text x="100" y="275" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#a1a1aa" letter-spacing="-1.5">
+    Grounded in your real experience.
   </text>
 
   <!-- Subtitle -->
-  <text x="100" y="345" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="400" fill="#94a3b8">
-    Adaptive voice &amp; text mock interviews calibrated directly to your resume claims
+  <text x="100" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#71717a">
+    Zero trivia. Claim provenance indexing, target Job Description calibration, and decoupled
   </text>
-  <text x="100" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="400" fill="#94a3b8">
-    and target Job Description, with decoupled 4-tier rubric assessments.
+  <text x="100" y="372" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#71717a">
+    rubric evaluation powered by deterministic state machine guardrails.
   </text>
 
   <!-- Feature Tags -->
-  <g transform="translate(100, 440)">
+  <g transform="translate(100, 435)">
     <!-- Tag 1 -->
-    <rect x="0" y="0" width="230" height="48" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-    <text x="24" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">📄 Resume Claim Grounding</text>
+    <rect x="0" y="0" width="230" height="46" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <text x="20" y="28" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#e4e4e7">01 Claim Provenance</text>
 
     <!-- Tag 2 -->
-    <rect x="250" y="0" width="230" height="48" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-    <text x="274" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">🎯 Dynamic JD Calibration</text>
+    <rect x="250" y="0" width="230" height="46" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <text x="270" y="28" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#e4e4e7">02 Target Calibration</text>
 
     <!-- Tag 3 -->
-    <rect x="500" y="0" width="230" height="48" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-    <text x="524" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">🎙️ Adaptive Turn Engine</text>
+    <rect x="500" y="0" width="230" height="46" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <text x="520" y="28" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#e4e4e7">03 Adaptive Probing</text>
 
     <!-- Tag 4 -->
-    <rect x="750" y="0" width="240" height="48" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1"/>
-    <text x="774" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" fill="#e2e8f0">📊 4-Tier Rubric Dossier</text>
+    <rect x="750" y="0" width="240" height="46" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+    <text x="770" y="28" font-family="'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#e4e4e7">04 Rubric Grounding</text>
   </g>
 
   <!-- Footer Meta -->
-  <line x1="100" y1="540" x2="1100" y2="540" stroke="#1e293b" stroke-width="1"/>
-  <text x="100" y="580" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#64748b">intervuex.dev</text>
-  <text x="1100" y="580" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="500" fill="#64748b">Production-Grade AI Engineering Practice</text>
+  <line x1="100" y1="535" x2="1100" y2="535" stroke="#27272a" stroke-width="1"/>
+  <text x="100" y="575" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="600" fill="#52525b">intervuex.dev</text>
+  <text x="1100" y="575" text-anchor="end" font-family="'JetBrains Mono', monospace" font-size="13" font-weight="500" fill="#52525b">Zero Biometrics • Strict Rubrics</text>
 </svg>

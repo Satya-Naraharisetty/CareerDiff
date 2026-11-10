@@ -307,10 +307,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       </div>
 
       {!isAuthenticated && (
-        <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 p-3.5 text-xs text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 text-xs text-zinc-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm font-sans">
           <div className="flex items-center gap-2.5">
-            <Lock className="h-4 w-4 shrink-0 text-amber-400" />
-            <span>You are viewing the calibration studio in preview mode. Sign in to analyze your resume and start live interview sessions.</span>
+            <Lock className="h-4 w-4 shrink-0 text-zinc-400" />
+            <span>You are viewing the calibration studio in preview mode. Sign in to analyze your resume and compile live interview sessions.</span>
           </div>
           <button
             type="button"
@@ -323,13 +323,13 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-900/60 bg-red-950/40 p-3.5 text-xs text-red-300 font-mono">
+        <div className="rounded-lg border border-rose-900/60 bg-rose-950/40 p-3.5 text-xs text-rose-300 font-mono">
           {error}
         </div>
       )}
 
       {resumeSuccessMsg && (
-        <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 p-3.5 text-xs text-emerald-300 flex items-center gap-2 font-mono">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 text-xs text-zinc-200 flex items-center gap-2 font-mono">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
           <span>{resumeSuccessMsg}</span>
         </div>
@@ -742,7 +742,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                           </span>
                         </div>
                       </div>
-                      <span className="text-xs text-emerald-400 font-medium bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-800/40">
+                      <span className="text-xs text-zinc-300 font-medium bg-zinc-900 px-2.5 py-1 rounded border border-zinc-800">
                         Active Interview Role
                       </span>
                     </div>
@@ -933,9 +933,9 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
             {createdBlueprint ? (
               <div className="space-y-4">
-                <div className="rounded-lg bg-emerald-950/30 border border-emerald-900/50 p-3 text-xs text-emerald-300 font-mono">
-                  Blueprint generated! Total allocated:{' '}
-                  <span className="font-bold">{Math.round(createdBlueprint.total_allocated_seconds / 60)} minutes</span>
+                <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-300 font-mono flex items-center justify-between">
+                  <span>Session Blueprint compiled</span>
+                  <span className="font-semibold text-emerald-400">{Math.round(createdBlueprint.total_allocated_seconds / 60)}m track</span>
                 </div>
 
                 <div className="space-y-2">

@@ -11,7 +11,6 @@ import {
   FileText,
   Loader2,
   RotateCcw,
-  ShieldAlert,
   TrendingUp,
   Zap,
 } from 'lucide-react';
@@ -205,7 +204,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
               cy={center}
               r={radius * ringLevel}
               fill="none"
-              stroke="#334155"
+              stroke="#27272a"
               strokeDasharray="3 3"
               strokeWidth="1"
             />
@@ -223,7 +222,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                 y1={center}
                 x2={x}
                 y2={y}
-                stroke="#334155"
+                stroke="#27272a"
                 strokeWidth="1"
               />
             );
@@ -232,9 +231,9 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
           {/* Filled Candidate Competency Shape */}
           <polygon
             points={polygonPoints}
-            fill="rgba(99, 102, 241, 0.35)"
-            stroke="#818cf8"
-            strokeWidth="2.5"
+            fill="rgba(52, 211, 153, 0.12)"
+            stroke="#34d399"
+            strokeWidth="2"
           />
 
           {/* Competency labels */}
@@ -248,11 +247,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                 key={idx}
                 x={x}
                 y={y}
-                fill="#cbd5e1"
+                fill="#a1a1aa"
                 fontSize="10"
                 fontWeight="600"
                 textAnchor="middle"
                 dominantBaseline="central"
+                className="font-mono"
               >
                 {item.competency_name.length > 14
                   ? `${item.competency_name.slice(0, 12)}…`
@@ -261,7 +261,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             );
           })}
         </svg>
-        <span className="mt-3 text-[11px] text-slate-400">Competency Mastery Distribution (L1 - L4)</span>
+        <span className="mt-3 text-[10px] text-zinc-500 font-mono">Competency Mastery Distribution (L1 - L4)</span>
       </div>
     );
   };
@@ -372,11 +372,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
         {/* Strengths & Knowledge Gaps */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-5 shadow-sm">
-            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Observed Technical Strengths
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-200 mb-3 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Observed Technical Strengths
             </h3>
-            <ul className="space-y-2 text-xs sm:text-sm text-emerald-200 font-sans">
+            <ul className="space-y-2 text-xs sm:text-sm text-zinc-300 font-sans">
               {report.strengths.map((s, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <span className="text-emerald-400 mt-1 font-mono">•</span>
@@ -386,26 +387,27 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             </ul>
           </div>
 
-          <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-5 shadow-sm">
-            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-1.5">
-              <ShieldAlert className="h-3.5 w-3.5" /> Technical Gaps &amp; Targeted Practice
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm">
+            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-200 mb-3 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+              Technical Gaps &amp; Targeted Practice
             </h3>
-            <ul className="space-y-2.5 text-xs sm:text-sm text-amber-200 font-sans">
+            <ul className="space-y-2.5 text-xs sm:text-sm text-zinc-300 font-sans">
               {report.knowledge_gaps.map((g, idx) => (
                 <li
                   key={idx}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-950/30 border border-amber-900/40"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-zinc-950 border border-zinc-800"
                 >
                   <div className="flex items-start gap-2">
-                    <span className="text-amber-400 mt-0.5 font-mono">•</span>
+                    <span className="text-zinc-500 mt-0.5 font-mono">•</span>
                     <span>{g}</span>
                   </div>
                   <button
                     type="button"
                     onClick={onReset}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold px-2.5 py-1 text-[11px] transition-colors shadow-sm self-start sm:self-auto"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold px-2.5 py-1 text-[11px] transition-colors shadow-sm self-start sm:self-auto font-sans"
                   >
-                    <Zap className="h-3 w-3" />
+                    <Zap className="h-3 w-3 text-zinc-400" />
                     Practice Gap
                   </button>
                 </li>

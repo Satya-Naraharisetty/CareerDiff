@@ -16,6 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
+import { IntervueXLogo } from './IntervueXLogo';
 import { useAuthStore } from '../stores/authStore';
 
 interface AuthModalProps {
@@ -161,25 +162,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
-      <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl shadow-black/80">
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8 shadow-2xl shadow-black/80 font-sans">
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors focus-visible:outline-2 focus-visible:outline-zinc-500"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Modal Header Title */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-extrabold text-white text-lg tracking-tight">
-              Intervue<span className="text-indigo-400">X</span>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm">
+              <IntervueXLogo className="h-4 w-4" />
+            </div>
+            <span className="font-semibold text-white text-sm font-mono tracking-tight">
+              IntervueX
             </span>
-            <span className="rounded-full bg-indigo-950/80 px-2 py-0.5 text-[10px] font-semibold text-indigo-300 border border-indigo-800/60">
-              AI Engine
+            <span className="rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+              Engine v1.0
             </span>
           </div>
           <h2 id="auth-modal-title" className="text-xl font-bold text-white tracking-tight">
@@ -188,9 +192,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             {tab === 'recover' && 'Recover your account'}
             {tab === 'backup_codes_reveal' && 'Save your backup recovery codes'}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-zinc-400 mt-0.5">
             {tab === 'login' && 'Access your calibrated interview sessions and evaluation dossiers.'}
-            {tab === 'register' && 'Start practicing technical interviews with adaptive AI feedback.'}
+            {tab === 'register' && 'Start practicing technical interviews with adaptive evaluation.'}
             {tab === 'recover' && 'Enter your email and an unused backup code to reset your password.'}
             {tab === 'backup_codes_reveal' && 'Store these single-use codes safely to recover your account if you forget your password.'}
           </p>
@@ -198,25 +202,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
         {/* Step: Backup Codes Reveal (Post-Registration) */}
         {tab === 'backup_codes_reveal' ? (
-          <div className="space-y-4 animate-in fade-in duration-150">
-            <div className="rounded-xl border border-amber-800/60 bg-amber-950/40 p-3 text-xs text-amber-300 flex items-start gap-2.5">
-              <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+          <div className="space-y-4 animate-in fade-in duration-150 font-mono">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 text-xs text-zinc-300 flex items-start gap-2.5">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
               <div>
-                <p className="font-semibold text-amber-200">Critical: Save these recovery codes now</p>
-                <p className="text-[11px] text-amber-300/90 mt-0.5">
+                <p className="font-semibold text-zinc-100">Critical: Save these recovery codes now</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5 font-sans">
                   These codes will not be shown again. If you lose your password, an unused backup code is required to recover your account.
                 </p>
               </div>
             </div>
 
             {/* Codes Grid */}
-            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-2 bg-zinc-950 p-3.5 rounded-xl border border-zinc-800">
               {provisionedBackupCodes.map((code, idx) => (
                 <div
                   key={idx}
-                  className="font-mono text-xs font-bold text-indigo-300 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800/80 flex items-center justify-between"
+                  className="font-mono text-xs font-bold text-zinc-200 bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-800 flex items-center justify-between"
                 >
-                  <span className="text-[10px] text-slate-500 font-sans">{idx + 1}.</span>
+                  <span className="text-[10px] text-zinc-500 font-sans">{idx + 1}.</span>
                   <span>{code}</span>
                 </div>
               ))}
@@ -227,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <button
                 type="button"
                 onClick={handleCopyBackupCodes}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 py-2 px-3 text-xs font-semibold text-slate-200 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 py-2 px-3 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
               >
                 {copiedCodes ? (
                   <>
@@ -236,7 +240,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   </>
                 ) : (
                   <>
-                    <Copy className="h-3.5 w-3.5 text-indigo-400" />
+                    <Copy className="h-3.5 w-3.5 text-zinc-400" />
                     Copy All Codes
                   </>
                 )}
@@ -245,9 +249,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <button
                 type="button"
                 onClick={handleDownloadBackupCodes}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 py-2 px-3 text-xs font-semibold text-slate-200 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 py-2 px-3 text-xs font-semibold text-zinc-300 hover:text-white transition-colors"
               >
-                <Download className="h-3.5 w-3.5 text-indigo-400" />
+                <Download className="h-3.5 w-3.5 text-zinc-400" />
                 Download as .txt
               </button>
             </div>
@@ -259,7 +263,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 if (onSuccess) onSuccess();
                 else onClose();
               }}
-              className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 hover:from-emerald-500 hover:to-teal-500 transition-all active:scale-[0.98]"
+              className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs sm:text-sm font-semibold text-zinc-950 hover:bg-zinc-200 shadow-sm transition-all active:scale-[0.98]"
             >
               <ShieldCheck className="h-4 w-4" />
               I Have Saved My Recovery Codes
@@ -269,7 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           <>
             {/* Header Tabs (only in login/register modes) */}
             {tab !== 'recover' && (
-              <div className="flex border-b border-slate-800 pb-2 mb-5">
+              <div className="flex border-b border-zinc-800 pb-2 mb-5 font-mono">
                 <button
                   type="button"
                   onClick={() => {
@@ -277,10 +281,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     clearError();
                     setShowPassword(false);
                   }}
-                  className={`flex-1 pb-2 text-sm font-semibold transition-all border-b-2 -mb-[10px] ${
+                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${
                     tab === 'login'
-                      ? 'border-indigo-500 text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                      ? 'border-white text-white'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Sign In
@@ -292,10 +296,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     clearError();
                     setShowPassword(false);
                   }}
-                  className={`flex-1 pb-2 text-sm font-semibold transition-all border-b-2 -mb-[10px] ${
+                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${
                     tab === 'register'
-                      ? 'border-indigo-500 text-indigo-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                      ? 'border-white text-white'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   Create Account
@@ -307,7 +311,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             {error && (
               <div
                 role="alert"
-                className="mb-4 flex items-center gap-2 rounded-lg bg-rose-950/60 border border-rose-800/60 p-3 text-xs text-rose-300 animate-in fade-in"
+                className="mb-4 flex items-center gap-2 rounded-lg bg-rose-950/60 border border-rose-800/60 p-3 text-xs text-rose-300 animate-in fade-in font-mono"
               >
                 <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
                 <span>{getDisplayError(error)}</span>
@@ -317,7 +321,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             {successMsg && (
               <div
                 role="status"
-                className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-950/60 border border-emerald-800/60 p-3 text-xs text-emerald-300 animate-in fade-in"
+                className="mb-4 flex items-center gap-2 rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs text-emerald-400 animate-in fade-in font-mono"
               >
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
                 <span>{successMsg}</span>
@@ -328,11 +332,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             <form onSubmit={handleSubmit} className="space-y-4" noValidate={false}>
               {tab === 'register' && (
                 <div>
-                  <label htmlFor="auth-fullname" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="auth-fullname" className="block text-xs font-medium text-zinc-300 mb-1.5 font-sans">
                     Full Name
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 pointer-events-none" />
+                    <User className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500 pointer-events-none" />
                     <input
                       ref={initialInputRef}
                       id="auth-fullname"
@@ -344,18 +348,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="e.g. Jane Doe"
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950/60 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-9 pr-3 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all font-sans"
                     />
                   </div>
                 </div>
               )}
 
               <div>
-                <label htmlFor="auth-email" className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="auth-email" className="block text-xs font-medium text-zinc-300 mb-1.5 font-sans">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 pointer-events-none" />
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500 pointer-events-none" />
                   <input
                     ref={tab !== 'register' ? initialInputRef : undefined}
                     id="auth-email"
@@ -368,7 +372,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950/60 py-2 pl-9 pr-3 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-9 pr-3 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all font-sans"
                   />
                 </div>
               </div>
@@ -376,11 +380,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               {/* Backup Code Input (Only in Recovery Mode) */}
               {tab === 'recover' && (
                 <div>
-                  <label htmlFor="auth-backup-code" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="auth-backup-code" className="block text-xs font-medium text-zinc-300 mb-1.5 font-sans">
                     Emergency Backup Code
                   </label>
                   <div className="relative">
-                    <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 pointer-events-none" />
+                    <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500 pointer-events-none" />
                     <input
                       id="auth-backup-code"
                       name="backup-code"
@@ -392,10 +396,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                       value={backupCodeInput}
                       onChange={(e) => setBackupCodeInput(e.target.value.toUpperCase())}
                       placeholder="e.g. H7KP-9X2M"
-                      className="w-full font-mono uppercase tracking-wider rounded-lg border border-slate-700 bg-slate-950/60 py-2 pl-9 pr-3 text-sm text-indigo-300 placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                      className="w-full font-mono uppercase tracking-wider rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-9 pr-3 text-xs sm:text-sm text-zinc-200 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-zinc-400 mt-1 font-mono">
                     Enter one of the 8-character recovery codes you saved upon registration.
                   </p>
                 </div>
@@ -403,7 +407,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="auth-password" className="block text-xs font-medium text-slate-300">
+                  <label htmlFor="auth-password" className="block text-xs font-medium text-zinc-300 font-sans">
                     {tab === 'recover' ? 'New Password' : 'Password'}
                   </label>
                   {tab === 'login' && (
@@ -414,14 +418,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         clearError();
                         setSuccessMsg(null);
                       }}
-                      className="text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline font-medium"
+                      className="text-[11px] text-zinc-400 hover:text-zinc-200 hover:underline font-mono"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 pointer-events-none" />
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500 pointer-events-none" />
                   <input
                     id="auth-password"
                     name="password"
@@ -435,7 +439,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="•••••••• (min 8 chars)"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950/60 py-2 pl-9 pr-10 text-sm text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 py-2.5 pl-9 pr-10 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 transition-all font-sans"
                   />
                   {/* Show / Hide Password Eye Toggle */}
                   <button
@@ -444,43 +448,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     aria-pressed={showPassword}
                     tabIndex={0}
-                    className="absolute right-2.5 top-2 rounded p-1 text-slate-400 hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-indigo-500 transition-colors"
+                    className="absolute right-2.5 top-2.5 rounded p-1 text-zinc-400 hover:text-zinc-200 focus-visible:outline-2 focus-visible:outline-zinc-500 transition-colors"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-indigo-400" />
+                      <EyeOff className="h-4 w-4 text-zinc-300" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4 text-zinc-400" />
                     )}
                   </button>
                 </div>
 
                 {/* Password Strength Indicators (Sign Up & Recovery Modes) */}
                 {(tab === 'register' || tab === 'recover') && password.length > 0 && (
-                  <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
+                  <div className="mt-2 space-y-1.5 animate-in fade-in duration-150 font-mono">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-1 flex-1 rounded-full bg-slate-800 overflow-hidden">
+                      <div className="h-1 flex-1 rounded-full bg-zinc-800 overflow-hidden">
                         <div
                           className={`h-full transition-all duration-300 ${
                             strengthScore === 1
                               ? 'w-1/3 bg-rose-500'
                               : strengthScore === 2
-                              ? 'w-2/3 bg-amber-500'
+                              ? 'w-2/3 bg-zinc-400'
                               : 'w-full bg-emerald-500'
                           }`}
                         />
                       </div>
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
                         {strengthScore === 1 ? 'Weak' : strengthScore === 2 ? 'Fair' : 'Strong'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                      <span className={hasMinLength ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
+                    <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+                      <span className={hasMinLength ? 'text-emerald-400 font-medium' : 'text-zinc-600'}>
                         ✓ 8+ chars
                       </span>
-                      <span className={hasMixedChars ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
+                      <span className={hasMixedChars ? 'text-emerald-400 font-medium' : 'text-zinc-600'}>
                         ✓ letters &amp; numbers
                       </span>
-                      <span className={hasSpecial ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
+                      <span className={hasSpecial ? 'text-emerald-400 font-medium' : 'text-zinc-600'}>
                         ✓ symbol
                       </span>
                     </div>
@@ -491,7 +495,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-3 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 py-2.5 px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 hover:from-indigo-500 hover:to-purple-500 focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
+                className="w-full mt-3 flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs sm:text-sm font-semibold text-zinc-950 hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm font-sans"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -508,7 +512,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
               </button>
 
               {/* Navigation Switch Footer */}
-              <div className="pt-2 text-center text-xs text-slate-400">
+              <div className="pt-2 text-center text-xs text-zinc-400 font-mono">
                 {tab === 'login' && (
                   <span>
                     Don&apos;t have an account?{' '}
@@ -519,7 +523,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         clearError();
                         setShowPassword(false);
                       }}
-                      className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline"
+                      className="text-zinc-200 hover:text-white font-medium hover:underline ml-1"
                     >
                       Create account
                     </button>
@@ -535,7 +539,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         clearError();
                         setShowPassword(false);
                       }}
-                      className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline"
+                      className="text-zinc-200 hover:text-white font-medium hover:underline ml-1"
                     >
                       Sign in
                     </button>
@@ -551,7 +555,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                         clearError();
                         setShowPassword(false);
                       }}
-                      className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline"
+                      className="text-zinc-200 hover:text-white font-medium hover:underline ml-1"
                     >
                       Back to sign in
                     </button>

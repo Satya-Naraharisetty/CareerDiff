@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Bot, Command, FileText, Home, LogOut, Menu, Radio, X } from 'lucide-react';
+import { Command, FileText, Home, LogOut, Menu, Radio, X } from 'lucide-react';
+import { IntervueXLogo } from './IntervueXLogo';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 
@@ -46,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => onNavigate('home')}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm group-hover:bg-zinc-800 transition-colors">
-            <Bot className="h-4 w-4" />
+            <IntervueXLogo className="h-4 w-4 text-zinc-100" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white font-mono">
             IntervueX

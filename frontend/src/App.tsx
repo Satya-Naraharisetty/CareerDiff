@@ -10,6 +10,7 @@ import { InterviewRoom } from './components/InterviewRoom';
 import { DossierView } from './components/DossierView';
 import { useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
+import { IntervueXLogo } from './components/IntervueXLogo';
 import { Cpu, Layers, ShieldCheck, Terminal } from 'lucide-react';
 import './App.css';
 
@@ -131,6 +132,9 @@ export const AppContent: React.FC = () => {
             {/* Brand column */}
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm">
+                  <IntervueXLogo className="h-3.5 w-3.5" />
+                </div>
                 <span className="font-semibold text-white text-sm tracking-tight font-mono">IntervueX</span>
                 <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
                   Engine v1.0
