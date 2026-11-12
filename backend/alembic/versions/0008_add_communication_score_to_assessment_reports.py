@@ -1,7 +1,7 @@
 """Add communication_score and communication_breakdown to assessment_reports table
 
-Revision ID: 0008_add_communication_score_to_assessment_reports
-Revises: 0007_add_ats_score_to_assessment_reports
+Revision ID: 0008_add_comm_score
+Revises: 0007_add_ats_score
 Create Date: 2026-11-12 08:30:00.000000
 
 """
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0008_add_communication_score_to_assessment_reports"
-down_revision: str | None = "0007_add_ats_score_to_assessment_reports"
+revision: str = "0008_add_comm_score"
+down_revision: str | None = "0007_add_ats_score"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

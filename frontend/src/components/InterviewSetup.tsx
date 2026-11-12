@@ -144,7 +144,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [seniority, setSeniority] = useState<SeniorityLevel>('SENIOR');
   const [duration, setDuration] = useState<number>(30);
   const [mode, setMode] = useState<InterviewMode>('VOICE');
-  const [preferredLanguage, setPreferredLanguage] = useState<string>('Python');
+  const [userSelectedLanguage, setUserSelectedLanguage] = useState<string | null>(null);
   const [companyPersona, setCompanyPersona] = useState<CompanyPersona>('STANDARD');
   const [targetCompany, setTargetCompany] = useState<string>('GlobalFinTech Corp');
   const [isAnalyzingCompany, setIsAnalyzingCompany] = useState<boolean>(false);
@@ -183,11 +183,8 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
     );
   }, [resumeAnalysis, jdAnalysis]);
 
-  useEffect(() => {
-    if (detectedLanguages.length > 0 && !detectedLanguages.includes(preferredLanguage)) {
-      setPreferredLanguage(detectedLanguages[0]);
-    }
-  }, [detectedLanguages]);
+  const preferredLanguage = userSelectedLanguage ?? (detectedLanguages[0] || 'Python');
+  const setPreferredLanguage = (lang: string) => setUserSelectedLanguage(lang);
 
   // Comparative Intelligence: Compute Resume vs. JD fit matrix whenever context updates
   useEffect(() => {

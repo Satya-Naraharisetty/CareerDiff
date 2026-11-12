@@ -1,6 +1,6 @@
 """Add ats_score and ats_breakdown to assessment_reports table
 
-Revision ID: 0007_add_ats_score_to_assessment_reports
+Revision ID: 0007_add_ats_score
 Revises: 0006_add_user_backup_codes
 Create Date: 2026-11-11 22:15:00.000000
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0007_add_ats_score_to_assessment_reports"
+revision: str = "0007_add_ats_score"
 down_revision: str | None = "0006_add_user_backup_codes"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
