@@ -18,8 +18,13 @@ from app.schemas.resume import (
     ResumeRead,
     ResumeTextUploadRequest,
 )
+from app.schemas.resume_rewriter import (
+    ResumeRewriteRequest,
+    ResumeRewriteResponse,
+)
 from app.services.claim_extractor import analyze_resume_profile, extract_claims_from_text
 from app.services.pdf_extractor import extract_text_from_pdf_bytes
+from app.services.resume_rewriter import rewrite_resume_for_jd
 from app.services.storage import upload_resume_document
 
 router = APIRouter()
@@ -348,4 +353,21 @@ async def get_resume_by_id(
         filename=resume.original_filename,
         raw_extracted_text=resume.raw_extracted_text,
         claims=[ResumeClaimRead.model_validate(c) for c in resume.claims],
+    )
+
+
+@router.post(
+    "/rewrite",
+    response_model=ResumeRewriteResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rewrite resume targeting job description with ATS score and LaTeX export",
+)
+async def rewrite_resume(
+    payload: ResumeRewriteRequest,
+) -> ResumeRewriteResponse:
+    """Analyze resume against target JD, compute ATS score first, generate fact-grounded rewrites, and render Overleaf LaTeX."""
+    return rewrite_resume_for_jd(
+        resume_text=payload.resume_text,
+        jd_text=payload.jd_text,
+        candidate_seniority=payload.candidate_seniority,
     )

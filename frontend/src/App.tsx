@@ -8,6 +8,7 @@ import { HomePage } from './components/HomePage';
 import { InterviewSetup } from './components/InterviewSetup';
 import { InterviewRoom } from './components/InterviewRoom';
 import { DossierView } from './components/DossierView';
+import { ResumeRewriter } from './components/ResumeRewriter';
 import { useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
 import { CareerDiffLogo } from './components/CareerDiffLogo';
@@ -25,7 +26,7 @@ const queryClient = new QueryClient({
 
 export const AppContent: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
-  const [currentView, setCurrentView] = useState<'home' | 'setup' | 'interview' | 'dossier'>(
+  const [currentView, setCurrentView] = useState<'home' | 'setup' | 'interview' | 'dossier' | 'rewriter'>(
     isAuthenticated ? 'setup' : 'home'
   );
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -66,6 +67,9 @@ export const AppContent: React.FC = () => {
         break;
       case 'dossier':
         document.title = 'Assessment Dossier & Rubric Grounding — CareerDiff';
+        break;
+      case 'rewriter':
+        document.title = 'Resume Rewriter & Overleaf LaTeX Studio — CareerDiff';
         break;
       default:
         document.title = 'CareerDiff — Autonomous Technical Interview Simulator & Rubric Engine';
@@ -122,6 +126,10 @@ export const AppContent: React.FC = () => {
 
         {currentView === 'dossier' && (
           <DossierView onReset={handleReset} />
+        )}
+
+        {currentView === 'rewriter' && (
+          <ResumeRewriter onBackToInterview={() => setCurrentView('setup')} />
         )}
       </main>
 

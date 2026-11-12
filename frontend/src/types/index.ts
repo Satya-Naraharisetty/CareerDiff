@@ -496,3 +496,63 @@ export interface EvaluationTriggerResponse {
   message: string;
   task_id: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Resume Rewriter & LaTeX Studio Schemas
+// ---------------------------------------------------------------------------
+export interface RewriteSuggestionItem {
+  section: string;
+  target_item: string;
+  original_text: string;
+  rewritten_text: string;
+  rationale: string;
+  matched_keywords: string[];
+  fact_preserved: boolean;
+}
+
+export interface RewrittenResumeProfile {
+  full_name: string;
+  contact_phone: string;
+  contact_email: string;
+  linkedin_url: string;
+  github_url: string;
+  location: string;
+  summary: string;
+  skills_by_category: Record<string, string[]>;
+  experiences: Array<{
+    company: string;
+    position: string;
+    location: string;
+    dates: string;
+    highlights: string[];
+  }>;
+  projects: Array<{
+    name: string;
+    technologies: string;
+    dates: string;
+    highlights: string[];
+  }>;
+  education: Array<{
+    institution: string;
+    degree: string;
+    location: string;
+    dates: string;
+  }>;
+}
+
+export interface ResumeRewriteRequest {
+  resume_text: string;
+  jd_text: string;
+  candidate_seniority?: SeniorityLevel;
+}
+
+export interface ResumeRewriteResponse {
+  ats_score: number;
+  ats_breakdown: Record<string, any>;
+  alignment_summary: string;
+  matched_keywords: string[];
+  missing_keywords: string[];
+  suggestions: RewriteSuggestionItem[];
+  latex_source: string;
+  rewritten_profile: RewrittenResumeProfile;
+}

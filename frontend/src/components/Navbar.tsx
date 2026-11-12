@@ -7,8 +7,8 @@ import { useInterviewStore } from '../stores/interviewStore';
 interface NavbarProps {
   onOpenAuth: () => void;
   onOpenProfile: () => void;
-  currentView: 'home' | 'setup' | 'interview' | 'dossier';
-  onNavigate: (view: 'home' | 'setup' | 'interview' | 'dossier') => void;
+  currentView: 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter';
+  onNavigate: (view: 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter') => void;
   onOpenCommandPalette?: () => void;
 }
 
@@ -100,6 +100,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
           >
             Dossier
+          </button>
+
+          <button
+            onClick={() => onNavigate('rewriter')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'rewriter'
+                ? 'bg-zinc-900 text-emerald-400 border border-emerald-500/30'
+                : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900/60'
+              }`}
+          >
+            <FileText className="h-3.5 w-3.5 text-emerald-400" />
+            Resume Studio (LaTeX)
           </button>
         </nav>
 
@@ -257,6 +268,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <FileText className="h-4 w-4 text-zinc-400" />
               Assessment Dossier
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('rewriter');
+                setMobileMenuOpen(false);
+              }}
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'rewriter'
+                  ? 'bg-zinc-800 text-emerald-400'
+                  : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900'
+                }`}
+            >
+              <FileText className="h-4 w-4 text-emerald-400" />
+              Resume Studio (LaTeX)
             </button>
           </nav>
 

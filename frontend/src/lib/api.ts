@@ -27,6 +27,8 @@ import type {
   ResumeAnalysisResponse,
   ResumeJdMatchRequest,
   ResumeJdMatchResponse,
+  ResumeRewriteRequest,
+  ResumeRewriteResponse,
   ResumeTextUploadRequest,
   RoleListResponse,
   TokenResponse,
@@ -253,4 +255,10 @@ export const resumesApi = {
     }),
 
   getLatest: () => fetchApi<ResumeAnalysisResponse>('/api/v1/resumes/latest'),
+
+  rewrite: (payload: ResumeRewriteRequest) =>
+    fetchApi<ResumeRewriteResponse>('/api/v1/resumes/rewrite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
