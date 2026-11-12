@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { interviewsApi } from '../lib/api';
 import { PcmPlayer, PcmRecorder } from '../lib/audio';
+import { BrowserSpeechRecognizer } from '../lib/speechRecognition';
 import type {
   EngineAction,
   InterviewBlueprintRead,
@@ -53,6 +54,7 @@ interface InterviewStoreState {
 let activeWs: WebSocket | null = null;
 let pcmPlayer: PcmPlayer | null = null;
 let pcmRecorder: PcmRecorder | null = null;
+let speechRecognizer: BrowserSpeechRecognizer | null = null;
 let countdownTimer: number | null = null;
 
 export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
@@ -324,6 +326,14 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         }
       );
 
+      // Start browser-native speech recognition to capture actual words candidate speaks
+      if (!speechRecognizer) {
+        speechRecognizer = new BrowserSpeechRecognizer();
+      }
+      speechRecognizer.start((liveTranscript) => {
+        set({ partialTranscript: liveTranscript });
+      });
+
       set({ isRecording: true, error: null });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Microphone access denied';
@@ -335,10 +345,20 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     if (pcmRecorder) {
       pcmRecorder.stop();
     }
+
+    let spokenTranscript: string | undefined = undefined;
+    if (speechRecognizer) {
+      const recognized = speechRecognizer.stop();
+      if (recognized && recognized.trim()) {
+        spokenTranscript = recognized.trim();
+      }
+    }
+
     if (activeWs && activeWs.readyState === WebSocket.OPEN) {
       activeWs.send(
         JSON.stringify({
           type: 'speech_stopped',
+          transcript: spokenTranscript || null,
           client_timestamp_ms: Date.now(),
         })
       );
@@ -365,6 +385,10 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   },
 
   disconnectVoiceSession: () => {
+    if (speechRecognizer) {
+      speechRecognizer.abort();
+      speechRecognizer = null;
+    }
     if (pcmRecorder) {
       pcmRecorder.stop();
       pcmRecorder = null;

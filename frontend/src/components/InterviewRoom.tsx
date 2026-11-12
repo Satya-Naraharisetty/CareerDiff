@@ -13,11 +13,13 @@ import {
   MicOff,
   Network,
   Play,
-  Radio,
   Send,
   Trash2,
   User,
+  Video,
+  VideoOff,
   Volume2,
+  X,
 } from 'lucide-react';
 import { useInterviewStore } from '../stores/interviewStore';
 
@@ -557,6 +559,11 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isRunningCode, setIsRunningCode] = useState(false);
+  const [showCamera, setShowCamera] = useState<boolean>(true);
+  const [isRoomCameraActive, setIsRoomCameraActive] = useState<boolean>(false);
+  const [showTextFallbackInVoice, setShowTextFallbackInVoice] = useState<boolean>(false);
+  const roomVideoRef = useRef<HTMLVideoElement | null>(null);
+  const roomStreamRef = useRef<MediaStream | null>(null);
 
   const activeTemplates = React.useMemo(
     () => getLanguageTemplates(preferredLanguage || 'Python'),
@@ -654,10 +661,52 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     }
   }, [sessionState, mode, wsStatus, startInterview, initVoiceSession]);
 
-  // Cleanup on unmount: guarantee hardware microphone is stopped when leaving room
+  // Camera stream lifecycle for candidate self-preview in interview room
+  useEffect(() => {
+    let active = true;
+    if (showCamera) {
+      navigator.mediaDevices
+        ?.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
+        })
+        .then((stream) => {
+          if (!active) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          roomStreamRef.current = stream;
+          setIsRoomCameraActive(true);
+          if (roomVideoRef.current) {
+            roomVideoRef.current.srcObject = stream;
+            roomVideoRef.current.play().catch(() => {});
+          }
+        })
+        .catch((err) => {
+          console.warn('Candidate camera not available in interview room:', err);
+          if (active) {
+            setIsRoomCameraActive(false);
+            setShowCamera(false);
+          }
+        });
+    }
+
+    return () => {
+      active = false;
+      if (roomStreamRef.current) {
+        roomStreamRef.current.getTracks().forEach((track) => track.stop());
+        roomStreamRef.current = null;
+      }
+    };
+  }, [showCamera]);
+
+  // Cleanup on unmount: guarantee hardware microphone and camera are stopped when leaving room
   useEffect(() => {
     return () => {
       stopVoiceRecording();
+      if (roomStreamRef.current) {
+        roomStreamRef.current.getTracks().forEach((track) => track.stop());
+        roomStreamRef.current = null;
+      }
     };
   }, [stopVoiceRecording]);
 
@@ -787,12 +836,24 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               )}
             </button>
 
-            {mode === 'VOICE' && (
-              <div className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 mr-2 font-mono">
-                <Radio className={`h-3.5 w-3.5 ${wsStatus === 'connected' ? 'text-emerald-400' : 'text-amber-400'}`} />
-                <span className="capitalize">{wsStatus}</span>
-              </div>
-            )}
+            {/* Camera Preview Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowCamera((prev) => !prev)}
+              title="Toggle Candidate Video Self-Preview"
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
+                showCamera
+                  ? 'border-emerald-700/80 bg-emerald-950/40 text-emerald-300 shadow-sm'
+                  : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+              }`}
+            >
+              {showCamera ? (
+                <Video className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <VideoOff className="h-3.5 w-3.5 text-zinc-500" />
+              )}
+              <span className="hidden sm:inline">Camera</span>
+            </button>
 
             <button
               type="button"
@@ -827,7 +888,34 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       {/* Middle Work Area: Split Screen when Scratchpad is open */}
       <div className={`flex-1 min-h-0 ${showScratchpad ? 'grid grid-cols-1 lg:grid-cols-12 gap-4' : 'flex flex-col'}`}>
         {/* Main Conversation Stream & Input Column */}
-        <div className={`flex flex-col min-h-0 ${showScratchpad ? 'lg:col-span-7' : 'flex-1'}`}>
+        <div className={`relative flex flex-col min-h-0 ${showScratchpad ? 'lg:col-span-7' : 'flex-1'}`}>
+          {/* Floating Candidate Camera Self-Preview */}
+          {showCamera && isRoomCameraActive && (
+            <div className="absolute top-3 right-3 z-20 w-36 sm:w-44 rounded-xl border border-zinc-700 bg-zinc-950/90 shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
+              <div className="relative aspect-video w-full bg-zinc-900">
+                <video
+                  ref={roomVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                <div className="absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-950/70 border border-zinc-800/80 text-[9px] font-mono text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Self-View
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCamera(false)}
+                  className="absolute top-1 right-1 p-0.5 rounded bg-zinc-950/70 text-zinc-400 hover:text-white transition-colors"
+                  title="Hide camera preview"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 space-y-4 backdrop-blur-sm shadow-inner">
             {turns.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center text-center text-zinc-500 py-12">
@@ -943,52 +1031,87 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 backdrop-blur-md shadow-sm">
             {mode === 'VOICE' ? (
               /* Voice Mode Controls */
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Mic Button & State */}
-                <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-4">
-                  <button
-                    type="button"
-                    onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                    disabled={wsStatus !== 'connected'}
-                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${isRecording
-                        ? 'bg-rose-600 text-white shadow-rose-600/20 hover:bg-rose-500'
-                        : 'bg-white text-zinc-950 hover:bg-zinc-200 shadow-sm'
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Mic Button & State */}
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-4">
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                      disabled={wsStatus !== 'connected'}
+                      className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
+                        isRecording
+                          ? 'bg-rose-600 text-white shadow-rose-600/20 hover:bg-rose-500'
+                          : 'bg-white text-zinc-950 hover:bg-zinc-200 shadow-sm'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {isRecording ? (
-                      <>
-                        <MicOff className="h-4 w-4" />
-                        <span>Stop Recording</span>
-                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-rose-700 text-white rounded border border-rose-500/50">Space</kbd>
-                      </>
-                    ) : (
-                      <>
-                        <Mic className="h-4 w-4" />
-                        <span>Speak</span>
-                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">Space</kbd>
-                      </>
-                    )}
-                  </button>
+                    >
+                      {isRecording ? (
+                        <>
+                          <MicOff className="h-4 w-4" />
+                          <span>Stop Recording</span>
+                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-rose-700 text-white rounded border border-rose-500/50">Space</kbd>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="h-4 w-4" />
+                          <span>Speak</span>
+                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">Space</kbd>
+                        </>
+                      )}
+                    </button>
 
-                  {/* Instant Barge-In Preemption Button */}
-                  <button
-                    type="button"
-                    onClick={bargeIn}
-                    title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
-                    className="flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white transition-all active:scale-[0.98]"
-                  >
-                    <Hand className="h-3.5 w-3.5 text-zinc-300" />
-                    <span>Barge-In</span>
-                    <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-700">Esc</kbd>
-                  </button>
+                    {/* Instant Barge-In Preemption Button */}
+                    <button
+                      type="button"
+                      onClick={bargeIn}
+                      title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white transition-all active:scale-[0.98]"
+                    >
+                      <Hand className="h-3.5 w-3.5 text-zinc-300" />
+                      <span>Barge-In</span>
+                      <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-700">Esc</kbd>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                    {/* 16-Bar Responsive Equalizer */}
+                    <AudioEqualizer
+                      audioLevel={audioLevel}
+                      isRecording={isRecording}
+                      isInterviewerSpeaking={isInterviewerSpeaking}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowTextFallbackInVoice((prev) => !prev)}
+                      className="text-[11px] font-mono text-zinc-400 hover:text-zinc-200 underline decoration-zinc-700 underline-offset-2 shrink-0 transition-colors"
+                    >
+                      {showTextFallbackInVoice ? 'Hide Text' : 'Type / Edit'}
+                    </button>
+                  </div>
                 </div>
 
-                {/* 16-Bar Responsive Equalizer */}
-                <AudioEqualizer
-                  audioLevel={audioLevel}
-                  isRecording={isRecording}
-                  isInterviewerSpeaking={isInterviewerSpeaking}
-                />
+                {/* Optional Text Fallback Input in Voice Mode */}
+                {showTextFallbackInVoice && (
+                  <form onSubmit={handleSendText} className="flex gap-2 pt-2 border-t border-zinc-800 animate-in fade-in duration-150">
+                    <input
+                      type="text"
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      placeholder="Type or paste technical answer if preferred..."
+                      disabled={isSubmitting || sessionState === 'COMPLETED'}
+                      className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 sm:px-4 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-50 font-sans"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !textInput.trim() || sessionState === 'COMPLETED'}
+                      className="shrink-0 flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Send</span>
+                    </button>
+                  </form>
+                )}
               </div>
             ) : (
               /* Text Mode Controls */

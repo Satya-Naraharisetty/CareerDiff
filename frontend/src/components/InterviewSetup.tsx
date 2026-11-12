@@ -20,6 +20,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { DeviceCheckModal } from './DeviceCheckModal';
 import { interviewsApi, resumesApi, rolesApi } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
@@ -149,6 +150,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [targetCompany, setTargetCompany] = useState<string>('GlobalFinTech Corp');
   const [isAnalyzingCompany, setIsAnalyzingCompany] = useState<boolean>(false);
   const [companyAnalysisResult, setCompanyAnalysisResult] = useState<CompanyAnalysisResponse | null>(null);
+  const [isDeviceCheckOpen, setIsDeviceCheckOpen] = useState<boolean>(false);
 
   // Step 1: Resume Ingestion State (DEFAULT OPTION IS UPLOAD FILE)
   const [resumeTab, setResumeTab] = useState<'upload' | 'paste'>('upload');
@@ -1445,7 +1447,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
                 <button
                   type="button"
-                  onClick={onStartInterview}
+                  onClick={() => setIsDeviceCheckOpen(true)}
                   className="w-full mt-4 flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-sm"
                 >
                   Enter Live Interview Room
@@ -1505,6 +1507,17 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           </div>
         </div>
       </div>
+
+      {/* Hardware Readiness & Permissions Check Modal */}
+      <DeviceCheckModal
+        isOpen={isDeviceCheckOpen}
+        onClose={() => setIsDeviceCheckOpen(false)}
+        onProceedToInterview={() => {
+          setIsDeviceCheckOpen(false);
+          onStartInterview();
+        }}
+        mode={mode}
+      />
     </div>
   );
 };

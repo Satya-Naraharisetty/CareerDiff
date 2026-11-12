@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import get_settings
 from app.core.database import async_session_factory
 from app.core.redis import get_redis_client
 from app.models.interview import Interview, InterviewBlueprint
@@ -32,6 +33,7 @@ async def interview_voice_gateway(
 ) -> None:
     """Real-time voice streaming endpoint multiplexing 16kHz PCM audio and JSON control frames."""
     redis = get_redis_client()
+    settings = get_settings()
     current_tts_task: asyncio.Task[None] | None = None
     tts_abort_event = asyncio.Event()
     try:
@@ -225,8 +227,14 @@ async def interview_voice_gateway(
                 # Finalize turn on 1,200ms trailing silence
                 if vad_result.speech_finalized:
                     raw_audio = vad.get_and_reset_buffer()
-                    transcript = await STTService.transcribe_final(raw_audio)
+                    transcript = await STTService.transcribe_final(
+                        raw_audio,
+                        allow_mock_fallback=(settings.environment == "testing"),
+                    )
                     dur_ms = int((len(raw_audio) / 32000) * 1000)
+
+                    if not transcript.strip():
+                        continue
 
                     await websocket.send_json(
                         {
@@ -254,10 +262,25 @@ async def interview_voice_gateway(
 
                 elif event_type == "speech_stopped":
                     # Instant client silence detection
-                    if len(vad.audio_buffer) > 0:
+                    client_transcript = payload.get("transcript")
+                    if len(vad.audio_buffer) > 0 or (client_transcript and str(client_transcript).strip()):
                         raw_audio = vad.force_finalize()
-                        transcript = await STTService.transcribe_final(raw_audio)
-                        dur_ms = int((len(raw_audio) / 32000) * 1000)
+                        transcript = await STTService.transcribe_final(
+                            raw_audio,
+                            simulated_transcript=client_transcript,
+                            allow_mock_fallback=(settings.environment == "testing"),
+                        )
+                        dur_ms = int((len(raw_audio) / 32000) * 1000) if raw_audio else 1000
+
+                        if not transcript.strip():
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": "No speech detected. Please speak into the microphone or use text input.",
+                                }
+                            )
+                            continue
+
                         await websocket.send_json(
                             {
                                 "type": "transcript_final",

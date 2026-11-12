@@ -5,6 +5,10 @@ import math
 import struct
 from collections.abc import AsyncGenerator
 
+import httpx
+
+from app.core.config import get_settings
+
 
 class STTService:
     """Handles real-time streaming speech transcription (partial and final transcripts)."""
@@ -28,19 +32,48 @@ class STTService:
         cls,
         audio_bytes: bytes,
         simulated_transcript: str | None = None,
+        allow_mock_fallback: bool = False,
     ) -> str:
         """Transcribe finalized speech turn into verified text transcript."""
-        if simulated_transcript:
+        if simulated_transcript is not None and simulated_transcript.strip():
             return simulated_transcript.strip()
 
-        duration_sec = len(audio_bytes) / (16000 * 2)
-        if duration_sec < 0.3:
+        duration_sec = len(audio_bytes) / (16000 * 2) if audio_bytes else 0.0
+        if duration_sec < 0.3 and not simulated_transcript:
             return ""
 
-        return (
-            "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
-            "and mitigated consumer group rebalance latency using cooperative sticky assignors."
-        )
+        settings = get_settings()
+
+        # Attempt Deepgram transcription if configured
+        if settings.deepgram_api_key and audio_bytes:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(
+                        "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&channels=1",
+                        headers={
+                            "Authorization": f"Token {settings.deepgram_api_key}",
+                            "Content-Type": "audio/raw",
+                        },
+                        content=audio_bytes,
+                    )
+                    if response.status_code == 200:
+                        data = response.json()
+                        channels = data.get("results", {}).get("channels", [])
+                        if channels and channels[0].get("alternatives"):
+                            transcript = str(channels[0]["alternatives"][0].get("transcript", "")).strip()
+                            if transcript:
+                                return transcript
+            except Exception:
+                pass
+
+        if allow_mock_fallback or settings.environment == "testing":
+            return (
+                "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
+                "and mitigated consumer group rebalance latency using cooperative sticky assignors."
+            )
+
+        return ""
+
 
 
 class TTSService:

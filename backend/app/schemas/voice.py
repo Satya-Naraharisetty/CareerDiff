@@ -26,10 +26,11 @@ class SpeechStartedMessage(BaseModel):
 
 
 class SpeechStoppedMessage(BaseModel):
-    """Emitted when client observes trailing silence."""
+    """Emitted when client observes trailing silence or user stops speaking."""
 
     type: Literal["speech_stopped"] = "speech_stopped"
     client_timestamp_ms: int = Field(default=0)
+    transcript: str | None = Field(default=None, description="Client-side transcribed speech text if available")
 
 
 class TextInputMessage(BaseModel):
