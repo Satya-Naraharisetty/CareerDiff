@@ -310,19 +310,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   key={cmd.id}
                   onClick={() => cmd.run()}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                    isSelected
+                  className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
                       ? 'bg-zinc-800 text-white'
                       : 'text-zinc-300 hover:bg-zinc-800/60'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 border ${
-                        isSelected
+                      className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 border ${isSelected
                           ? 'border-zinc-700 bg-zinc-700/80 text-white'
                           : 'border-zinc-800 bg-zinc-950 text-zinc-400'
-                      }`}
+                        }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
                     </div>
@@ -361,7 +359,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             <span>↵ Select</span>
             <span>ESC Close</span>
           </div>
-          <span className="text-zinc-600">IntervueX Command HUD</span>
+          <span className="text-zinc-600">CareerDiff Command HUD</span>
         </div>
       </div>
     </div>

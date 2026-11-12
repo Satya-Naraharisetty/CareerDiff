@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { authApi } from '../lib/api';
-import { IntervueXLogo } from './IntervueXLogo';
+import { CareerDiffLogo } from './CareerDiffLogo';
 import { useAuthStore } from '../stores/authStore';
 import type { UserProfileResponse } from '../types';
 
@@ -175,7 +175,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const handleDownloadCodes = () => {
     if (!newBackupCodes) return;
     const text = [
-      'IntervueX Emergency Backup Recovery Codes',
+      'CareerDiff Emergency Backup Recovery Codes',
       `Account: ${profileData?.email || user?.email}`,
       `Regenerated: ${new Date().toISOString()}`,
       '',
@@ -189,7 +189,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `intervuex-recovery-codes-${(user?.email || 'user').split('@')[0]}.txt`;
+    link.download = `CareerDiff-recovery-codes-${(user?.email || 'user').split('@')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -251,7 +251,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         {/* Modal Header */}
         <div className="flex items-center gap-3.5 mb-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-700 shadow-sm text-zinc-100">
-            <IntervueXLogo className="h-5 w-5" size={24} />
+            <CareerDiffLogo className="h-5 w-5" size={24} />
           </div>
           <div>
             <h2 id="profile-modal-title" className="text-lg font-bold text-white tracking-tight font-sans">
@@ -266,44 +266,40 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
-              activeTab === 'profile'
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${activeTab === 'profile'
                 ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Overview
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('password')}
-            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
-              activeTab === 'password'
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${activeTab === 'password'
                 ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Password
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('backup_codes')}
-            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
-              activeTab === 'backup_codes'
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${activeTab === 'backup_codes'
                 ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
+              }`}
           >
             Recovery
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('danger')}
-            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${
-              activeTab === 'danger'
+            className={`flex-1 pb-2 text-xs font-mono font-medium transition-all border-b-2 -mb-[10px] ${activeTab === 'danger'
                 ? 'border-rose-500 text-rose-400'
                 : 'border-transparent text-zinc-500 hover:text-rose-400'
-            }`}
+              }`}
           >
             Danger Zone
           </button>
@@ -460,13 +456,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   <div className="flex items-center gap-1.5">
                     <div className="h-1 flex-1 rounded-full bg-zinc-800 overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-300 ${
-                          strengthScore === 1
+                        className={`h-full transition-all duration-300 ${strengthScore === 1
                             ? 'w-1/3 bg-rose-500'
                             : strengthScore === 2
-                            ? 'w-2/3 bg-zinc-400'
-                            : 'w-full bg-emerald-500'
-                        }`}
+                              ? 'w-2/3 bg-zinc-400'
+                              : 'w-full bg-emerald-500'
+                          }`}
                       />
                     </div>
                     <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">

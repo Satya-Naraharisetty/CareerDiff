@@ -9,8 +9,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "intervuex",
-    "intervuex-backend",
+    "CareerDiff",
+    "CareerDiff-backend",
 ]
 
 [[package]]
@@ -1138,7 +1138,7 @@ wheels = [
 ]
 
 [[package]]
-name = "intervuex"
+name = "CareerDiff"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -1199,7 +1199,7 @@ dev = [
 ]
 
 [[package]]
-name = "intervuex-backend"
+name = "CareerDiff-backend"
 version = "0.1.0"
 source = { editable = "backend" }
 dependencies = [

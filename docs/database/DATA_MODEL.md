@@ -1,4 +1,4 @@
-# Data Model & Schema Specification — IntervueX
+# Data Model & Schema Specification — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Schema Specification  

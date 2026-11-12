@@ -9,9 +9,9 @@ link-mode = "copy"
 packages = ["app"]
 
 [project]
-name = "intervuex-backend"
+name = "CareerDiff-backend"
 version = "0.1.0"
-description = "IntervueX Backend — FastAPI, SQLAlchemy, Redis"
+description = "CareerDiff Backend — FastAPI, SQLAlchemy, Redis"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

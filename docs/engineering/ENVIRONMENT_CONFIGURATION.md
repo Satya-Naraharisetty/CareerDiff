@@ -1,4 +1,4 @@
-# Environment Configuration Specification — IntervueX
+# Environment Configuration Specification — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Configuration Standard  
@@ -11,13 +11,13 @@
 | :--- | :--- | :--- | :--- | :--- |
 | `ENVIRONMENT` | `string` | `development` | Yes | `development`, `testing`, or `production`. |
 | `LOG_LEVEL` | `string` | `INFO` | No | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
-| `DATABASE_URL` | `string` | `postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_dev` | Yes | Async PostgreSQL connection string. |
+| `DATABASE_URL` | `string` | `postgresql+asyncpg://CareerDiff:postgres@localhost:5432/CareerDiff_dev` | Yes | Async PostgreSQL connection string. |
 | `REDIS_URL` | `string` | `redis://localhost:6379/0` | Yes | Redis connection string for session state. |
 | `JWT_SECRET_KEY` | `string` | `insecure_dev_secret_change_in_production_key_32bytes` | Yes | 32+ byte cryptographic secret for JWT signing. |
 | `JWT_ALGORITHM` | `string` | `HS256` | No | Algorithm for JWT tokens. |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`| `int` | `15` | No | Short access token TTL. |
 | `S3_ENDPOINT_URL`| `string` | `http://localhost:9000` | No | S3 / MinIO endpoint URL. |
-| `S3_BUCKET_NAME` | `string` | `intervuex-resumes` | Yes | S3 bucket for storing resume files. |
+| `S3_BUCKET_NAME` | `string` | `CareerDiff-resumes` | Yes | S3 bucket for storing resume files. |
 | `S3_ACCESS_KEY` | `string` | `minioadmin` | Yes | S3 access key. |
 | `S3_SECRET_KEY` | `string` | `minioadmin` | Yes | S3 secret key. |
 | `GEMINI_API_KEY` | `string` | | Yes | API key for Gemini LLM. |

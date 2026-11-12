@@ -1,4 +1,4 @@
-# Architecture Foundation Review & Correction Report — IntervueX
+# Architecture Foundation Review & Correction Report — CareerDiff
 
 **Document Version:** 1.0.0  
 **Date:** 2026-11-10  
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-Following the initial scaffolding of the IntervueX documentation and Antigravity customization system, a comprehensive second-pass architecture review was conducted. The goal was to eliminate premature assumptions, correct contradictory requirements, replace hardcoded universal constants with configurable policy models, normalize evidence data structures, refine real-time audio terminology, and establish an uncompromised, implementable engineering foundation.
+Following the initial scaffolding of the CareerDiff documentation and Antigravity customization system, a comprehensive second-pass architecture review was conducted. The goal was to eliminate premature assumptions, correct contradictory requirements, replace hardcoded universal constants with configurable policy models, normalize evidence data structures, refine real-time audio terminology, and establish an uncompromised, implementable engineering foundation.
 
 Zero application code was written, zero dependencies were installed, and zero database migrations were executed during this review.
 

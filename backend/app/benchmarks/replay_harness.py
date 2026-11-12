@@ -9,7 +9,7 @@ from app.services.interview_state_machine import InterviewStateMachine
 from app.services.live_answer_interpreter import LiveAnswerInterpreter
 from app.services.policy_guardrails import PolicyGuardrails
 
-logger = logging.getLogger("intervuex.benchmark")
+logger = logging.getLogger("CareerDiff.benchmark")
 
 
 class SeniorityLevel(str, Enum):

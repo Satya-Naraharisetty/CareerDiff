@@ -255,7 +255,9 @@ def analyze_job_description(
         m = re.search(pat, jd_text, re.IGNORECASE)
         if m:
             cand = m.group(1).strip()
-            if 2 <= len(cand) <= 40 and not any(w in cand.lower() for w in ["the team", "our team", "role", "us", "you"]):
+            if 2 <= len(cand) <= 40 and not any(
+                w in cand.lower() for w in ["the team", "our team", "role", "us", "you"]
+            ):
                 extracted_company = cand
                 break
 
@@ -407,11 +409,7 @@ def match_resume_against_jd(
     ]
 
     # 2. Skill Overlap Ratio
-    skill_ratio = (
-        len(matched_skills) / max(len(active_jd_techs), 1)
-        if active_jd_techs
-        else 0.8
-    )
+    skill_ratio = len(matched_skills) / max(len(active_jd_techs), 1) if active_jd_techs else 0.8
 
     # 3. Seniority Fit
     seniority_map = {"JUNIOR": 1, "MID": 2, "SENIOR": 3, "STAFF": 4}
@@ -441,9 +439,7 @@ def match_resume_against_jd(
         "idempotency",
     ]
     jd_arch_count = sum(1 for term in arch_terms if term in jd_lower)
-    resume_arch_count = sum(
-        1 for term in arch_terms if term in resume_lower and term in jd_lower
-    )
+    resume_arch_count = sum(1 for term in arch_terms if term in resume_lower and term in jd_lower)
     arch_overlap = (resume_arch_count / max(jd_arch_count, 1)) if jd_arch_count else 0.8
 
     # 5. Composite Score Calculation
@@ -452,19 +448,15 @@ def match_resume_against_jd(
 
     # 6. Alignment Summary & Strategy
     if match_score >= 80:
-        alignment_summary = (
-            f"Strong Alignment ({match_score}%). Resume directly demonstrates core tech stack and seniority requirements."
-        )
+        alignment_summary = f"Strong Alignment ({match_score}%). Resume directly demonstrates core tech stack and seniority requirements."
     elif match_score >= 60:
-        alignment_summary = (
-            f"Moderate Alignment ({match_score}%). Core skills align well, with a few tooling or domain gaps."
-        )
+        alignment_summary = f"Moderate Alignment ({match_score}%). Core skills align well, with a few tooling or domain gaps."
     else:
-        alignment_summary = (
-            f"Stretch Opportunity ({match_score}%). Foundational qualifications present, but target stack requirements have notable gaps."
-        )
+        alignment_summary = f"Stretch Opportunity ({match_score}%). Foundational qualifications present, but target stack requirements have notable gaps."
 
-    matched_sample = ", ".join(matched_skills[:3]) if matched_skills else "general engineering principles"
+    matched_sample = (
+        ", ".join(matched_skills[:3]) if matched_skills else "general engineering principles"
+    )
     gap_sample = ", ".join(missing_skills[:2]) if missing_skills else "none"
 
     if missing_skills:
@@ -521,9 +513,7 @@ def compute_ats_score(
     missing_critical_keywords = [s for s in jd_canonical_list if s not in resume_canonical_set]
 
     keyword_ratio = (
-        len(matched_keywords) / max(len(jd_canonical_list), 1)
-        if jd_canonical_list
-        else 0.85
+        len(matched_keywords) / max(len(jd_canonical_list), 1) if jd_canonical_list else 0.85
     )
     keyword_score = min(100, max(20, round(keyword_ratio * 100)))
 
@@ -610,5 +600,3 @@ def compute_ats_score(
         "missing_critical_keywords": missing_critical_keywords,
         "optimization_tips": tips,
     }
-
-

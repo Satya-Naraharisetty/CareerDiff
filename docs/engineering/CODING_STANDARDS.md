@@ -1,4 +1,4 @@
-# Coding Standards & Engineering Guidelines — IntervueX
+# Coding Standards & Engineering Guidelines — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Engineering Constitution  

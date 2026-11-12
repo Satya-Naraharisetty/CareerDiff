@@ -1,4 +1,4 @@
-# Security Architecture & Threat Model — IntervueX
+# Security Architecture & Threat Model — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Security Specification  
@@ -7,7 +7,7 @@
 
 ## 1. Threat Modeling (STRIDE Analysis)
 
-| STRIDE Category | Threat Description | Attack Vector in IntervueX | Mitigations Implemented |
+| STRIDE Category | Threat Description | Attack Vector in CareerDiff | Mitigations Implemented |
 | :--- | :--- | :--- | :--- |
 | **Spoofing** | Attacker impersonates candidate or hijacks WebSocket session. | Replay of intercepted connection tokens; brute-force session IDs. | Short-lived (60s) single-use WebSocket tickets stored in Redis and consumed via atomic `GETDEL`; cryptographically signed JWTs; WSS enforcement. |
 | **Tampering** | Modification of resume text, rubric scores, or transcript turns. | Manipulating API payloads or intercepting database transactions. | Server-side cryptographic hash verification for uploaded files; foreign-key invariants; Pydantic schema validation. |
@@ -72,7 +72,7 @@ To comply with data protection regulations, **failover targets must strictly adh
 
 ## 4. Multi-Tier Retention, Processing & Comprehensive Deletion Policies
 
-IntervueX strictly separates three distinct data classes with independent retention lifecycles:
+CareerDiff strictly separates three distinct data classes with independent retention lifecycles:
 
 ```mermaid
 flowchart TD
@@ -126,16 +126,16 @@ When a candidate invokes `DELETE /api/v1/candidates/me`, the system executes a *
 1. **GDPR (EU) & UK GDPR**:
    - **Article 15 (Access)**: Candidates can export their entire transcript and evaluation dossier as JSON.
    - **Article 17 (Erasure)**: Hard delete supported via `DELETE /api/v1/candidates/me`.
-   - **Article 22 (Automated Decision-Making)**: IntervueX MVP is an interview practice simulator, not a hiring decision system. It does not render legal or significant employment effects.
+   - **Article 22 (Automated Decision-Making)**: CareerDiff MVP is an interview practice simulator, not a hiring decision system. It does not render legal or significant employment effects.
 2. **NYC Local Law 144 & EU AI Act (Annex III High-Risk AI)**:
-   - **MVP Exemption**: In the MVP (Candidate Practice), IntervueX is used voluntarily by candidates for personal skill assessment and preparation. It is **not** an Automated Employment Decision Tool (AEDT) under NYC LL 144.
+   - **MVP Exemption**: In the MVP (Candidate Practice), CareerDiff is used voluntarily by candidates for personal skill assessment and preparation. It is **not** an Automated Employment Decision Tool (AEDT) under NYC LL 144.
    - **Post-MVP Hiring Requirement (Phase 7+)**: If deployed by enterprise employers for candidate screening, an independent annual bias audit and 10-day candidate notification become mandatory prior to enterprise activation.
 
 ---
 
 ## 6. Measurable Reliability & Availability Objectives (SLOs)
 
-Rather than stating absolute claims ("100% uptime", "zero data loss"), IntervueX defines concrete Service Level Objectives:
+Rather than stating absolute claims ("100% uptime", "zero data loss"), CareerDiff defines concrete Service Level Objectives:
 
 | Metric | Target Service Level Objective (SLO) | Measurement Method |
 | :--- | :--- | :--- |

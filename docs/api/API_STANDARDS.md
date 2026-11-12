@@ -1,4 +1,4 @@
-# API Design Standards & Conventions — IntervueX
+# API Design Standards & Conventions — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Standard  

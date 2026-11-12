@@ -1,6 +1,6 @@
-# User Journeys — IntervueX
+# User Journeys — CareerDiff
 
-This document traces the comprehensive end-to-end user journeys through the IntervueX platform. Journeys 1 through 4 represent the **Primary MVP Candidate Practice Experience**, while Journey 5 represents the **Preserved Post-MVP Enterprise Assessment Flow**.
+This document traces the comprehensive end-to-end user journeys through the CareerDiff platform. Journeys 1 through 4 represent the **Primary MVP Candidate Practice Experience**, while Journey 5 represents the **Preserved Post-MVP Enterprise Assessment Flow**.
 
 ---
 

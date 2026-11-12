@@ -1,4 +1,4 @@
-# Canonical Phased Engineering Roadmap — IntervueX
+# Canonical Phased Engineering Roadmap — CareerDiff
 
 **Document Version:** 1.1.0  
 **Status:** Approved Canonical Roadmap  
@@ -123,7 +123,7 @@ We deliberately decouple the **cognitive intelligence** of the interview engine 
 
 ## Phase 4: Adaptive Interview Engine & Text Interviews
 - **Status**: **COMPLETED** (Verified)
-- **Objectives**: Build the core intelligence of IntervueX: the deterministic turn-taking state machine, the 9-action adaptive decision engine, bounded context management, and interactive text-based technical interviews.
+- **Objectives**: Build the core intelligence of CareerDiff: the deterministic turn-taking state machine, the 9-action adaptive decision engine, bounded context management, and interactive text-based technical interviews.
 - **Dependencies**: Phase 3 Blueprints, Redis 7.
 - **Deliverables**:
   - `InterviewStateMachine` enforcing macro state transitions (`WARMUP` $\rightarrow$ `TECHNICAL_CORE` $\rightarrow$ `CONCLUDING`).

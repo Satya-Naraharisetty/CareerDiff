@@ -1,4 +1,4 @@
-# Third-Pass Architecture Review & Reliability Hardening Report — IntervueX
+# Third-Pass Architecture Review & Reliability Hardening Report — CareerDiff
 
 **Document Version:** 1.0.0  
 **Date:** 2026-11-10  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-Prior to initiating Phase 1 implementation (Development Environment & Backend Foundation), a rigorous third-pass architectural review of the IntervueX codebase, documentation, schemas, and Antigravity customization rules was conducted. 
+Prior to initiating Phase 1 implementation (Development Environment & Backend Foundation), a rigorous third-pass architectural review of the CareerDiff codebase, documentation, schemas, and Antigravity customization rules was conducted. 
 
 The primary objective was to resolve critical design tensions and single points of failure across eight key operational dimensions:
 1. **Product Scope Alignment**: Explicitly separating candidate practice from enterprise hiring assessment to avoid premature regulatory and sales drag.
@@ -252,7 +252,7 @@ While the mandatory 15-point learning breakdown is central to the project's educ
 Every affected document was reviewed, updated to version 1.2.0, and verified for internal consistency:
 
 ```text
-IntervueX Documentation Suite (Third-Pass Synchronized)
+CareerDiff Documentation Suite (Third-Pass Synchronized)
 ├── README.md                              # Tech stack (Taskiq), canonical roadmap, learning protocol
 ├── AGENTS.md                              # Proportionality, ADR conflict check, Taskiq/Outbox invariants
 ├── .agents/rules/

@@ -1,39 +1,39 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: intervuex-postgres
+    container_name: careerdiff-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: intervuex
+      POSTGRES_USER: careerdiff
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: intervuex_dev
+      POSTGRES_DB: careerdiff_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U intervuex -d intervuex_dev"]
+      test: [ "CMD-SHELL", "pg_isready -U careerdiff -d careerdiff_dev" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: intervuex-redis
+    container_name: careerdiff-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
   minio:
     image: cgr.dev/chainguard/minio:latest
-    container_name: intervuex-minio
+    container_name: careerdiff-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -52,4 +52,4 @@ volumes:
 
 networks:
   default:
-    name: intervuex-network
+    name: careerdiff-network

@@ -1,8 +1,8 @@
-# IntervueX
+# CareerDiff
 
 > **Voice-First, Adaptive AI Technical Interviewing Platform**
 
-IntervueX is an intelligent, voice-first technical interviewing system designed to conduct authentic, adaptive, and deeply technical interviews. Unlike static chatbots that recite canned lists of questions, IntervueX operates as an autonomous, context-aware technical interviewer: it analyzes candidate resumes, understands role competencies, formulates dynamic interview plans, adapts question difficulty in real time based on candidate answers, probes vague claims, challenges technical trade-offs, and generates transparent, evidence-backed evaluation reports.
+CareerDiff is an intelligent, voice-first technical interviewing system designed to conduct authentic, adaptive, and deeply technical interviews. Unlike static chatbots that recite canned lists of questions, CareerDiff operates as an autonomous, context-aware technical interviewer: it analyzes candidate resumes, understands role competencies, formulates dynamic interview plans, adapts question difficulty in real time based on candidate answers, probes vague claims, challenges technical trade-offs, and generates transparent, evidence-backed evaluation reports.
 
 ---
 
@@ -10,7 +10,7 @@ IntervueX is an intelligent, voice-first technical interviewing system designed 
 
 > **"The LLM conducts the conversation, but the Interview Engine controls the interview."**
 
-In IntervueX, the Large Language Model (LLM) is **never** granted unconstrained authority over session state, rubric scoring, competency progression, or time allocation. Instead, IntervueX employs a **three-tier architecture**:
+In CareerDiff, the Large Language Model (LLM) is **never** granted unconstrained authority over session state, rubric scoring, competency progression, or time allocation. Instead, CareerDiff employs a **three-tier architecture**:
 
 - **Deterministic Invariants**: Enforces hard session stops, turn persistence before state advancement, closed 9-action space, and non-penalizing treatment of unassessed competencies.
 - **Configurable Session Policy**: Governs required competencies, weighted coverage targets, maximum probe limits, topic time budgets, and conclusion buffers.
@@ -33,7 +33,7 @@ graph TD
 
 ## 👥 Engineering Constitution & Learning-First Development
 
-IntervueX is engineered with a strict **learning-first philosophy**. This repository serves as both a production-grade software system and an interactive engineering classroom.
+CareerDiff is engineered with a strict **learning-first philosophy**. This repository serves as both a production-grade software system and an interactive engineering classroom.
 
 ### The 15-Point Learning Requirement
 For **every** code change, the following 15 points are systematically taught:
@@ -72,7 +72,7 @@ For **every** code change, the following 15 points are systematically taught:
 ## 📁 Repository Structure
 
 ```text
-IntervueX/
+CareerDiff/
 ├── .agents/                        # Antigravity AI engineering configuration
 │   ├── rules/*.md                  # Enforceable rules (01-18)
 │   └── skills/<skill>/SKILL.md     # 10 Multi-step operational skills
@@ -131,9 +131,9 @@ flowchart LR
 
 ## 🔒 Ethics & Responsible AI Guarantees
 
-IntervueX strictly enforces the following ethical constraints:
+CareerDiff strictly enforces the following ethical constraints:
 1. **Zero Biometric Proxying**: We never analyze candidate video, facial expressions, micro-movements, eye gaze, vocal pitch, tone, or accents as proxies for technical competence.
-2. **No Automated Hiring Decisions**: IntervueX produces evidence-backed assessment reports; human hiring managers remain the sole decision-makers.
+2. **No Automated Hiring Decisions**: CareerDiff produces evidence-backed assessment reports; human hiring managers remain the sole decision-makers.
 3. **Transparent Evidence**: Every score, feedback bullet, and claim verification links directly to transcript turns, timestamped quotes, and character offsets.
 4. **Candidate Consent**: Explicit opt-in microphone and transcript storage consent is required prior to starting any session.
 

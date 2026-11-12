@@ -1,6 +1,6 @@
-# User Personas — IntervueX
+# User Personas — CareerDiff
 
-This document establishes the authoritative user personas for the IntervueX platform. It reflects our primary MVP focus on **Candidate Technical Interview Practice & Mastery Simulation**, while preserving the architectural and data modeling path for post-MVP **Enterprise Hiring Assessment**.
+This document establishes the authoritative user personas for the CareerDiff platform. It reflects our primary MVP focus on **Candidate Technical Interview Practice & Mastery Simulation**, while preserving the architectural and data modeling path for post-MVP **Enterprise Hiring Assessment**.
 
 ---
 
@@ -29,7 +29,7 @@ Give me a real architectural challenge, challenge my trade-offs, and respect my 
 - Being cut off mid-thought or having latency delays make conversation feel unnatural.
 - Not receiving clear evidence for why a particular answer was rated or scored.
 
-### Behavioral Requirements for IntervueX
+### Behavioral Requirements for CareerDiff
 - The engine must detect high-level answers and automatically trigger `CHALLENGE` or `PROBE_DEEPER`.
 - The voice pipeline must handle natural pauses (Alex taking 4-5 seconds to think before outlining a distributed lock algorithm) without prematurely terminating the turn.
 - The evaluation must acknowledge valid alternative engineering trade-offs.
@@ -60,7 +60,7 @@ system design questions. I want to know where my blind spots are so I can study 
 - Generic feedback like "Improve system design skills" without specific transcript citations.
 - Clunky interview software with mic permission issues or confusing UI controls.
 
-### Behavioral Requirements for IntervueX
+### Behavioral Requirements for CareerDiff
 - When Maya struggles or gives a circular answer, the engine must trigger `SIMPLIFY` or `CLARIFY` to provide a helpful nudge.
 - The feedback report must link directly to the transcript, showing exactly where a gap was revealed and recommending specific reading topics.
 

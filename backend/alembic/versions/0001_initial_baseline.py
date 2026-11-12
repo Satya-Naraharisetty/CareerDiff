@@ -16,7 +16,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Baseline migration marker for IntervueX schema
+    # Baseline migration marker for CareerDiff schema
     pass
 
 

@@ -1,6 +1,6 @@
-# Engineering Journal — IntervueX
+# Engineering Journal — CareerDiff
 
-This journal records our architectural decisions, technical trade-offs, debugging discoveries, and engineering lessons learned as we build IntervueX.
+This journal records our architectural decisions, technical trade-offs, debugging discoveries, and engineering lessons learned as we build CareerDiff.
 
 ---
 
@@ -94,7 +94,7 @@ Before starting Phase 1 implementation, a rigorous third-pass architectural revi
 - **Candidate Practice vs Hiring Screening**: Validating with self-directed software engineers validates the engine faster with zero enterprise procurement drag, while preserving enterprise capabilities for Phase 7+.
 
 ### 5. Mistakes, Bugs & Debugging Insights
-- *Catching Maintenance-Only Libraries*: Relying on initial impressions of ARQ without checking its recent commit activity and maintainer notice could have stranded IntervueX on an abandoned queue. Checking current maintenance status before Phase 1 code avoided painful refactoring later.
+- *Catching Maintenance-Only Libraries*: Relying on initial impressions of ARQ without checking its recent commit activity and maintainer notice could have stranded CareerDiff on an abandoned queue. Checking current maintenance status before Phase 1 code avoided painful refactoring later.
 - *String Indexing Traps*: Using Python standard slicing `str[start:end]` without Unicode normalization (NFC) creates off-by-one errors when dealing with multi-byte characters or emoji. Standardizing on NFC normalization before offset computation eliminates slice mismatches.
 
 ### 6. Verification & Tests

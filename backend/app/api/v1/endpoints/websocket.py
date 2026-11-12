@@ -21,7 +21,7 @@ from app.services.ticket_service import TicketService
 from app.services.turn_service import TurnService
 
 router = APIRouter()
-logger = logging.getLogger("intervuex.voice")
+logger = logging.getLogger("CareerDiff.voice")
 
 
 @router.websocket("/interviews/{interview_id}")

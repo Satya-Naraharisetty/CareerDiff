@@ -1,4 +1,4 @@
-# Acceptance Criteria — IntervueX
+# Acceptance Criteria — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Acceptance Criteria  

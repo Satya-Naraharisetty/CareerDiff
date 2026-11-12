@@ -9,7 +9,7 @@ from app.models.outbox import OutboxEvent
 from app.services.outbox_service import OutboxService
 from app.tasks.eval_tasks import evaluate_interview_task
 
-logger = logging.getLogger("intervuex.outbox_poller")
+logger = logging.getLogger("CareerDiff.outbox_poller")
 
 
 class OutboxPoller:

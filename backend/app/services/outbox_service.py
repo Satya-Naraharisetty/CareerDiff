@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.outbox import OutboxEvent
 
-logger = logging.getLogger("intervuex.outbox")
+logger = logging.getLogger("CareerDiff.outbox")
 
 
 class OutboxService:

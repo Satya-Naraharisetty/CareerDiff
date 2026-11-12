@@ -1,4 +1,4 @@
-# Debugging & Operational Troubleshooting Guide — IntervueX
+# Debugging & Operational Troubleshooting Guide — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Engineering Playbook  

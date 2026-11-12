@@ -1,4 +1,4 @@
-"""IntervueX FastAPI Application Entrypoint."""
+"""CareerDiff FastAPI Application Entrypoint."""
 
 import logging
 import os
@@ -18,21 +18,21 @@ from app.core.tracing import CorrelationIdMiddleware
 
 settings = get_settings()
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
-logger = logging.getLogger("intervuex")
+logger = logging.getLogger("CareerDiff")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown lifecycle hooks."""
-    logger.info("Initializing IntervueX backend services in %s mode...", settings.environment)
+    logger.info("Initializing CareerDiff backend services in %s mode...", settings.environment)
     yield
-    logger.info("Shutting down IntervueX backend services...")
+    logger.info("Shutting down CareerDiff backend services...")
     await engine.dispose()
     logger.info("Database engine connections cleanly closed.")
 
 
 app = FastAPI(
-    title="IntervueX API",
+    title="CareerDiff API",
     description="Adaptive AI-Powered Technical Interview Platform",
     version="0.1.0",
     docs_url="/docs",
@@ -73,7 +73,7 @@ app.include_router(ws_router, prefix="/ws/v1")
 async def root() -> dict[str, str]:
     """Provide service identity and documentation pointers."""
     return {
-        "service": "IntervueX API",
+        "service": "CareerDiff API",
         "version": "0.1.0",
         "status": "online",
         "docs": "/docs",
@@ -88,7 +88,7 @@ async def robots_txt() -> str:
         "Allow: /\n"
         "Disallow: /api/\n"
         "Disallow: /ws/\n\n"
-        "Sitemap: https://intervuex.dev/sitemap.xml\n"
+        "Sitemap: https://CareerDiff.dev/sitemap.xml\n"
     )
 
 
@@ -99,7 +99,7 @@ async def sitemap_xml() -> Response:
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         "  <url>\n"
-        "    <loc>https://intervuex.dev/</loc>\n"
+        "    <loc>https://CareerDiff.dev/</loc>\n"
         "    <lastmod>2026-11-10</lastmod>\n"
         "    <changefreq>weekly</changefreq>\n"
         "    <priority>1.0</priority>\n"

@@ -129,5 +129,3 @@ async def analyze_company_endpoint(
         architectural_focus=res["architectural_focus"],
         confidence=float(res.get("confidence", 0.9)),
     )
-
-

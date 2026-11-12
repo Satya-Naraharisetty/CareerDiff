@@ -1,4 +1,4 @@
-# Failure Handling & Fault Tolerance — IntervueX
+# Failure Handling & Fault Tolerance — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Technical Architecture  
@@ -9,7 +9,7 @@
 
 In a voice-first real-time platform, failure will inevitably occur: external AI APIs timeout, candidate Wi-Fi drops, LLMs generate invalid JSON, and audio streams encounter jitter.
 
-The core reliability philosophy of IntervueX is:
+The core reliability philosophy of CareerDiff is:
 > **"Never crash the interview. Degrade gracefully, preserve session state, and fall back to deterministic safety."**
 
 ```mermaid
@@ -230,7 +230,7 @@ If an outbox event transitions to `PUBLISHED` but the worker crashes mid-evaluat
 
 ## 4. Failure Injection & Chaos Testing Matrix
 
-To guarantee distributed resilience, IntervueX includes automated failure injection test suites executed against real PostgreSQL and Redis containers:
+To guarantee distributed resilience, CareerDiff includes automated failure injection test suites executed against real PostgreSQL and Redis containers:
 
 | Test Identifier | Failure Injected | System Invariant Verified | Expected Outcome |
 | :--- | :--- | :--- | :--- |

@@ -1,4 +1,4 @@
-# Entity Relationship Diagram (ERD) — IntervueX
+# Entity Relationship Diagram (ERD) — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Database Architecture  

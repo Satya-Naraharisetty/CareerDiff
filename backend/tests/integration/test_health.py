@@ -12,7 +12,7 @@ async def test_root_endpoint(async_client: AsyncClient) -> None:
     response = await async_client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["service"] == "IntervueX API"
+    assert data["service"] == "CareerDiff API"
     assert data["status"] == "online"
     assert data["docs"] == "/docs"
 

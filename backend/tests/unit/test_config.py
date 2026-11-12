@@ -15,7 +15,7 @@ def test_default_settings() -> None:
     assert cfg.jwt_algorithm == "HS256"
     assert cfg.jwt_access_token_expire_minutes == 15
     assert cfg.s3_endpoint_url == "http://localhost:9000"
-    assert cfg.s3_bucket_name == "intervuex-resumes"
+    assert cfg.s3_bucket_name == "careerdiff-resumes"
 
 
 def test_custom_environment_override() -> None:

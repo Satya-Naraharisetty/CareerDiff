@@ -1,4 +1,4 @@
-# Dependency Management Policy — IntervueX
+# Dependency Management Policy — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Engineering Constitution  
@@ -7,7 +7,7 @@
 
 ## 1. Principles for Introducing Dependencies
 
-Every external dependency introduced into IntervueX is a liability: it increases build times, expands attack surface, introduces transitive bloat, and creates maintenance overhead.
+Every external dependency introduced into CareerDiff is a liability: it increases build times, expands attack surface, introduces transitive bloat, and creates maintenance overhead.
 
 ### The 5-Point Vetting Checklist
 Before adding **any** new library (`uv add <pkg>` or `pnpm add <pkg>`), the engineer must verify:

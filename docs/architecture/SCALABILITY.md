@@ -1,4 +1,4 @@
-# Scalability & Performance Engineering — IntervueX
+# Scalability & Performance Engineering — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Technical Architecture  
@@ -7,7 +7,7 @@
 
 ## 1. Resource Consumption Modeling (Per Session)
 
-To scale IntervueX predictably, we quantify the resource requirements for a single active 30-minute voice interview session:
+To scale CareerDiff predictably, we quantify the resource requirements for a single active 30-minute voice interview session:
 
 | Resource Dimension | Consumption per Active 30m Session | Sustained Rate / Peak |
 | :--- | :--- | :--- |

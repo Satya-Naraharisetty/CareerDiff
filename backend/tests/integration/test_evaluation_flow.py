@@ -206,5 +206,5 @@ async def test_full_interview_completion_outbox_and_evaluation_flow(
     # 10. Verify Dossier HTML endpoint
     dossier_res = await async_client.get(f"/api/v1/interviews/{interview_id}/dossier?token={token}")
     assert dossier_res.status_code == 200
-    assert "IntervueX Assessment Dossier" in dossier_res.text
+    assert "CareerDiff Assessment Dossier" in dossier_res.text
     assert "radar-chart" in dossier_res.text

@@ -1,4 +1,4 @@
-# Database Migration Strategy — IntervueX
+# Database Migration Strategy — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Engineering Standard  

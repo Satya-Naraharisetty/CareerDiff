@@ -6,7 +6,7 @@ import re
 from app.core.config import get_settings
 from app.schemas.adaptive import EngineAction, QuestionArchetype
 
-logger = logging.getLogger("intervuex.turn_generator")
+logger = logging.getLogger("CareerDiff.turn_generator")
 
 
 class TurnGenerationResult(str):
@@ -215,7 +215,11 @@ class TurnGenerator:
         """Generate welcoming opener for the WARMUP phase grounded in candidate resume & company motivation."""
         name_str = f" {candidate_name}" if candidate_name else ""
         skills_str = ", ".join(top_skills[:3]) if top_skills and len(top_skills) > 0 else None
-        company_phrase = f" for our {target_seniority.lower()} engineering team at {company_name}" if company_name else ""
+        company_phrase = (
+            f" for our {target_seniority.lower()} engineering team at {company_name}"
+            if company_name
+            else ""
+        )
         motivation_probe = (
             f" Along with your recent work, what excites you about the engineering challenges here at {company_name}?"
             if company_name
@@ -319,7 +323,9 @@ class TurnGenerator:
         # Code review sample selection if applicable
         code_sample: str | None = None
         if chosen_archetype == QuestionArchetype.CODE_REVIEW:
-            lang_snippets = SAMPLE_CODE_SNIPPETS.get(preferred_language) or SAMPLE_CODE_SNIPPETS["Python"]
+            lang_snippets = (
+                SAMPLE_CODE_SNIPPETS.get(preferred_language) or SAMPLE_CODE_SNIPPETS["Python"]
+            )
             code_sample = lang_snippets.get("concurrency") or lang_snippets.get("database")
 
         settings = get_settings()
@@ -351,7 +357,10 @@ class TurnGenerator:
                         "- Probe fundamental systems architecture, clean interface boundaries, concurrency control, "
                         "caching layers, and database query optimization."
                     ),
-                }.get(company_persona.upper(), "Interviewer Persona: Balanced Senior Engineering Evaluator.")
+                }.get(
+                    company_persona.upper(),
+                    "Interviewer Persona: Balanced Senior Engineering Evaluator.",
+                )
 
                 archetype_guidelines = {
                     QuestionArchetype.SKILL_FUNDAMENTALS: (
@@ -400,10 +409,12 @@ class TurnGenerator:
                 }.get(chosen_archetype, "Archetype: Deep Technical Systems Architecture.")
 
                 company_context = f"Target Company: {company_name}\n" if company_name else ""
-                code_context = f"\nAttached Code Sample:\n```\n{code_sample}\n```\n" if code_sample else ""
+                code_context = (
+                    f"\nAttached Code Sample:\n```\n{code_sample}\n```\n" if code_sample else ""
+                )
 
                 prompt = (
-                    f"You are IntervueX, a principal software engineering technical interviewer.\n"
+                    f"You are CareerDiff, a principal software engineering technical interviewer.\n"
                     f"{persona_guidelines}\n"
                     f"{archetype_guidelines}\n"
                     f"{company_context}"
@@ -640,7 +651,7 @@ class TurnGenerator:
                 prompt = (
                     f"You are a Staff Software Engineer and interviewer at {company}.\n"
                     f"The candidate has just completed their {target_seniority.lower()} technical interview and asked you: "
-                    f"\"{candidate_question}\"\n\n"
+                    f'"{candidate_question}"\n\n'
                     f"Task: Respond authentically and professionally as an engineering leader at {company}.\n"
                     f"Guidelines:\n"
                     f"- Answer their questions directly in 2-3 sentences based on realistic modern production engineering practices "

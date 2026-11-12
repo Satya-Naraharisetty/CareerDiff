@@ -1,4 +1,4 @@
-# Local Development Guide — IntervueX
+# Local Development Guide — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Setup Runbook  
@@ -7,7 +7,7 @@
 
 ## 1. System Prerequisites
 
-Before starting local development on IntervueX, ensure your workstation has the following installed:
+Before starting local development on CareerDiff, ensure your workstation has the following installed:
 - **Operating System**: macOS, Linux, or Windows (WSL2 or PowerShell).
 - **Python**: `3.12` or higher (recommended via `uv` or `pyenv`).
 - **Node.js**: `20.x` or higher (recommended via `nvm` or `fnm`).
@@ -31,7 +31,7 @@ docker compose ps
 ```
 
 ### Local Services & Ports:
-- **PostgreSQL 16**: `localhost:5432` (User: `intervuex`, DB: `intervuex_dev`, Pass: `postgres`)
+- **PostgreSQL 16**: `localhost:5432` (User: `CareerDiff`, DB: `CareerDiff_dev`, Pass: `postgres`)
 - **Redis 7**: `localhost:6379`
 - **MinIO S3**: `localhost:9000` (Console: `localhost:9001`, User: `minioadmin`, Pass: `minioadmin`)
 

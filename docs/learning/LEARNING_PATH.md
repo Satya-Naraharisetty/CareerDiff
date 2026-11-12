@@ -1,4 +1,4 @@
-# IntervueX Engineering Curriculum & Learning Path
+# CareerDiff Engineering Curriculum & Learning Path
 
 **Document Version:** 1.0.0  
 **Status:** Active Learning Curriculum  
@@ -7,7 +7,7 @@
 
 ## 1. Educational Mission & Philosophy
 
-The primary objective of IntervueX is not merely to build a commercial software product. It is to transform you into a **self-sufficient, production-grade systems engineer and AI architect** who deeply understands:
+The primary objective of CareerDiff is not merely to build a commercial software product. It is to transform you into a **self-sufficient, production-grade systems engineer and AI architect** who deeply understands:
 - How asynchronous event loops handle thousands of concurrent streaming connections.
 - How deterministic state machines constrain probabilistic AI models.
 - How audio buffers, Voice Activity Detection, and WebSockets interact in real-time browser engineering.

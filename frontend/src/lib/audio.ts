@@ -1,5 +1,5 @@
 /**
- * IntervueX Audio Utilities
+ * CareerDiff Audio Utilities
  * 16kHz 16-bit Mono Linear PCM Capture & Playback with Web Audio API.
  * Sub-150ms barge-in interruption capability.
  */
@@ -82,7 +82,7 @@ export class PcmPlayer {
   close(): void {
     this.stopAll();
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
-      this.audioCtx.close().catch(() => {});
+      this.audioCtx.close().catch(() => { });
       this.audioCtx = null;
     }
   }
@@ -199,7 +199,7 @@ export class PcmRecorder {
       this.mediaStream = null;
     }
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
-      this.audioCtx.close().catch(() => {});
+      this.audioCtx.close().catch(() => { });
       this.audioCtx = null;
     }
     if (this.onVolumeChange) {

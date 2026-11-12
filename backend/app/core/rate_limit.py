@@ -9,7 +9,7 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger("intervuex.rate_limit")
+logger = logging.getLogger("CareerDiff.rate_limit")
 
 
 class TokenBucket:
@@ -109,7 +109,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=429,
                 content={
-                    "type": "https://api.intervuex.com/errors/rate-limit-exceeded",
+                    "type": "https://api.CareerDiff.com/errors/rate-limit-exceeded",
                     "title": "Too Many Requests",
                     "status": 429,
                     "detail": "Rate limit exceeded. Please wait before retrying.",

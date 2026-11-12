@@ -1,4 +1,4 @@
-# MVP Scope Specification — IntervueX
+# MVP Scope Specification — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved  
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary & Purpose
 
-The objective of the IntervueX Minimum Viable Product (MVP) is to prove the core thesis:
+The objective of the CareerDiff Minimum Viable Product (MVP) is to prove the core thesis:
 > **An AI system with deterministic state machine control, configurable session policy, and adaptive LLM reasoning can conduct a technical interview that feels authentic, adapts intelligently to depth, rigorously tests resume claims, and provides transparent, evidence-backed evaluation.**
 
 ### Primary MVP Focus: Candidate Technical Interview Practice

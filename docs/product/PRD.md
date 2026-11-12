@@ -1,4 +1,4 @@
-# Product Requirements Document (PRD) — IntervueX
+# Product Requirements Document (PRD) — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved for Implementation Planning  
@@ -13,7 +13,7 @@ Technical interviews are high-stakes, stressful, and frequently miscalibrated. T
 2. **Superficial AI Chatbots**: Generic chatbots act as passive conversationalists reciting static question lists. They cannot probe technical depth, challenge hand-wavy claims, or verify asserted resume accomplishments.
 
 ### Primary MVP Use Case: Candidate Technical Interview Practice & Mastery Simulation
-To establish a clear product boundary, minimize legal/regulatory compliance hurdles, and accelerate the feedback loop, **the primary MVP use case for IntervueX is Candidate Technical Interview Practice & Skill Mastery**.
+To establish a clear product boundary, minimize legal/regulatory compliance hurdles, and accelerate the feedback loop, **the primary MVP use case for CareerDiff is Candidate Technical Interview Practice & Skill Mastery**.
 
 - **Why Candidate Practice First?**
   1. *Immediate Pedagogical Feedback*: Candidates directly benefit from transparent rubric visibility, verbatim evidence citations, and curated study recommendations.
@@ -27,7 +27,7 @@ The underlying architecture (resume claim provenance, deterministic blueprints, 
 
 ## 2. Product Vision
 
-**IntervueX** is an autonomous, voice-first, adaptive AI technical interviewing coach and mastery simulator. It listens, evaluates technical depth in real time, formulates dynamic follow-ups, rigorously verifies claims from the candidate's resume, and produces evidence-backed, rubric-grounded assessment reports.
+**CareerDiff** is an autonomous, voice-first, adaptive AI technical interviewing coach and mastery simulator. It listens, evaluates technical depth in real time, formulates dynamic follow-ups, rigorously verifies claims from the candidate's resume, and produces evidence-backed, rubric-grounded assessment reports.
 
 ### Core Guiding Tenet
 > *"The LLM conducts the conversation, but the Interview Engine controls the interview."*

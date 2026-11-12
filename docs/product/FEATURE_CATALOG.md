@@ -1,6 +1,6 @@
-# Feature Catalog — IntervueX
+# Feature Catalog — CareerDiff
 
-This document establishes the comprehensive feature catalog for IntervueX across all modules. Each feature is tracked with an immutable identifier, functional module, release phase, complexity tier, input/output contracts, and dependencies.
+This document establishes the comprehensive feature catalog for CareerDiff across all modules. Each feature is tracked with an immutable identifier, functional module, release phase, complexity tier, input/output contracts, and dependencies.
 
 ---
 

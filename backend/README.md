@@ -1,3 +1,3 @@
-# IntervueX Backend
+# CareerDiff Backend
 
-FastAPI backend application for IntervueX.
+FastAPI backend application for CareerDiff.

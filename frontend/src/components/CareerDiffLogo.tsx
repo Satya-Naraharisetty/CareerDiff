@@ -5,7 +5,7 @@ interface LogoProps {
   size?: number;
 }
 
-export const IntervueXLogo: React.FC<LogoProps> = ({ className = 'h-4 w-4', size = 24 }) => (
+export const CareerDiffLogo: React.FC<LogoProps> = ({ className = 'h-4 w-4', size = 24 }) => (
   <svg
     width={size}
     height={size}
@@ -36,4 +36,5 @@ export const IntervueXLogo: React.FC<LogoProps> = ({ className = 'h-4 w-4', size
   </svg>
 );
 
-export default IntervueXLogo;
+export default CareerDiffLogo;
+

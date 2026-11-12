@@ -12,7 +12,7 @@ members = ["backend"]
 packages = ["backend/app"]
 
 [project]
-name = "intervuex"
+name = "CareerDiff"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

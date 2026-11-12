@@ -41,7 +41,7 @@ for potential_path in [
 
 
 class Settings(BaseModel):
-    """IntervueX backend environment configuration schema."""
+    """CareerDiff backend environment configuration schema."""
 
     environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development"))
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
@@ -50,7 +50,7 @@ class Settings(BaseModel):
         default_factory=lambda: normalize_database_url(
             os.getenv(
                 "DATABASE_URL",
-                "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_dev",
+                "postgresql+asyncpg://careerdiff:postgres@localhost:5432/careerdiff_dev",
             )
         )
     )
@@ -58,7 +58,7 @@ class Settings(BaseModel):
         default_factory=lambda: normalize_database_url(
             os.getenv(
                 "TEST_DATABASE_URL",
-                "postgresql+asyncpg://intervuex:postgres@localhost:5432/intervuex_test",
+                "postgresql+asyncpg://careerdiff:postgres@localhost:5432/careerdiff_test",
             )
         )
     )
@@ -81,7 +81,7 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("S3_ENDPOINT_URL", "http://localhost:9000")
     )
     s3_bucket_name: str = Field(
-        default_factory=lambda: os.getenv("S3_BUCKET_NAME", "intervuex-resumes")
+        default_factory=lambda: os.getenv("S3_BUCKET_NAME", "careerdiff-resumes")
     )
     s3_access_key: str = Field(default_factory=lambda: os.getenv("S3_ACCESS_KEY", "minioadmin"))
     s3_secret_key: str = Field(default_factory=lambda: os.getenv("S3_SECRET_KEY", "minioadmin"))

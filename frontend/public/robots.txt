@@ -1,7 +1,7 @@
-# IntervueX Robots Configuration
+# CareerDiff Robots Configuration
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /ws/
 
-Sitemap: https://intervuex.dev/sitemap.xml
+Sitemap: https://CareerDiff.dev/sitemap.xml

@@ -10,7 +10,7 @@ import { InterviewRoom } from './components/InterviewRoom';
 import { DossierView } from './components/DossierView';
 import { useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
-import { IntervueXLogo } from './components/IntervueXLogo';
+import { CareerDiffLogo } from './components/CareerDiffLogo';
 import { Cpu, Layers, ShieldCheck, Terminal } from 'lucide-react';
 import './App.css';
 
@@ -56,19 +56,19 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     switch (currentView) {
       case 'home':
-        document.title = 'IntervueX — Autonomous Technical Interview Simulator & Rubric Engine';
+        document.title = 'CareerDiff — Autonomous Technical Interview Simulator & Rubric Engine';
         break;
       case 'setup':
-        document.title = 'Session Calibration & Resume Analysis — IntervueX';
+        document.title = 'Session Calibration & Resume Analysis — CareerDiff';
         break;
       case 'interview':
-        document.title = 'Live Technical Interview Simulation — IntervueX';
+        document.title = 'Live Technical Interview Simulation — CareerDiff';
         break;
       case 'dossier':
-        document.title = 'Assessment Dossier & Rubric Grounding — IntervueX';
+        document.title = 'Assessment Dossier & Rubric Grounding — CareerDiff';
         break;
       default:
-        document.title = 'IntervueX — Autonomous Technical Interview Simulator & Rubric Engine';
+        document.title = 'CareerDiff — Autonomous Technical Interview Simulator & Rubric Engine';
     }
   }, [currentView]);
 
@@ -133,9 +133,9 @@ export const AppContent: React.FC = () => {
             <div className="space-y-3 md:col-span-1">
               <div className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm">
-                  <IntervueXLogo className="h-3.5 w-3.5" />
+                  <CareerDiffLogo className="h-3.5 w-3.5" />
                 </div>
-                <span className="font-semibold text-white text-sm tracking-tight font-mono">IntervueX</span>
+                <span className="font-semibold text-white text-sm tracking-tight font-mono">CareerDiff</span>
                 <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
                   Engine v1.0
                 </span>
@@ -189,7 +189,7 @@ export const AppContent: React.FC = () => {
           </div>
 
           <div className="mt-8 pt-6 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
-            <p>© 2026 IntervueX. Grounded Technical Practice &amp; Decoupled Evaluation.</p>
+            <p>© 2026 CareerDiff. Grounded Technical Practice &amp; Decoupled Evaluation.</p>
             <div className="flex items-center gap-4 text-xs">
               <span className="hover:text-zinc-300 cursor-pointer transition-colors">Privacy &amp; Data Minimization</span>
               <span>•</span>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Command, FileText, Home, LogOut, Menu, Radio, X } from 'lucide-react';
-import { IntervueXLogo } from './IntervueXLogo';
+import { CareerDiffLogo } from './CareerDiffLogo';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 
@@ -47,10 +47,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => onNavigate('home')}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm group-hover:bg-zinc-800 transition-colors">
-            <IntervueXLogo className="h-4 w-4 text-zinc-100" />
+            <CareerDiffLogo className="h-4 w-4 text-zinc-100" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white font-mono">
-            IntervueX
+            CareerDiff
           </span>
           <span className="hidden sm:inline-block rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
             Engine v1.0
@@ -61,33 +61,30 @@ export const Navbar: React.FC<NavbarProps> = ({
         <nav className="hidden lg:flex items-center gap-1 font-sans" aria-label="Main Navigation">
           <button
             onClick={() => onNavigate('home')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              currentView === 'home'
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'home'
                 ? 'bg-zinc-900 text-white border border-zinc-800'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-            }`}
+              }`}
           >
             Home
           </button>
 
           <button
             onClick={() => handleGuardedNavigate('setup')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              currentView === 'setup'
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'setup'
                 ? 'bg-zinc-900 text-white border border-zinc-800'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-            }`}
+              }`}
           >
             Setup
           </button>
 
           <button
             onClick={() => handleGuardedNavigate('interview')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              currentView === 'interview'
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'interview'
                 ? 'bg-zinc-900 text-white border border-zinc-800'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-            }`}
+              }`}
           >
             {isSessionActive && (
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -97,11 +94,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={() => handleGuardedNavigate('dossier')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              currentView === 'dossier'
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'dossier'
                 ? 'bg-zinc-900 text-white border border-zinc-800'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-            }`}
+              }`}
           >
             Dossier
           </button>
@@ -207,11 +203,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onNavigate('home');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'home'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'home'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
+                }`}
             >
               <Home className="h-4 w-4 text-zinc-400" />
               Home
@@ -222,11 +217,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 handleGuardedNavigate('setup');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'setup'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'setup'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
+                }`}
             >
               <FileText className="h-4 w-4 text-zinc-400" />
               Calibration Setup
@@ -237,11 +231,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 handleGuardedNavigate('interview');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'interview'
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'interview'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2.5">
                 <Radio className="h-4 w-4 text-zinc-400" />
@@ -257,11 +250,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 handleGuardedNavigate('dossier');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'dossier'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'dossier'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
+                }`}
             >
               <FileText className="h-4 w-4 text-zinc-400" />
               Assessment Dossier

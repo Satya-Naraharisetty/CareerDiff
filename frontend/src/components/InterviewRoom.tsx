@@ -205,11 +205,10 @@ const SvgDiagramPreview: React.FC<{ syntax: string }> = ({ syntax }) => {
         {nodes.map((node, i) => (
           <React.Fragment key={node.id}>
             <div
-              className={`rounded-xl px-3.5 py-2 text-center shadow-md border transition-all ${
-                node.isDb
+              className={`rounded-xl px-3.5 py-2 text-center shadow-md border transition-all ${node.isDb
                   ? 'border-indigo-700/80 bg-indigo-950/40 text-indigo-300 ring-1 ring-indigo-500/20'
                   : 'border-zinc-700 bg-zinc-900 text-zinc-200'
-              }`}
+                }`}
             >
               <div className="text-[10px] text-zinc-500 font-mono uppercase">
                 {node.isDb ? 'Storage / Queue' : 'Service Node'}
@@ -494,13 +493,12 @@ const AudioEqualizer: React.FC<{
           return (
             <div
               key={i}
-              className={`flex-1 rounded-full transition-all duration-75 ${
-                isRecording
+              className={`flex-1 rounded-full transition-all duration-75 ${isRecording
                   ? 'bg-emerald-400 shadow-sm shadow-emerald-500/20'
                   : isInterviewerSpeaking
-                  ? 'bg-zinc-200 animate-pulse'
-                  : 'bg-zinc-800'
-              }`}
+                    ? 'bg-zinc-200 animate-pulse'
+                    : 'bg-zinc-800'
+                }`}
               style={{ height: `${heightPercent}%` }}
             />
           );
@@ -512,8 +510,8 @@ const AudioEqualizer: React.FC<{
             isRecording
               ? 'text-emerald-400 font-semibold'
               : isInterviewerSpeaking
-              ? 'text-zinc-200 font-semibold'
-              : 'text-zinc-500'
+                ? 'text-zinc-200 font-semibold'
+                : 'text-zinc-500'
           }
         >
           {isRecording ? 'PCM STREAM' : isInterviewerSpeaking ? 'INTERVIEWER' : 'STANDBY'}
@@ -732,12 +730,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2 font-mono">
             <span className="relative flex h-2.5 w-2.5">
-              <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                sessionState === 'COMPLETED' ? 'bg-zinc-500' : 'bg-emerald-400 animate-ping'
-              }`} />
-              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                sessionState === 'COMPLETED' ? 'bg-zinc-500' : 'bg-emerald-500'
-              }`} />
+              <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${sessionState === 'COMPLETED' ? 'bg-zinc-500' : 'bg-emerald-400 animate-ping'
+                }`} />
+              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${sessionState === 'COMPLETED' ? 'bg-zinc-500' : 'bg-emerald-500'
+                }`} />
             </span>
             <span className="font-semibold text-xs sm:text-sm text-zinc-100">{targetSeniority} Track</span>
           </div>
@@ -778,11 +774,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               type="button"
               onClick={() => setShowScratchpad((prev) => !prev)}
               title="Toggle Architecture & Code Scratchpad (Key: S)"
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
-                showScratchpad
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${showScratchpad
                   ? 'border-zinc-500 bg-zinc-800 text-white shadow-sm'
                   : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-              }`}
+                }`}
             >
               <Code2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Scratchpad</span>
@@ -856,16 +851,15 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   )}
 
                   <div
-                    className={`max-w-[90%] sm:max-w-[75%] rounded-xl p-4 shadow-sm ${
-                      isInterviewer
+                    className={`max-w-[90%] sm:max-w-[75%] rounded-xl p-4 shadow-sm ${isInterviewer
                         ? 'rounded-tl-none border border-zinc-800 bg-zinc-950 text-zinc-200'
                         : 'rounded-tr-none border border-zinc-700 bg-zinc-800 text-white'
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 font-mono">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-semibold tracking-tight">
-                          {isInterviewer ? 'IntervueX Evaluator' : 'Candidate'}
+                          {isInterviewer ? 'CareerDiff Evaluator' : 'Candidate'}
                         </span>
                         {turn.action_taken && (
                           <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-800">
@@ -874,9 +868,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                         )}
                         {turn.question_archetype && ARCHETYPE_CONFIG[turn.question_archetype] && (
                           <span
-                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${
-                              ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
-                            }`}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
+                              }`}
                           >
                             <span>{ARCHETYPE_CONFIG[turn.question_archetype].icon}</span>
                             <span>{ARCHETYPE_CONFIG[turn.question_archetype].label}</span>
@@ -957,11 +950,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                     type="button"
                     onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
                     disabled={wsStatus !== 'connected'}
-                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
-                      isRecording
+                    className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${isRecording
                         ? 'bg-rose-600 text-white shadow-rose-600/20 hover:bg-rose-500'
                         : 'bg-white text-zinc-950 hover:bg-zinc-200 shadow-sm'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {isRecording ? (
                       <>
@@ -1033,11 +1025,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   <button
                     type="button"
                     onClick={() => setScratchpadTab('CODE')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${
-                      scratchpadTab === 'CODE'
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${scratchpadTab === 'CODE'
                         ? 'bg-zinc-800 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
+                      }`}
                   >
                     <Code2 className="h-3 w-3" />
                     <span>Code</span>
@@ -1045,11 +1036,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   <button
                     type="button"
                     onClick={() => setScratchpadTab('DIAGRAM')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${
-                      scratchpadTab === 'DIAGRAM'
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${scratchpadTab === 'DIAGRAM'
                         ? 'bg-zinc-800 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
+                      }`}
                   >
                     <Network className="h-3 w-3 text-sky-400" />
                     <span>Architecture Diagram</span>

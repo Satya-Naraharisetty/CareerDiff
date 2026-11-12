@@ -373,7 +373,9 @@ class TurnService:
             transcript=interviewer_turn.transcript,
             action_taken=approved_action,
             session_state=interview.state,
-            active_topic=active_topic.topic_name if interview.state != InterviewState.COMPLETED.value else None,
+            active_topic=active_topic.topic_name
+            if interview.state != InterviewState.COMPLETED.value
+            else None,
             question_archetype=question_archetype,
             code_sample=code_sample,
             created_at=interviewer_turn.created_at,

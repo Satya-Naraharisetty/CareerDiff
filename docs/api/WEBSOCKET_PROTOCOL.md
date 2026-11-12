@@ -1,4 +1,4 @@
-# WebSocket Protocol Specification — IntervueX
+# WebSocket Protocol Specification — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Real-Time Protocol Specification  
@@ -12,7 +12,7 @@ To prevent token leakage in server logs, clients do not pass JWTs directly in qu
 
 ### Handshake URL
 ```text
-wss://api.intervuex.com/ws/v1/interviews/8f8b34e5-9c22-4411-aaee-567890abcdef?ticket=v4.ticket.3g7H8K9L...
+wss://api.CareerDiff.com/ws/v1/interviews/8f8b34e5-9c22-4411-aaee-567890abcdef?ticket=v4.ticket.3g7H8K9L...
 ```
 
 ### Handshake Invariants:

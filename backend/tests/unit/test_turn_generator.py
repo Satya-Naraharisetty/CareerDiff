@@ -34,7 +34,9 @@ def test_generate_question_with_context_continuity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generate_question_async_deterministic_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_generate_question_async_deterministic_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # Set gemini_api_key empty to test deterministic generator
     from app.core import config
 

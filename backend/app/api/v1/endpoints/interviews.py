@@ -54,7 +54,7 @@ from app.services.evaluator import AssessmentEvaluator
 from app.services.ticket_service import TicketService
 from app.services.turn_service import TurnService
 
-logger = logging.getLogger("intervuex.interviews")
+logger = logging.getLogger("CareerDiff.interviews")
 
 router = APIRouter()
 
@@ -485,9 +485,7 @@ async def retake_interview_turn(
     """Analyze and rescore a re-attempted candidate turn, returning delta and Staff answer."""
     # 1. Verify Interview & Candidate Profile
     stmt_interview = (
-        select(Interview)
-        .options(selectinload(Interview.turns))
-        .where(Interview.id == interview_id)
+        select(Interview).options(selectinload(Interview.turns)).where(Interview.id == interview_id)
     )
     interview = (await db.execute(stmt_interview)).scalar_one_or_none()
     if not interview:
@@ -498,7 +496,11 @@ async def retake_interview_turn(
 
     # 2. Locate targeted candidate turn
     candidate_turn = next(
-        (t for t in interview.turns if t.turn_index == payload.turn_index and t.speaker == "CANDIDATE"),
+        (
+            t
+            for t in interview.turns
+            if t.turn_index == payload.turn_index and t.speaker == "CANDIDATE"
+        ),
         None,
     )
     if not candidate_turn:
@@ -509,7 +511,11 @@ async def retake_interview_turn(
 
     # 3. Locate preceding interviewer question
     interviewer_turn = next(
-        (t for t in reversed(interview.turns) if t.turn_index < payload.turn_index and t.speaker == "INTERVIEWER"),
+        (
+            t
+            for t in reversed(interview.turns)
+            if t.turn_index < payload.turn_index and t.speaker == "INTERVIEWER"
+        ),
         None,
     )
     question_text = (

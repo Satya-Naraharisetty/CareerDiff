@@ -1,4 +1,4 @@
-# Definition of Done (DoD) — IntervueX
+# Definition of Done (DoD) — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Quality Gate  
@@ -7,7 +7,7 @@
 
 ## 1. Feature & Bugfix Completion Checklist
 
-A task, feature, or bugfix in IntervueX is **NOT** done until all 8 verification gates are passed:
+A task, feature, or bugfix in CareerDiff is **NOT** done until all 8 verification gates are passed:
 
 ```mermaid
 flowchart LR

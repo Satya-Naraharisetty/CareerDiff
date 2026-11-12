@@ -1,4 +1,4 @@
-# Testing Strategy & Quality Assurance — IntervueX
+# Testing Strategy & Quality Assurance — CareerDiff
 
 **Document Version:** 1.1.0  
 **Status:** Approved Engineering Standard  
@@ -9,7 +9,7 @@
 
 Blanket line coverage metrics (e.g. "always 85% across everything") create a false sense of security: developers write trivial tests for boilerplate getters while leaving concurrency, state transitions, and database rollbacks untested.
 
-IntervueX adopts **Risk-Based Testing**: testing depth is directly proportional to failure impact.
+CareerDiff adopts **Risk-Based Testing**: testing depth is directly proportional to failure impact.
 
 ```mermaid
 graph TD
@@ -106,7 +106,7 @@ Automated tests verify that logic executes; **meticulous manual inspection verif
 
 ## 7. Distributed Systems Failure Injection & Chaos Testing
 
-Distributed systems inevitably fail under network partitions, broker crashes, worker terminations, and lease timeouts. To guarantee that IntervueX upholds its durability and at-least-once invariants, the test suite includes automated **Chaos & Fault Injection Tests** located in `backend/tests/integration/test_fault_injection.py`:
+Distributed systems inevitably fail under network partitions, broker crashes, worker terminations, and lease timeouts. To guarantee that CareerDiff upholds its durability and at-least-once invariants, the test suite includes automated **Chaos & Fault Injection Tests** located in `backend/tests/integration/test_fault_injection.py`:
 
 ```mermaid
 flowchart TD

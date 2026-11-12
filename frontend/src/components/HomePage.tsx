@@ -52,7 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-zinc-400 leading-relaxed font-normal max-w-2xl mx-auto">
-            Zero generic trivia. IntervueX indexes verified claims from your resume, calibrates against your target Job Description, and executes adaptive interviews controlled by deterministic state machine guardrails.
+            Zero generic trivia. CareerDiff indexes verified claims from your resume, calibrates against your target Job Description, and executes adaptive interviews controlled by deterministic state machine guardrails.
           </p>
 
           {/* Primary Action Buttons */}
@@ -102,7 +102,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                   <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
                 </div>
                 <span className="text-[11px] sm:text-xs font-mono text-zinc-400 truncate">
-                  intervuex-session // alex-rivera-sr-backend
+                  CareerDiff-session // alex-rivera-sr-backend
                 </span>
               </div>
 
@@ -125,11 +125,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 <button
                   type="button"
                   onClick={() => setActivePreviewTab('interview')}
-                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                    activePreviewTab === 'interview'
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${activePreviewTab === 'interview'
                       ? 'bg-zinc-800 text-white font-medium'
                       : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   <span className="sm:hidden">session.log</span>
                   <span className="hidden sm:inline">live_session.log</span>
@@ -137,11 +136,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 <button
                   type="button"
                   onClick={() => setActivePreviewTab('provenance')}
-                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                    activePreviewTab === 'provenance'
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${activePreviewTab === 'provenance'
                       ? 'bg-zinc-800 text-white font-medium'
                       : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   <span className="sm:hidden">claims.json</span>
                   <span className="hidden sm:inline">claim_provenance.json</span>
@@ -149,11 +147,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 <button
                   type="button"
                   onClick={() => setActivePreviewTab('dossier')}
-                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
-                    activePreviewTab === 'dossier'
+                  className={`flex-1 sm:flex-initial text-center whitespace-nowrap px-2 sm:px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${activePreviewTab === 'dossier'
                       ? 'bg-zinc-800 text-white font-medium'
                       : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   <span className="sm:hidden">dossier.yaml</span>
                   <span className="hidden sm:inline">rubric_dossier.yaml</span>
@@ -238,7 +235,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 </div>
                 <div className={`rounded-lg bg-zinc-950/80 p-3 sm:p-4 border border-zinc-800/80 ${wrapPreviewText ? '' : 'touch-scroll-x'}`}>
                   <pre className={`text-[11px] leading-relaxed text-zinc-300 font-mono ${wrapPreviewText ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}>
-{`{
+                    {`{
   "provenance_id": "prov_89fa2bc",
   "document": "alex_rivera_resume.pdf",
   "detected_seniority": "SENIOR",
@@ -278,7 +275,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 </div>
                 <div className={`rounded-lg bg-zinc-950/80 p-3 sm:p-4 border border-zinc-800/80 ${wrapPreviewText ? '' : 'touch-scroll-x'}`}>
                   <pre className={`text-[11px] leading-relaxed text-zinc-300 font-mono ${wrapPreviewText ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'}`}>
-{`evaluation_report:
+                    {`evaluation_report:
   overall_score: 3.8 / 4.0 (Staff / Senior Specialist)
   competency_scores:
     - name: "Distributed Systems & Event Streaming"
@@ -309,7 +306,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
               Built on deterministic systems engineering.
             </h3>
             <p className="text-xs sm:text-sm text-zinc-400">
-              How IntervueX eliminates hallucination and conversational drift.
+              How CareerDiff eliminates hallucination and conversational drift.
             </p>
           </div>
 
@@ -363,7 +360,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 Strict Zero Biometrics Invariant
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                IntervueX strictly rejects video capture, gaze tracking, micro-expressions, vocal pitch, tone, or accents as proxies for competence. Candidates are evaluated exclusively on architectural reasoning and code depth.
+                CareerDiff strictly rejects video capture, gaze tracking, micro-expressions, vocal pitch, tone, or accents as proxies for competence. Candidates are evaluated exclusively on architectural reasoning and code depth.
               </p>
               <div className="text-[11px] font-mono text-zinc-500 border-t border-zinc-800/80 pt-2">
                 Audio RAM-Only • Right to Erasure Cascade
@@ -377,7 +374,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-white">System Comparison</h3>
             <p className="text-xs text-zinc-400">
-              Why senior engineers practice with IntervueX instead of unstructured chat prompts.
+              Why senior engineers practice with CareerDiff instead of unstructured chat prompts.
             </p>
           </div>
 
@@ -387,7 +384,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
                 <tr className="border-b border-zinc-800 font-mono text-zinc-400 uppercase text-[11px]">
                   <th className="py-2.5 pr-4">Dimension</th>
                   <th className="py-2.5 pr-4 text-zinc-500">Generic Chatbots</th>
-                  <th className="py-2.5 text-zinc-200">IntervueX Engine</th>
+                  <th className="py-2.5 text-zinc-200">CareerDiff Engine</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60 text-zinc-300">

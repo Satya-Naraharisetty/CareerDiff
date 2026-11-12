@@ -1,4 +1,4 @@
-# Debugging Lessons & Post-Mortem Ledger — IntervueX
+# Debugging Lessons & Post-Mortem Ledger — CareerDiff
 
 This document serves as our knowledge base of debugging discoveries, unexpected failure modes, and permanent engineering lessons learned across development.
 

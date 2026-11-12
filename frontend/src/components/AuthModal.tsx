@@ -16,7 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { IntervueXLogo } from './IntervueXLogo';
+import { CareerDiffLogo } from './CareerDiffLogo';
 import { useAuthStore } from '../stores/authStore';
 
 interface AuthModalProps {
@@ -79,7 +79,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           setProvisionedBackupCodes(res.backup_codes);
           setTab('backup_codes_reveal');
         } else {
-          setSuccessMsg('Account created successfully! Welcome to IntervueX.');
+          setSuccessMsg('Account created successfully! Welcome to CareerDiff.');
           setTimeout(() => {
             if (onSuccess) onSuccess();
             else onClose();
@@ -130,7 +130,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
   const handleDownloadBackupCodes = () => {
     const text = [
-      'IntervueX Emergency Backup Recovery Codes',
+      'CareerDiff Emergency Backup Recovery Codes',
       `Account: ${email.trim()}`,
       `Generated: ${new Date().toISOString()}`,
       '',
@@ -144,7 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `intervuex-recovery-codes-${email.split('@')[0]}.txt`;
+    link.download = `CareerDiff-recovery-codes-${email.split('@')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -177,10 +177,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm">
-              <IntervueXLogo className="h-4 w-4" />
+              <CareerDiffLogo className="h-4 w-4" />
             </div>
             <span className="font-semibold text-white text-sm font-mono tracking-tight">
-              IntervueX
+              CareerDiff
             </span>
             <span className="rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
               Engine v1.0
@@ -281,11 +281,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     clearError();
                     setShowPassword(false);
                   }}
-                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${
-                    tab === 'login'
+                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${tab === 'login'
                       ? 'border-white text-white'
                       : 'border-transparent text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   Sign In
                 </button>
@@ -296,11 +295,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     clearError();
                     setShowPassword(false);
                   }}
-                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${
-                    tab === 'register'
+                  className={`flex-1 pb-2 text-xs font-semibold transition-all border-b-2 -mb-[10px] ${tab === 'register'
                       ? 'border-white text-white'
                       : 'border-transparent text-zinc-400 hover:text-zinc-200'
-                  }`}
+                    }`}
                 >
                   Create Account
                 </button>
@@ -464,13 +462,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     <div className="flex items-center gap-1.5">
                       <div className="h-1 flex-1 rounded-full bg-zinc-800 overflow-hidden">
                         <div
-                          className={`h-full transition-all duration-300 ${
-                            strengthScore === 1
+                          className={`h-full transition-all duration-300 ${strengthScore === 1
                               ? 'w-1/3 bg-rose-500'
                               : strengthScore === 2
-                              ? 'w-2/3 bg-zinc-400'
-                              : 'w-full bg-emerald-500'
-                          }`}
+                                ? 'w-2/3 bg-zinc-400'
+                                : 'w-full bg-emerald-500'
+                            }`}
                         />
                       </div>
                       <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">

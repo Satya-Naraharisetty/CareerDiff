@@ -21,7 +21,7 @@ from app.models.role import Competency, JobRole, Rubric
 from app.services.jd_analyzer import compute_ats_score
 from app.services.voice_analytics import analyze_voice_and_communication
 
-logger = logging.getLogger("intervuex.evaluator")
+logger = logging.getLogger("CareerDiff.evaluator")
 
 
 class AssessmentEvaluator:
@@ -234,14 +234,10 @@ class AssessmentEvaluator:
             stmt_role = select(JobRole).where(JobRole.id == interview.role_id)
             role = (await db.execute(stmt_role)).scalar_one_or_none()
 
-            jd_text = (
-                interview.session_policy.get("jd_text")
-                or (
-                    f"{role.name}\n{role.description or ''}\n"
-                    + ", ".join(c.name for c in competencies)
-                    if role
-                    else "Software Engineering Role"
-                )
+            jd_text = interview.session_policy.get("jd_text") or (
+                f"{role.name}\n{role.description or ''}\n" + ", ".join(c.name for c in competencies)
+                if role
+                else "Software Engineering Role"
             )
 
             resume_text = (

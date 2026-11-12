@@ -1,5 +1,5 @@
 /**
- * IntervueX Full-Stack TypeScript Schema Definitions
+ * CareerDiff Full-Stack TypeScript Schema Definitions
  * Perfectly aligned with backend Pydantic models (Auth, Roles, Interview, Adaptive, Voice, Evaluation).
  */
 
@@ -346,48 +346,48 @@ export type WsClientMessage =
 
 export type WsServerMessage =
   | {
-      type: 'session_ready';
-      interview_id: string;
-      current_turn_index: number;
-      state: string;
-      remaining_seconds: number;
-    }
+    type: 'session_ready';
+    interview_id: string;
+    current_turn_index: number;
+    state: string;
+    remaining_seconds: number;
+  }
   | {
-      type: 'transcript_partial';
-      turn_index: number;
-      text: string;
-    }
+    type: 'transcript_partial';
+    turn_index: number;
+    text: string;
+  }
   | {
-      type: 'transcript_final';
-      turn_index: number;
-      speaker: string;
-      text: string;
-      duration_ms: number;
-    }
+    type: 'transcript_final';
+    turn_index: number;
+    speaker: string;
+    text: string;
+    duration_ms: number;
+  }
   | {
-      type: 'interviewer_speaking';
-      turn_index: number;
-      action: string;
-      question_text: string;
-    }
+    type: 'interviewer_speaking';
+    turn_index: number;
+    action: string;
+    question_text: string;
+  }
   | {
-      type: 'interviewer_interrupted';
-      turn_index: number;
-      cutoff_timestamp_ms: number;
-    }
+    type: 'interviewer_interrupted';
+    turn_index: number;
+    cutoff_timestamp_ms: number;
+  }
   | {
-      type: 'state_change';
-      previous_state: string;
-      new_state: string;
-      active_competency: string | null;
-    }
+    type: 'state_change';
+    previous_state: string;
+    new_state: string;
+    active_competency: string | null;
+  }
   | {
-      type: 'error';
-      code: string;
-      message: string;
-      fatal: boolean;
-      details?: Record<string, unknown> | null;
-    };
+    type: 'error';
+    code: string;
+    message: string;
+    fatal: boolean;
+    details?: Record<string, unknown> | null;
+  };
 
 // ---------------------------------------------------------------------------
 // Assessment Dossier & Evaluation

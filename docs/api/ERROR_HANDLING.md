@@ -1,4 +1,4 @@
-# Error Handling & Problem Details — IntervueX
+# Error Handling & Problem Details — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved Standard  
@@ -8,11 +8,11 @@
 
 ## 1. Standard Error Envelope (RFC 7807)
 
-Every non-2xx HTTP error returned by the IntervueX REST API follows the standardized RFC 7807 Problem Details envelope with `Content-Type: application/problem+json`:
+Every non-2xx HTTP error returned by the CareerDiff REST API follows the standardized RFC 7807 Problem Details envelope with `Content-Type: application/problem+json`:
 
 ```json
 {
-  "type": "https://api.intervuex.com/errors/interview-state-conflict",
+  "type": "https://api.CareerDiff.com/errors/interview-state-conflict",
   "title": "Interview State Conflict",
   "status": 409,
   "detail": "Cannot transition interview to TECHNICAL_CORE before warmup is completed.",
@@ -31,7 +31,7 @@ When client input fails Pydantic schema validation, the envelope includes field-
 
 ```json
 {
-  "type": "https://api.intervuex.com/errors/validation-error",
+  "type": "https://api.CareerDiff.com/errors/validation-error",
   "title": "Validation Error",
   "status": 422,
   "detail": "Request payload contains 2 invalid fields.",

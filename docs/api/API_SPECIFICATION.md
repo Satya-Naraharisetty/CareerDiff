@@ -1,8 +1,8 @@
-# REST API Specification — IntervueX
+# REST API Specification — CareerDiff
 
 **Document Version:** 1.0.0  
 **Status:** Approved OpenAPI / REST Specification  
-**Base URL:** `https://api.intervuex.com/api/v1`  
+**Base URL:** `https://api.CareerDiff.com/api/v1`  
 
 ---
 
@@ -142,7 +142,7 @@ Generates a short-lived (60s) single-use authorization ticket to initiate the We
     ```json
     {
       "ticket": "v4.ticket.3g7H8K9L...",
-      "websocket_url": "wss://api.intervuex.com/ws/v1/interviews/8f8b34e5-9c22-4411-aaee-567890abcdef?ticket=v4.ticket.3g7H8K9L...",
+      "websocket_url": "wss://api.CareerDiff.com/ws/v1/interviews/8f8b34e5-9c22-4411-aaee-567890abcdef?ticket=v4.ticket.3g7H8K9L...",
       "expires_in_seconds": 60
     }
     ```

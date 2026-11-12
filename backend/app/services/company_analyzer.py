@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from app.core.config import get_settings
 
-logger = logging.getLogger("intervuex.company_analyzer")
+logger = logging.getLogger("CareerDiff.company_analyzer")
 
 CompanyPersonaType = Literal["STANDARD", "BIG_TECH", "SCALE_UP", "FINTECH"]
 
@@ -38,7 +38,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "BIG_TECH",
         "scale_tier": "Hyperscale Global Infrastructure",
         "rationale": "Parent company of Google, maintaining global planet-scale distributed infrastructure.",
-        "focus": ["Multi-Region Replication", "Distributed Consensus", "High Availability (99.999%)"],
+        "focus": [
+            "Multi-Region Replication",
+            "Distributed Consensus",
+            "High Availability (99.999%)",
+        ],
     },
     "meta": {
         "persona": "BIG_TECH",
@@ -62,7 +66,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
             "Amazon and AWS set the benchmark for service-oriented architecture (SOA), cell-based "
             "isolation, extreme multi-tenant security, and autonomous microservices."
         ),
-        "focus": ["Cell-Based Architecture", "Backpressure & Circuit Breakers", "Distributed Queues (SQS)"],
+        "focus": [
+            "Cell-Based Architecture",
+            "Backpressure & Circuit Breakers",
+            "Distributed Queues (SQS)",
+        ],
     },
     "aws": {
         "persona": "BIG_TECH",
@@ -80,7 +88,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "BIG_TECH",
         "scale_tier": "Hyperscale Consumer Ecosystem",
         "rationale": "Operates iCloud and media backends with hundreds of millions of client devices and strict security protocols.",
-        "focus": ["Zero-Knowledge Cryptography", "Global CDN Distribution", "Massive Event Ingestion"],
+        "focus": [
+            "Zero-Knowledge Cryptography",
+            "Global CDN Distribution",
+            "Massive Event Ingestion",
+        ],
     },
     "netflix": {
         "persona": "BIG_TECH",
@@ -89,7 +101,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
             "Pioneered chaos engineering and resilient cloud microservices; engineering emphasizes "
             "active-active multi-region failover, circuit breakers, and client-side load balancing."
         ),
-        "focus": ["Active-Active Multi-Region", "Circuit Breakers", "Chaos Engineering & Resilience"],
+        "focus": [
+            "Active-Active Multi-Region",
+            "Circuit Breakers",
+            "Chaos Engineering & Resilience",
+        ],
     },
     "uber": {
         "persona": "BIG_TECH",
@@ -103,7 +119,6 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "rationale": "Operates TikTok with massive video streaming and recommendation engine compute at millions of QPS.",
         "focus": ["Massive Throughput Streaming", "Low-Latency Sharding", "Distributed Caching"],
     },
-
     # ⚡ High-Velocity Scale-Ups & Unicorns
     "stripe": {
         "persona": "SCALE_UP",
@@ -129,37 +144,61 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "SCALE_UP",
         "scale_tier": "Distributed Data Lakehouse Scale-Up",
         "rationale": "Builds Spark and Delta Lake engines; probes distributed query planning, worker concurrency, and columnar formats.",
-        "focus": ["Distributed Query Planning", "Worker Concurrency & Backpressure", "Storage Layer Sharding"],
+        "focus": [
+            "Distributed Query Planning",
+            "Worker Concurrency & Backpressure",
+            "Storage Layer Sharding",
+        ],
     },
     "snowflake": {
         "persona": "SCALE_UP",
         "scale_tier": "Cloud Data Warehouse Scale-Up",
         "rationale": "Pioneered separation of compute and storage in cloud databases; probes multi-tenant query scheduling.",
-        "focus": ["Compute/Storage Separation", "Multi-Tenant Resource Allocation", "Query Optimization"],
+        "focus": [
+            "Compute/Storage Separation",
+            "Multi-Tenant Resource Allocation",
+            "Query Optimization",
+        ],
     },
     "doordash": {
         "persona": "SCALE_UP",
         "scale_tier": "High-Velocity Delivery Marketplace",
         "rationale": "High-concurrency order dispatch and logistics; emphasizes fast rollback paths, Kafka event buses, and redis caching.",
-        "focus": ["Kafka Partitioning", "Redis Caching Strategies", "Idempotent Order State Transitions"],
+        "focus": [
+            "Kafka Partitioning",
+            "Redis Caching Strategies",
+            "Idempotent Order State Transitions",
+        ],
     },
     "vercel": {
         "persona": "SCALE_UP",
         "scale_tier": "Developer Cloud & Edge Scale-Up",
         "rationale": "Builds Next.js and global edge computing; probes serverless execution, CDN caching, and low-latency proxies.",
-        "focus": ["Edge Computing & Proxies", "Incremental Static Regeneration", "Zero-Cold-Start Runtimes"],
+        "focus": [
+            "Edge Computing & Proxies",
+            "Incremental Static Regeneration",
+            "Zero-Cold-Start Runtimes",
+        ],
     },
     "supabase": {
         "persona": "SCALE_UP",
         "scale_tier": "Open-Source Cloud Backend Scale-Up",
         "rationale": "Scales multi-tenant PostgreSQL clusters and real-time CDC engines; probes WAL replication and connection pooling.",
-        "focus": ["PostgreSQL WAL Streaming", "Connection Pooling (PgBouncer)", "Realtime WebSockets"],
+        "focus": [
+            "PostgreSQL WAL Streaming",
+            "Connection Pooling (PgBouncer)",
+            "Realtime WebSockets",
+        ],
     },
     "openai": {
         "persona": "SCALE_UP",
         "scale_tier": "Hypergrowth AI Frontier Lab",
         "rationale": "High-throughput model inference serving and cluster orchestration; probes GPU utilization, queuing, and streaming SSE.",
-        "focus": ["Streaming Response Delivery", "Distributed Request Queues", "Inference Concurrency Control"],
+        "focus": [
+            "Streaming Response Delivery",
+            "Distributed Request Queues",
+            "Inference Concurrency Control",
+        ],
     },
     "anthropic": {
         "persona": "SCALE_UP",
@@ -171,7 +210,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "SCALE_UP",
         "scale_tier": "Real-Time Collaborative Web Scale-Up",
         "rationale": "Pioneered browser WebAssembly and multiplayer CRDT-like syncing; evaluates real-time collaborative state reconciliation.",
-        "focus": ["Conflict-Free Replicated Data", "WebSocket Synchronization", "WebAssembly Compute"],
+        "focus": [
+            "Conflict-Free Replicated Data",
+            "WebSocket Synchronization",
+            "WebAssembly Compute",
+        ],
     },
     "canva": {
         "persona": "SCALE_UP",
@@ -179,7 +222,6 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "rationale": "High-volume visual rendering and asset pipeline; probes distributed asset processing, workers, and caching.",
         "focus": ["Asynchronous Job Queues", "CDN Asset Caching", "Horizontally Scaled Renderers"],
     },
-
     # 🛡️ Mission-Critical FinTech & Banking
     "jpmorgan": {
         "persona": "FINTECH",
@@ -205,7 +247,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "FINTECH",
         "scale_tier": "Tier-1 Global Investment Bank",
         "rationale": "High-stakes algorithmic trading and transaction banking; probes strict latency SLAs, auditability, and data security.",
-        "focus": ["Low-Latency In-Memory Processing", "Audit Compliance & Ledgers", "Deterministic Concurrency"],
+        "focus": [
+            "Low-Latency In-Memory Processing",
+            "Audit Compliance & Ledgers",
+            "Deterministic Concurrency",
+        ],
     },
     "morgan stanley": {
         "persona": "FINTECH",
@@ -217,25 +263,41 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "FINTECH",
         "scale_tier": "Market Maker & Quantitative Hedge Fund",
         "rationale": "Ultra-low-latency market making; evaluates microsecond networking, lockless concurrency, and cache locality.",
-        "focus": ["Lock-Free Ring Buffers", "Zero-Allocation Caching", "Microsecond p99/p99.9 Latency"],
+        "focus": [
+            "Lock-Free Ring Buffers",
+            "Zero-Allocation Caching",
+            "Microsecond p99/p99.9 Latency",
+        ],
     },
     "jane street": {
         "persona": "FINTECH",
         "scale_tier": "Proprietary Quantitative Trading",
         "rationale": "High-throughput quantitative trading; probes functional correctness, deterministic concurrency, and low latency.",
-        "focus": ["Deterministic Concurrency", "Zero-Copy Data Pipelines", "Type-Driven Correctness"],
+        "focus": [
+            "Deterministic Concurrency",
+            "Zero-Copy Data Pipelines",
+            "Type-Driven Correctness",
+        ],
     },
     "bloomberg": {
         "persona": "FINTECH",
         "scale_tier": "Financial Data & Analytics Terminal",
         "rationale": "Global financial telemetry backbone; evaluates real-time market data dissemination and high-availability database engines.",
-        "focus": ["Real-Time Market Data Pub/Sub", "High-Throughput Timeseries", "Database Sharding"],
+        "focus": [
+            "Real-Time Market Data Pub/Sub",
+            "High-Throughput Timeseries",
+            "Database Sharding",
+        ],
     },
     "coinbase": {
         "persona": "FINTECH",
         "scale_tier": "Crypto Asset Exchange & Custody",
         "rationale": "Digital asset exchange requiring strict cold/hot wallet cryptography, deterministic order matching, and zero double-spend.",
-        "focus": ["Cryptographic Key Signing", "Deterministic Matching Engine", "High-Throughput Order Books"],
+        "focus": [
+            "Cryptographic Key Signing",
+            "Deterministic Matching Engine",
+            "High-Throughput Order Books",
+        ],
     },
     "robinhood": {
         "persona": "FINTECH",
@@ -253,7 +315,11 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
         "persona": "FINTECH",
         "scale_tier": "Global Digital Banking Neobank",
         "rationale": "High-speed multi-currency ledgers and payments; probes strict debit/credit balance consistency and card processing.",
-        "focus": ["Double-Entry Accounting Ledgers", "Multi-Currency Balance Consistency", "Fraud Detection Pipelines"],
+        "focus": [
+            "Double-Entry Accounting Ledgers",
+            "Multi-Currency Balance Consistency",
+            "Fraud Detection Pipelines",
+        ],
     },
 }
 
@@ -261,7 +327,9 @@ KNOWN_COMPANIES: dict[str, dict[str, Any]] = {
 def _normalize_name(name: str) -> str:
     """Normalize company name string for resilient matching."""
     cleaned = name.strip().lower()
-    cleaned = re.sub(r"\b(inc|corp|corporation|ltd|limited|co|llc|technologies|systems|labs)\b", "", cleaned)
+    cleaned = re.sub(
+        r"\b(inc|corp|corporation|ltd|limited|co|llc|technologies|systems|labs)\b", "", cleaned
+    )
     return re.sub(r"[^a-z0-9]", "", cleaned)
 
 
@@ -298,15 +366,31 @@ def classify_company_from_catalog(company_name: str) -> dict[str, Any] | None:
     return None
 
 
-def heuristic_company_classification(company_name: str, jd_text: str | None = None) -> dict[str, Any]:
+def heuristic_company_classification(
+    company_name: str, jd_text: str | None = None
+) -> dict[str, Any]:
     """Fallback heuristic analysis using domain keyword triggers."""
     combined = f"{company_name} {jd_text or ''}".lower()
 
     # FinTech check
     fintech_keywords = [
-        "bank", "capital", "trading", "hedge", "crypto", "exchange",
-        "securities", "asset", "fund", "fintech", "wealth", "payment",
-        "ledger", "insurance", "clearing", "brokerage", "currency",
+        "bank",
+        "capital",
+        "trading",
+        "hedge",
+        "crypto",
+        "exchange",
+        "securities",
+        "asset",
+        "fund",
+        "fintech",
+        "wealth",
+        "payment",
+        "ledger",
+        "insurance",
+        "clearing",
+        "brokerage",
+        "currency",
     ]
     if any(re.search(rf"\b{kw}\b", combined) for kw in fintech_keywords):
         return {
@@ -328,8 +412,13 @@ def heuristic_company_classification(company_name: str, jd_text: str | None = No
 
     # Big Tech check
     big_tech_keywords = [
-        "hyperscale", "planet-scale", "millions of qps", "billions of users",
-        "global infrastructure", "cloud platform", "multi-datacenter",
+        "hyperscale",
+        "planet-scale",
+        "millions of qps",
+        "billions of users",
+        "global infrastructure",
+        "cloud platform",
+        "multi-datacenter",
     ]
     if any(kw in combined for kw in big_tech_keywords):
         return {
@@ -351,8 +440,16 @@ def heuristic_company_classification(company_name: str, jd_text: str | None = No
 
     # Scale-Up check
     scale_up_keywords = [
-        "scale-up", "scaleup", "unicorn", "series b", "series c", "series d",
-        "hypergrowth", "fast-growing", "developer velocity", "saas platform",
+        "scale-up",
+        "scaleup",
+        "unicorn",
+        "series b",
+        "series c",
+        "series d",
+        "hypergrowth",
+        "fast-growing",
+        "developer velocity",
+        "saas platform",
     ]
     if any(kw in combined for kw in scale_up_keywords):
         return {
@@ -413,7 +510,7 @@ async def classify_company_persona(
             client = genai.Client(api_key=settings.gemini_api_key)
             jd_snippet = jd_text[:2000] if jd_text else "None provided"
             prompt = (
-                f"You are IntervueX Corporate Engineering Archetype Classifier.\n\n"
+                f"You are CareerDiff Corporate Engineering Archetype Classifier.\n\n"
                 f"Company Name: <company_name>{company_name}</company_name>\n"
                 f"Job Description Context: <jd_context>{jd_snippet}</jd_context>\n\n"
                 f"Task: Classify this company into exactly ONE of these four technical interview personas:\n"
@@ -450,12 +547,16 @@ async def classify_company_persona(
                     "company_name": company_name.strip(),
                     "detected_persona": detected,
                     "scale_tier": str(data.get("scale_tier", "Specialized Technology Enterprise")),
-                    "rationale": str(data.get("rationale", f"Calibrated for {company_name} engineering scope.")),
+                    "rationale": str(
+                        data.get("rationale", f"Calibrated for {company_name} engineering scope.")
+                    ),
                     "architectural_focus": focus_list,
                     "confidence": 0.90,
                 }
         except Exception as exc:
-            logger.warning("Gemini company classification failed (%s); using heuristic fallback", exc)
+            logger.warning(
+                "Gemini company classification failed (%s); using heuristic fallback", exc
+            )
 
     # 3. Fallback heuristic
     return heuristic_company_classification(company_name, jd_text)

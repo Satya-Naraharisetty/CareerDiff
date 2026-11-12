@@ -1,4 +1,4 @@
-# Voice & Real-Time Streaming Pipeline — IntervueX
+# Voice & Real-Time Streaming Pipeline — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Technical Architecture  
@@ -66,7 +66,7 @@ Modern browser `AudioContext` and `navigator.mediaDevices.getUserMedia` typicall
 Transmitting 48kHz audio to the server wastes 3x bandwidth and requires CPU-heavy server-side resampling before running 16kHz Silero VAD or Deepgram STT.
 
 ### Client-Side Resampling Protocol:
-1. The browser UI loads a custom `AudioWorkletProcessor` (`intervuex-capture-processor.js`) running in a dedicated browser audio rendering thread.
+1. The browser UI loads a custom `AudioWorkletProcessor` (`CareerDiff-capture-processor.js`) running in a dedicated browser audio rendering thread.
 2. The worklet receives hardware audio buffers from the microphone at $f_{\text{in}} \in \{44100, 48000\}$.
 3. The worklet performs linear interpolation and anti-aliasing low-pass filtering to downsample the stream to exactly $f_{\text{out}} = 16,000$ Hz:
    $$\text{Ratio} = \frac{16000}{f_{\text{in}}}$$
@@ -76,7 +76,7 @@ Transmitting 48kHz audio to the server wastes 3x bandwidth and requires CPU-heav
 
 ## 4. Measurable Engineering Hypotheses (To Be Benchmarked in Phase 5)
 
-Rather than stating latency and threshold figures as accomplished facts, IntervueX treats them as **target performance hypotheses** to be validated during Phase 5 implementation:
+Rather than stating latency and threshold figures as accomplished facts, CareerDiff treats them as **target performance hypotheses** to be validated during Phase 5 implementation:
 
 ```text
 Hypothesis 1: End-to-End Turn Latency

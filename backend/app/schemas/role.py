@@ -85,8 +85,12 @@ class ResumeJdMatchResponse(BaseModel):
 class CompanyAnalysisRequest(BaseModel):
     """Payload to classify and calibrate company engineering archetype."""
 
-    company_name: str = Field(min_length=2, max_length=120, description="Company or organization name")
-    jd_text: str | None = Field(default=None, max_length=50000, description="Optional job description context")
+    company_name: str = Field(
+        min_length=2, max_length=120, description="Company or organization name"
+    )
+    jd_text: str | None = Field(
+        default=None, max_length=50000, description="Optional job description context"
+    )
 
 
 class CompanyAnalysisResponse(BaseModel):
@@ -98,5 +102,3 @@ class CompanyAnalysisResponse(BaseModel):
     rationale: str
     architectural_focus: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0, default=0.9)
-
-

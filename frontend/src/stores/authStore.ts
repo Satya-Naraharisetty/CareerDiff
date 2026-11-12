@@ -22,7 +22,7 @@ interface AuthState {
   clearError: () => void;
 }
 
-const STORAGE_KEY = 'intervuex_auth_storage';
+const STORAGE_KEY = 'CareerDiff_auth_storage';
 
 const loadPersistedAuth = (): { token: string | null; user: UserProfile | null } => {
   try {

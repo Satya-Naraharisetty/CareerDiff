@@ -1,4 +1,4 @@
-# System Overview Architecture — IntervueX
+# System Overview Architecture — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Architecture Blueprint  
@@ -7,9 +7,9 @@
 
 ## 1. High-Level Architectural Pattern: The Modular Monolith
 
-IntervueX is designed as a **Modular Monolith with Asynchronous Background Processing**.
+CareerDiff is designed as a **Modular Monolith with Asynchronous Background Processing**.
 
-Rather than introducing the operational complexity, network latency, and distributed transaction challenges of microservices, IntervueX enforces strict logical boundaries within a single unified Python backend codebase. Heavy, non-blocking tasks (resume extraction, post-interview rubric evaluation) are offloaded to an asynchronous task queue (**Taskiq**) backed by Redis, governed by a **Transactional Outbox** in PostgreSQL to eliminate dual-write race conditions.
+Rather than introducing the operational complexity, network latency, and distributed transaction challenges of microservices, CareerDiff enforces strict logical boundaries within a single unified Python backend codebase. Heavy, non-blocking tasks (resume extraction, post-interview rubric evaluation) are offloaded to an asynchronous task queue (**Taskiq**) backed by Redis, governed by a **Transactional Outbox** in PostgreSQL to eliminate dual-write race conditions.
 
 ```mermaid
 graph TB

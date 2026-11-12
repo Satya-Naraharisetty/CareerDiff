@@ -196,7 +196,7 @@ async def test_chat_interface_endpoint(async_client: AsyncClient) -> None:
     res = await async_client.get(f"/api/v1/interviews/{interview_id}/chat?token={token}")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
-    assert "IntervueX — Live Technical Interview" in res.text
+    assert "CareerDiff — Live Technical Interview" in res.text
 
 
 @pytest.mark.asyncio

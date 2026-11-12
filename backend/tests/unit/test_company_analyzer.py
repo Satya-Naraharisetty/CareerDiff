@@ -16,12 +16,19 @@ def test_classify_known_catalog_companies() -> None:
     res_google = classify_company_from_catalog("Google")
     assert res_google is not None
     assert res_google["detected_persona"] == "BIG_TECH"
-    assert "Spanner" in res_google["rationale"] or "Paxos" in res_google["rationale"] or "planet" in res_google["rationale"]
+    assert (
+        "Spanner" in res_google["rationale"]
+        or "Paxos" in res_google["rationale"]
+        or "planet" in res_google["rationale"]
+    )
 
     res_netflix = classify_company_from_catalog("Netflix")
     assert res_netflix is not None
     assert res_netflix["detected_persona"] == "BIG_TECH"
-    assert "chaos" in res_netflix["rationale"].lower() or "microservices" in res_netflix["rationale"].lower()
+    assert (
+        "chaos" in res_netflix["rationale"].lower()
+        or "microservices" in res_netflix["rationale"].lower()
+    )
 
     # Scale-Up
     res_stripe = classify_company_from_catalog("Stripe")
@@ -46,13 +53,19 @@ def test_classify_known_catalog_companies() -> None:
 
 def test_heuristic_classification_unlisted_companies() -> None:
     """Verify heuristic keywords detect domain archetypes for unlisted or startup companies."""
-    res_fin = heuristic_company_classification("Kredivo Payments", "Building a regional credit card ledger")
+    res_fin = heuristic_company_classification(
+        "Kredivo Payments", "Building a regional credit card ledger"
+    )
     assert res_fin["detected_persona"] == "FINTECH"
 
-    res_scale = heuristic_company_classification("CloudFlow Scaleup", "A series B hypergrowth SaaS platform")
+    res_scale = heuristic_company_classification(
+        "CloudFlow Scaleup", "A series B hypergrowth SaaS platform"
+    )
     assert res_scale["detected_persona"] == "SCALE_UP"
 
-    res_std = heuristic_company_classification("Apex Consulting Solutions", "Enterprise web development")
+    res_std = heuristic_company_classification(
+        "Apex Consulting Solutions", "Enterprise web development"
+    )
     assert res_std["detected_persona"] == "STANDARD"
 
 

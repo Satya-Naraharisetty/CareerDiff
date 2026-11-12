@@ -7,7 +7,7 @@ from app.core.database import async_session_factory
 from app.services.evaluator import AssessmentEvaluator
 from app.tasks.broker import broker
 
-logger = logging.getLogger("intervuex.tasks")
+logger = logging.getLogger("CareerDiff.tasks")
 
 
 @broker.task(task_name="evaluate_interview_task")

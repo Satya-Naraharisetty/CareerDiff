@@ -13,5 +13,5 @@ if settings.environment == "testing":
 else:
     broker = ListQueueBroker(
         url=settings.redis_url,
-        queue_name="intervuex_tasks",
+        queue_name="CareerDiff_tasks",
     )

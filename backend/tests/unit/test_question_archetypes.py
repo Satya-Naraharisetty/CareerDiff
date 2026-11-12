@@ -14,19 +14,54 @@ from app.services.turn_generator import (
 def test_archetype_resolution_mapping() -> None:
     """Verify deterministic mapping from EngineAction and context to QuestionArchetype."""
     # Warmup and Concluding states
-    assert TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, state="WARMUP") == QuestionArchetype.WARMUP_MOTIVATION
-    assert TurnGenerator.resolve_archetype(EngineAction.CONCLUDE, state="CONCLUDING") == QuestionArchetype.REVERSE_QA
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, state="WARMUP")
+        == QuestionArchetype.WARMUP_MOTIVATION
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.CONCLUDE, state="CONCLUDING")
+        == QuestionArchetype.REVERSE_QA
+    )
 
     # Technical Core mappings
-    assert TurnGenerator.resolve_archetype(EngineAction.VERIFY_CLAIM) == QuestionArchetype.SKILL_FUNDAMENTALS
-    assert TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, turn_index=2) == QuestionArchetype.SKILL_FUNDAMENTALS
-    assert TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, turn_index=3) == QuestionArchetype.SCENARIO_DECISION
-    assert TurnGenerator.resolve_archetype(EngineAction.CHALLENGE, turn_index=1) == QuestionArchetype.DEBUGGING_INCIDENT
-    assert TurnGenerator.resolve_archetype(EngineAction.CHALLENGE, turn_index=2) == QuestionArchetype.SCENARIO_DECISION
-    assert TurnGenerator.resolve_archetype(EngineAction.SCENARIO, turn_index=3) == QuestionArchetype.CODE_REVIEW
-    assert TurnGenerator.resolve_archetype(EngineAction.SCENARIO, turn_index=4, company_name="Stripe") == QuestionArchetype.COMPANY_SPECIFIC
-    assert TurnGenerator.resolve_archetype(EngineAction.CHANGE_TOPIC, turn_index=1, company_name="Stripe") == QuestionArchetype.COMPANY_SPECIFIC
-    assert TurnGenerator.resolve_archetype(EngineAction.CHANGE_TOPIC, turn_index=2) == QuestionArchetype.ANALYZING_DESIGN
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.VERIFY_CLAIM)
+        == QuestionArchetype.SKILL_FUNDAMENTALS
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, turn_index=2)
+        == QuestionArchetype.SKILL_FUNDAMENTALS
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.PROBE_DEEPER, turn_index=3)
+        == QuestionArchetype.SCENARIO_DECISION
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.CHALLENGE, turn_index=1)
+        == QuestionArchetype.DEBUGGING_INCIDENT
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.CHALLENGE, turn_index=2)
+        == QuestionArchetype.SCENARIO_DECISION
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.SCENARIO, turn_index=3)
+        == QuestionArchetype.CODE_REVIEW
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.SCENARIO, turn_index=4, company_name="Stripe")
+        == QuestionArchetype.COMPANY_SPECIFIC
+    )
+    assert (
+        TurnGenerator.resolve_archetype(
+            EngineAction.CHANGE_TOPIC, turn_index=1, company_name="Stripe"
+        )
+        == QuestionArchetype.COMPANY_SPECIFIC
+    )
+    assert (
+        TurnGenerator.resolve_archetype(EngineAction.CHANGE_TOPIC, turn_index=2)
+        == QuestionArchetype.ANALYZING_DESIGN
+    )
 
 
 def test_code_review_sample_injection() -> None:

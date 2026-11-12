@@ -1,5 +1,5 @@
 /**
- * IntervueX Typed API Client
+ * CareerDiff Typed API Client
  * Built on native fetch with Bearer token injection, RFC 7807 problem details parsing,
  * and strict typing for all REST endpoints.
  */
@@ -53,7 +53,7 @@ export class ApiError extends Error {
 
 const getAuthToken = (): string | null => {
   try {
-    const raw = localStorage.getItem('intervuex_auth_storage');
+    const raw = localStorage.getItem('CareerDiff_auth_storage');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed?.state?.token || null;

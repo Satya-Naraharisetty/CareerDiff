@@ -1,16 +1,16 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: intervuex-prod-postgres
+    container_name: careerdiff-prod-postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-intervuex}
+      POSTGRES_USER: ${POSTGRES_USER:-careerdiff}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeInProduction123!}
-      POSTGRES_DB: ${POSTGRES_DB:-intervuex_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-careerdiff_prod}
     volumes:
       - prod_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intervuex} -d ${POSTGRES_DB:-intervuex_prod}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-careerdiff} -d ${POSTGRES_DB:-careerdiff_prod}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,12 +22,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: intervuex-prod-redis
+    container_name: careerdiff-prod-redis
     restart: always
     volumes:
       - prod_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: intervuex-prod-api
+    container_name: careerdiff-prod-api
     restart: always
     depends_on:
       postgres:
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
     environment:
       ENVIRONMENT: production
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-intervuex}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-intervuex_prod}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-careerdiff}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-careerdiff_prod}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-ProdSecretKeyMustBeSet32BytesLong}
       LOG_LEVEL: INFO
@@ -66,7 +66,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: intervuex-prod-worker
+    container_name: careerdiff-prod-worker
     restart: always
     depends_on:
       postgres:
@@ -75,10 +75,10 @@ services:
         condition: service_healthy
     environment:
       ENVIRONMENT: production
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-intervuex}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-intervuex_prod}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-careerdiff}:${POSTGRES_PASSWORD:-ChangeMeInProduction123!}@postgres:5432/${POSTGRES_DB:-careerdiff_prod}
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
-    command: ["uv", "run", "taskiq", "worker", "app.tasks.eval_tasks:broker"]
+    command: [ "uv", "run", "taskiq", "worker", "app.tasks.eval_tasks:broker" ]
     deploy:
       resources:
         limits:
@@ -91,4 +91,4 @@ volumes:
 
 networks:
   default:
-    name: intervuex-prod-network
+    name: careerdiff-prod-network

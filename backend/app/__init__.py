@@ -1,1 +1,1 @@
-"""IntervueX Backend Application Package."""
+"""CareerDiff Backend Application Package."""

@@ -31,12 +31,8 @@ def test_perfect_fit_resume_jd_matching() -> None:
 
 def test_synonym_normalization_in_matching() -> None:
     """Verify that synonyms like k8s, golang, psql, and gcp match canonical terms."""
-    resume = (
-        "Built distributed microservices in Go, Kubernetes, PostgreSQL, and Google Cloud."
-    )
-    jd = (
-        "Seeking Backend Engineer with experience in Golang, K8s, PSQL, and GCP."
-    )
+    resume = "Built distributed microservices in Go, Kubernetes, PostgreSQL, and Google Cloud."
+    jd = "Seeking Backend Engineer with experience in Golang, K8s, PSQL, and GCP."
     result = match_resume_against_jd(
         resume_text=resume,
         jd_text=jd,
@@ -53,11 +49,8 @@ def test_synonym_normalization_in_matching() -> None:
     assert len(result.missing_skills) == 0
 
 
-
 def test_gap_detection_in_resume_jd_matching() -> None:
-    resume = (
-        "Mid-Level Python Developer with 3 years experience building Flask and PostgreSQL REST APIs."
-    )
+    resume = "Mid-Level Python Developer with 3 years experience building Flask and PostgreSQL REST APIs."
     jd = (
         "Senior Infrastructure Architect. Requirements: 7+ years, Kubernetes, Kafka, Go, "
         "Distributed consensus, PostgreSQL."
@@ -115,10 +108,7 @@ def test_compute_ats_score_high_alignment() -> None:
 
 
 def test_compute_ats_score_with_gaps_and_tips() -> None:
-    resume = (
-        "Junior Developer\n"
-        "Built simple websites with HTML, CSS, and basic Python."
-    )
+    resume = "Junior Developer\nBuilt simple websites with HTML, CSS, and basic Python."
     jd = (
         "Staff Infrastructure Engineer. Requirements: 8+ years, Kubernetes, Kafka, Go, Terraform, "
         "Distributed consensus, 100k QPS."
@@ -134,7 +124,8 @@ def test_compute_ats_score_with_gaps_and_tips() -> None:
     )
 
     assert ats["ats_score"] < 70
-    assert "Kubernetes" in ats["missing_critical_keywords"] or "Go" in ats["missing_critical_keywords"]
+    assert (
+        "Kubernetes" in ats["missing_critical_keywords"] or "Go" in ats["missing_critical_keywords"]
+    )
     # Check that optimization tips provide advice for missing keywords
     assert any("Add target keywords" in tip for tip in ats["optimization_tips"])
-

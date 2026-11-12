@@ -1,6 +1,6 @@
-# Architecture Decision Records (ADRs) — IntervueX
+# Architecture Decision Records (ADRs) — CareerDiff
 
-This document records the foundational architectural decisions made for the IntervueX platform, following the standard Architecture Decision Record (ADR) format.
+This document records the foundational architectural decisions made for the CareerDiff platform, following the standard Architecture Decision Record (ADR) format.
 
 ---
 
@@ -11,7 +11,7 @@ This document records the foundational architectural decisions made for the Inte
 We need to architect an early-stage, voice-first technical interviewing platform. The system has multiple logical domains (Resume Parsing, Role Management, Adaptive Engine, Voice Pipeline, Evaluation). A common anti-pattern in modern software engineering is premature decomposition into distributed microservices, introducing network latency, deployment complexity, distributed transaction failure modes, and developer friction.
 
 ### Decision
-We will build IntervueX as a **Modular Monolith** running within a single FastAPI repository, supplemented by asynchronous worker processes (Taskiq). Domain boundaries will be enforced strictly via Python package separation, typed protocols, and clear interface abstractions.
+We will build CareerDiff as a **Modular Monolith** running within a single FastAPI repository, supplemented by asynchronous worker processes (Taskiq). Domain boundaries will be enforced strictly via Python package separation, typed protocols, and clear interface abstractions.
 
 ### Consequences
 - **Positive**: Single repository deployment, local development runs cleanly via simple `docker compose up`, fast in-memory function calls between modules, zero distributed transaction overhead, ACID transactions across domains.
@@ -133,7 +133,7 @@ We must store active session state, turn transcripts, evaluation scores, and que
 Many AI projects adopt LangChain or LangGraph. However, these libraries suffer from rapid deprecation cycles, leaky abstractions, difficult debugging, performance overhead, and opaque prompt formatting.
 
 ### Decision
-IntervueX will **not** use LangChain, LangGraph, CrewAI, or similar heavy agent frameworks. We implement clean, native provider interfaces using **vanilla Python, Pydantic v2 schemas, and official provider SDKs** (or direct HTTP clients).
+CareerDiff will **not** use LangChain, LangGraph, CrewAI, or similar heavy agent frameworks. We implement clean, native provider interfaces using **vanilla Python, Pydantic v2 schemas, and official provider SDKs** (or direct HTTP clients).
 
 ### Consequences
 - **Positive**: 100% control over prompt engineering, transparent latency and token tracking, effortless debugging, zero dependency lock-in, zero framework bloat.

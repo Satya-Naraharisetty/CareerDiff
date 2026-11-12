@@ -1,4 +1,4 @@
-# Adaptive Interview Engine Specification — IntervueX
+# Adaptive Interview Engine Specification — CareerDiff
 
 **Document Version:** 1.2.0  
 **Status:** Approved Technical Specification  
@@ -9,7 +9,7 @@
 
 The **Adaptive Interview Engine (AIE)** simulates the judgment of an experienced engineering interviewer who listens actively, probes depth, and verifies claims, while operating within rigorous session boundaries.
 
-Rather than granting an LLM unconstrained conversational freedom, IntervueX structures interview control into three distinct tiers:
+Rather than granting an LLM unconstrained conversational freedom, CareerDiff structures interview control into three distinct tiers:
 
 ```mermaid
 graph TD
@@ -46,7 +46,7 @@ graph TD
 
 ## 2. Evaluation Boundaries: `LiveAnswerInterpreter` vs. `AssessmentEvaluator`
 
-A critical architectural invariant in IntervueX is the **strict separation between live adaptation and post-interview rubric evaluation**. Live turn-taking must never wait for comprehensive rubric evaluation, and live adaptation must never be blocked by background report generation.
+A critical architectural invariant in CareerDiff is the **strict separation between live adaptation and post-interview rubric evaluation**. Live turn-taking must never wait for comprehensive rubric evaluation, and live adaptation must never be blocked by background report generation.
 
 ```mermaid
 graph LR
