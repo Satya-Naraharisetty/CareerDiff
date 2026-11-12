@@ -10,11 +10,17 @@ import {
   ShieldCheck,
   RefreshCw,
   Sliders,
+  Eye,
+  BookOpen,
+  Award,
+  Layers,
 } from 'lucide-react';
 import { resumesApi } from '../lib/api';
 import type {
   ResumeRewriteResponse,
+  RewrittenResumeProfile,
   SeniorityLevel,
+  TemplateStyle,
 } from '../types';
 
 interface ResumeRewriterProps {
@@ -67,18 +73,57 @@ Requirements:
 • Proven expertise tuning PostgreSQL query performance, MVCC vacuum behavior, and composite indexing.
 • Strong foundation in distributed concurrency, idempotency tokens, and network fault tolerance.`;
 
+const TEMPLATE_DESCRIPTIONS: Record<TemplateStyle, { name: string; tag: string; font: string; desc: string; ats: string }> = {
+  jakes_resume: {
+    name: "Jake's Clean ATS",
+    tag: "Gold Standard",
+    font: "Computer Modern (Classic Serif)",
+    desc: "The universally-recognized single-column Overleaf resume template. 100% parseable by Workday, Greenhouse, and Lever.",
+    ats: "100% Compatible",
+  },
+  modern_tech: {
+    name: "Modern Tech Developer",
+    tag: "Emerald Accents",
+    font: "Source Sans / Modern Sans",
+    desc: "Contemporary sans-serif typography with emerald teal section dividers and clean modern bullet hierarchy.",
+    ats: "99% Compatible",
+  },
+  executive_serif: {
+    name: "Classic Executive & Staff",
+    tag: "Distinguished",
+    font: "Bitstream Charter Serif",
+    desc: "Elegant serif typeface with small-caps headings and formal tabular alignment. Ideal for Staff/Principal roles.",
+    ats: "99% Compatible",
+  },
+  minimalist_sans: {
+    name: "Nordic Minimalist Compact",
+    tag: "1-Page Optimizer",
+    font: "Clean Sans-Serif (9.5pt)",
+    desc: "High-density compact layout with tight margins designed to fit 6+ years of experience cleanly on exactly 1 page.",
+    ats: "98% Compatible",
+  },
+};
+
 export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToInterview }) => {
   const [resumeText, setResumeText] = useState(SAMPLE_RESUME);
   const [jdText, setJdText] = useState(SAMPLE_JD);
   const [seniority, setSeniority] = useState<SeniorityLevel>('SENIOR');
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateStyle>('jakes_resume');
   const [isLoading, setIsLoading] = useState(false);
+  const [isReRendering, setIsReRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rewriteData, setRewriteData] = useState<ResumeRewriteResponse | null>(null);
+
+  // Editable profile state for live sync
+  const [currentProfile, setCurrentProfile] = useState<RewrittenResumeProfile | null>(null);
+  const [activeLatexSource, setActiveLatexSource] = useState<string>('');
 
   // Suggestions state: allow candidate to toggle accepted/reverted suggestions
   const [acceptedSuggestions, setAcceptedSuggestions] = useState<Record<number, boolean>>({});
   const [copiedLatex, setCopiedLatex] = useState(false);
-  const [activeTab, setActiveTab] = useState<'suggestions' | 'latex' | 'preview'>('suggestions');
+  const [copiedCoverLetter, setCopiedCoverLetter] = useState(false);
+  const [activeTab, setActiveTab] = useState<'suggestions' | 'preview' | 'latex' | 'cover_letter'>('suggestions');
+  const [coverLetterMode, setCoverLetterMode] = useState<'text' | 'latex'>('text');
 
   const handleRunRewriter = async () => {
     setIsLoading(true);
@@ -88,8 +133,12 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
         resume_text: resumeText,
         jd_text: jdText,
         candidate_seniority: seniority,
+        template_style: selectedTemplate,
       });
       setRewriteData(data);
+      setCurrentProfile(data.rewritten_profile);
+      setActiveLatexSource(data.latex_source);
+
       // Default all suggestions to accepted
       const initialAccepted: Record<number, boolean> = {};
       data.suggestions.forEach((_, idx) => {
@@ -103,27 +152,112 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
     }
   };
 
-  const toggleSuggestion = (idx: number) => {
-    setAcceptedSuggestions((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
+  // Re-render LaTeX when template changes or suggestions are toggled
+  const handleSwitchTemplate = async (newTemplate: TemplateStyle) => {
+    setSelectedTemplate(newTemplate);
+    if (!currentProfile) return;
+
+    setIsReRendering(true);
+    try {
+      const res = await resumesApi.renderLatex({
+        profile: currentProfile,
+        template_style: newTemplate,
+      });
+      setActiveLatexSource(res.latex_source);
+    } catch (err: any) {
+      console.error('Failed to re-render template:', err);
+    } finally {
+      setIsReRendering(false);
+    }
+  };
+
+  const toggleSuggestion = async (idx: number) => {
+    if (!rewriteData || !currentProfile) return;
+
+    const newAcceptedState = !acceptedSuggestions[idx];
+    const updatedAccepted = {
+      ...acceptedSuggestions,
+      [idx]: newAcceptedState,
+    };
+    setAcceptedSuggestions(updatedAccepted);
+
+    // Apply or revert this suggestion in currentProfile
+    const sugg = rewriteData.suggestions[idx];
+    const targetText = newAcceptedState ? sugg.rewritten_text : sugg.original_text;
+
+    const clonedProfile: RewrittenResumeProfile = JSON.parse(JSON.stringify(currentProfile));
+
+    if (sugg.section === 'summary') {
+      clonedProfile.summary = targetText;
+    } else if (sugg.section === 'experience') {
+      for (const exp of clonedProfile.experiences) {
+        const hIdx = exp.highlights.findIndex(
+          (h) => h === (newAcceptedState ? sugg.original_text : sugg.rewritten_text)
+        );
+        if (hIdx !== -1) {
+          exp.highlights[hIdx] = targetText;
+          break;
+        }
+      }
+    }
+
+    setCurrentProfile(clonedProfile);
+
+    // Re-render LaTeX on the fly
+    try {
+      const res = await resumesApi.renderLatex({
+        profile: clonedProfile,
+        template_style: selectedTemplate,
+      });
+      setActiveLatexSource(res.latex_source);
+    } catch (err) {
+      console.error('Failed to update LaTeX after toggling suggestion:', err);
+    }
   };
 
   const handleCopyLatex = () => {
-    if (!rewriteData) return;
-    navigator.clipboard.writeText(rewriteData.latex_source);
+    if (!activeLatexSource) return;
+    navigator.clipboard.writeText(activeLatexSource);
     setCopiedLatex(true);
     setTimeout(() => setCopiedLatex(false), 2500);
   };
 
-  const handleDownloadTex = () => {
+  const handleCopyCoverLetter = () => {
     if (!rewriteData) return;
-    const blob = new Blob([rewriteData.latex_source], { type: 'text/x-tex;charset=utf-8' });
+    const textToCopy =
+      coverLetterMode === 'text'
+        ? rewriteData.cover_letter_text
+        : rewriteData.cover_letter_latex;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedCoverLetter(true);
+    setTimeout(() => setCopiedCoverLetter(false), 2500);
+  };
+
+  const handleDownloadTex = () => {
+    if (!activeLatexSource || !currentProfile) return;
+    const blob = new Blob([activeLatexSource], { type: 'text/x-tex;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${rewriteData.rewritten_profile.full_name.toLowerCase().replace(/\s+/g, '_')}_overleaf_resume.tex`;
+    link.download = `${currentProfile.full_name.toLowerCase().replace(/\s+/g, '_')}_${selectedTemplate}.tex`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadCoverLetter = () => {
+    if (!rewriteData || !currentProfile) return;
+    const content =
+      coverLetterMode === 'latex'
+        ? rewriteData.cover_letter_latex
+        : rewriteData.cover_letter_text;
+    const ext = coverLetterMode === 'latex' ? 'tex' : 'txt';
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${currentProfile.full_name.toLowerCase().replace(/\s+/g, '_')}_cover_letter.${ext}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -136,7 +270,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-950 border border-emerald-500/30 text-emerald-400">
                 <FileText className="h-4 w-4" />
               </span>
@@ -144,11 +278,11 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                 Resume Rewriter & Overleaf LaTeX Studio
               </h1>
               <span className="rounded-full bg-emerald-950 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 border border-emerald-800/40">
-                Overleaf Jake's Template Standard
+                4 Free Overleaf Templates
               </span>
             </div>
             <p className="text-sm text-zinc-400 mt-1">
-              Score first, suggest targeted bullet rewrites for your target JD, strictly preserve your verified facts, and export to production-grade LaTeX.
+              Score first against your target JD, suggest targeted bullet rewrites, strictly preserve your verified facts, inspect 1-page fit, and export ready-to-compile LaTeX & cover letters.
             </p>
           </div>
           {onBackToInterview && (
@@ -163,57 +297,106 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
         </div>
 
         {/* Input Configuration Panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 shadow-sm">
-          {/* Resume Input */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                <span>1. Candidate Resume Text</span>
-                <span className="text-[10px] text-zinc-500 font-normal">Original Experience & Skills</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setResumeText(SAMPLE_RESUME)}
-                className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-              >
-                Reset to Sample
-              </button>
+        <div className="space-y-6 bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Resume Input */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <span>1. Candidate Resume Text</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Original Experience & Skills</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setResumeText(SAMPLE_RESUME)}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  Reset to Sample
+                </button>
+              </div>
+              <textarea
+                rows={9}
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
+                className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs font-mono text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all resize-y"
+                placeholder="Paste raw resume text here..."
+              />
             </div>
-            <textarea
-              rows={9}
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs font-mono text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all resize-y"
-              placeholder="Paste raw resume text here..."
-            />
+
+            {/* Job Description Input */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <span>2. Target Job Description (JD)</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Target Keywords & Scope</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setJdText(SAMPLE_JD)}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  Reset to Sample
+                </button>
+              </div>
+              <textarea
+                rows={9}
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs font-mono text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all resize-y"
+                placeholder="Paste job description requirements and tech stack here..."
+              />
+            </div>
           </div>
 
-          {/* Job Description Input */}
-          <div className="space-y-3">
+          {/* Template Style Selector Gallery */}
+          <div className="space-y-3 pt-4 border-t border-zinc-800/80">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                <span>2. Target Job Description (JD)</span>
-                <span className="text-[10px] text-zinc-500 font-normal">Target Keywords & Scope</span>
+                <Layers className="h-4 w-4 text-emerald-400" />
+                <span>3. Choose LaTeX Template Style</span>
+                <span className="text-[10px] text-zinc-500 font-normal">Free Overleaf pdflatex compatible</span>
               </label>
-              <button
-                type="button"
-                onClick={() => setJdText(SAMPLE_JD)}
-                className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-              >
-                Reset to Sample
-              </button>
             </div>
-            <textarea
-              rows={9}
-              value={jdText}
-              onChange={(e) => setJdText(e.target.value)}
-              className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs font-mono text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all resize-y"
-              placeholder="Paste job description requirements and tech stack here..."
-            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {(Object.keys(TEMPLATE_DESCRIPTIONS) as TemplateStyle[]).map((styleId) => {
+                const info = TEMPLATE_DESCRIPTIONS[styleId];
+                const isSelected = selectedTemplate === styleId;
+                return (
+                  <button
+                    key={styleId}
+                    type="button"
+                    onClick={() => handleSwitchTemplate(styleId)}
+                    className={`text-left rounded-xl border p-3.5 transition-all ${
+                      isSelected
+                        ? 'border-emerald-500 bg-emerald-950/40 shadow-sm ring-1 ring-emerald-500'
+                        : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 hover:bg-zinc-900/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white">{info.name}</span>
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                          isSelected
+                            ? 'bg-emerald-900 text-emerald-300'
+                            : 'bg-zinc-800 text-zinc-400'
+                        }`}
+                      >
+                        {info.ats}
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-zinc-400 mb-1">{info.font}</div>
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {info.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Seniority & Trigger Action */}
-          <div className="lg:col-span-2 flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-zinc-800/80">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-zinc-800/80">
             <div className="flex items-center gap-3">
               <span className="text-xs font-medium text-zinc-400">Target Seniority:</span>
               {(['JUNIOR', 'MID', 'SENIOR', 'STAFF'] as SeniorityLevel[]).map((lvl) => (
@@ -246,7 +429,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  <span>Score First & Suggest Rewrites</span>
+                  <span>Score First & Generate Overleaf LaTeX</span>
                 </>
               )}
             </button>
@@ -261,7 +444,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
         )}
 
         {/* Results Studio */}
-        {rewriteData && (
+        {rewriteData && currentProfile && (
           <div className="space-y-6">
             {/* Step 1: Score First (ATS Scorecard) */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-6">
@@ -314,6 +497,37 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                 </div>
               </div>
 
+              {/* Page Fit & Density Indicator Gauge */}
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/80 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-emerald-400">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-200">Page Length & Density:</span>
+                      <span className="rounded bg-emerald-950 border border-emerald-800/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                        {rewriteData.page_fit.estimated_pages} Page{rewriteData.page_fit.estimated_pages > 1 ? 's' : ''} ({rewriteData.page_fit.density_status})
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {rewriteData.page_fit.fit_recommendation}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs font-mono text-zinc-400">
+                  <div>
+                    <span className="text-zinc-500">Bullets: </span>
+                    <span className="font-semibold text-zinc-200">{rewriteData.page_fit.total_bullets}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500">Characters: </span>
+                    <span className="font-semibold text-zinc-200">{rewriteData.page_fit.total_characters}</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Keywords Gap Analysis Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -359,51 +573,99 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
             </div>
 
             {/* Navigation Tabs for Results */}
-            <div className="flex items-center justify-between border-b border-zinc-800">
-              <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800">
+              <div className="flex gap-4 overflow-x-auto pb-1 sm:pb-0">
                 <button
                   type="button"
                   onClick={() => setActiveTab('suggestions')}
-                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
                     activeTab === 'suggestions'
                       ? 'border-emerald-500 text-emerald-400'
                       : 'border-transparent text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>Rewrite Suggestions & Diffs ({rewriteData.suggestions.length})</span>
+                  <span>Bullet Diffs ({rewriteData.suggestions.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('preview')}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'preview'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>Live Visual Preview</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('latex')}
-                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
                     activeTab === 'latex'
                       ? 'border-emerald-500 text-emerald-400'
                       : 'border-transparent text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  <span>Overleaf LaTeX Source</span>
+                  <span>Overleaf LaTeX Code</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cover_letter')}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === 'cover_letter'
+                      ? 'border-emerald-500 text-emerald-400'
+                      : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Award className="h-4 w-4" />
+                  <span>Cover Letter Studio</span>
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyLatex}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  <span>{copiedLatex ? 'Copied to Clipboard!' : 'Copy LaTeX'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadTex}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download .tex</span>
-                </button>
+              {/* Action Buttons for active view */}
+              <div className="flex items-center gap-2 pb-2 sm:pb-0">
+                {activeTab === 'cover_letter' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleCopyCoverLetter}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>{copiedCoverLetter ? 'Copied!' : 'Copy Letter'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCoverLetter}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Download Letter</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleCopyLatex}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>{copiedLatex ? 'Copied to Clipboard!' : 'Copy LaTeX'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTex}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Download .tex</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -417,7 +679,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                       <strong>Strict Fact-Preservation Invariant:</strong> No fake companies, non-existent projects, or fabricated metrics are generated. Action verbs and JD competencies are elevated around verified candidate achievements.
                     </span>
                   </div>
-                  <span className="text-[10px] text-zinc-400">
+                  <span className="text-[10px] text-zinc-400 flex-shrink-0">
                     {Object.values(acceptedSuggestions).filter(Boolean).length} / {rewriteData.suggestions.length} Accepted
                   </span>
                 </div>
@@ -494,14 +756,214 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
               </div>
             )}
 
-            {/* Tab 2: Overleaf LaTeX Source Code */}
+            {/* Tab 2: Live Visual Resume Preview */}
+            {activeTab === 'preview' && (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-zinc-300">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                    <span>
+                      <strong>Visual Layout Preview:</strong> Rendering styling matching <strong>{TEMPLATE_DESCRIPTIONS[selectedTemplate].name}</strong>.
+                    </span>
+                  </div>
+                  {isReRendering && (
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Syncing template...</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Simulated Paper Document */}
+                <div className="rounded-xl border border-zinc-700 bg-white text-zinc-900 p-8 shadow-2xl max-w-4xl mx-auto space-y-6 min-h-[900px]">
+                  {/* Header / Contact */}
+                  <div className="text-center space-y-1 border-b border-zinc-200 pb-4">
+                    <h1
+                      className={`text-2xl font-bold tracking-tight text-zinc-900 ${
+                        selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'
+                      }`}
+                    >
+                      {currentProfile.full_name}
+                    </h1>
+                    <div className="text-xs text-zinc-600 flex flex-wrap justify-center items-center gap-2">
+                      {currentProfile.contact_phone && <span>{currentProfile.contact_phone}</span>}
+                      <span>•</span>
+                      {currentProfile.contact_email && <span>{currentProfile.contact_email}</span>}
+                      <span>•</span>
+                      {currentProfile.location && <span>{currentProfile.location}</span>}
+                      {currentProfile.linkedin_url && (
+                        <>
+                          <span>•</span>
+                          <span className="text-zinc-700 font-mono text-[11px]">{currentProfile.linkedin_url}</span>
+                        </>
+                      )}
+                      {currentProfile.github_url && (
+                        <>
+                          <span>•</span>
+                          <span className="text-zinc-700 font-mono text-[11px]">{currentProfile.github_url}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  {currentProfile.summary && (
+                    <div className="space-y-1.5">
+                      <h2
+                        className={`text-xs uppercase font-bold tracking-wider pb-1 ${
+                          selectedTemplate === 'modern_tech'
+                            ? 'text-teal-700 border-b border-teal-500'
+                            : 'text-zinc-900 border-b border-zinc-900'
+                        } ${selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'}`}
+                      >
+                        Professional Summary
+                      </h2>
+                      <p className="text-xs text-zinc-700 leading-relaxed">
+                        {currentProfile.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Experience */}
+                  {currentProfile.experiences.length > 0 && (
+                    <div className="space-y-4">
+                      <h2
+                        className={`text-xs uppercase font-bold tracking-wider pb-1 ${
+                          selectedTemplate === 'modern_tech'
+                            ? 'text-teal-700 border-b border-teal-500'
+                            : 'text-zinc-900 border-b border-zinc-900'
+                        } ${selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'}`}
+                      >
+                        Experience
+                      </h2>
+                      <div className="space-y-3.5">
+                        {currentProfile.experiences.map((exp, eIdx) => (
+                          <div key={eIdx} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs font-semibold text-zinc-900">
+                              <span>{exp.position}</span>
+                              <span className="text-zinc-500 font-normal">{exp.dates}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-zinc-600 italic">
+                              <span>{exp.company}</span>
+                              <span className="not-italic text-zinc-500">{exp.location}</span>
+                            </div>
+                            <ul className="list-disc list-inside text-xs text-zinc-700 space-y-1 pt-1">
+                              {exp.highlights.map((hl, hIdx) => (
+                                <li key={hIdx} className="leading-relaxed">
+                                  <span>{hl}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Projects */}
+                  {currentProfile.projects.length > 0 && (
+                    <div className="space-y-4">
+                      <h2
+                        className={`text-xs uppercase font-bold tracking-wider pb-1 ${
+                          selectedTemplate === 'modern_tech'
+                            ? 'text-teal-700 border-b border-teal-500'
+                            : 'text-zinc-900 border-b border-zinc-900'
+                        } ${selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'}`}
+                      >
+                        Projects
+                      </h2>
+                      <div className="space-y-3">
+                        {currentProfile.projects.map((proj, pIdx) => (
+                          <div key={pIdx} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs font-semibold text-zinc-900">
+                              <span>
+                                {proj.name}{' '}
+                                {proj.technologies && (
+                                  <span className="font-normal italic text-zinc-600">
+                                    | {proj.technologies}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-zinc-500 font-normal">{proj.dates}</span>
+                            </div>
+                            <ul className="list-disc list-inside text-xs text-zinc-700 space-y-1 pt-1">
+                              {proj.highlights.map((hl, hIdx) => (
+                                <li key={hIdx} className="leading-relaxed">
+                                  <span>{hl}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  {currentProfile.education.length > 0 && (
+                    <div className="space-y-2">
+                      <h2
+                        className={`text-xs uppercase font-bold tracking-wider pb-1 ${
+                          selectedTemplate === 'modern_tech'
+                            ? 'text-teal-700 border-b border-teal-500'
+                            : 'text-zinc-900 border-b border-zinc-900'
+                        } ${selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'}`}
+                      >
+                        Education
+                      </h2>
+                      <div className="space-y-1.5">
+                        {currentProfile.education.map((edu, edIdx) => (
+                          <div key={edIdx} className="flex items-center justify-between text-xs text-zinc-900">
+                            <div>
+                              <span className="font-semibold">{edu.institution}</span>
+                              <span className="text-zinc-600 italic"> — {edu.degree}</span>
+                            </div>
+                            <span className="text-zinc-500">{edu.dates}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Skills */}
+                  {Object.keys(currentProfile.skills_by_category).length > 0 && (
+                    <div className="space-y-2">
+                      <h2
+                        className={`text-xs uppercase font-bold tracking-wider pb-1 ${
+                          selectedTemplate === 'modern_tech'
+                            ? 'text-teal-700 border-b border-teal-500'
+                            : 'text-zinc-900 border-b border-zinc-900'
+                        } ${selectedTemplate === 'executive_serif' ? 'font-serif' : 'font-sans'}`}
+                      >
+                        Technical Skills
+                      </h2>
+                      <div className="space-y-1 text-xs text-zinc-700">
+                        {Object.entries(currentProfile.skills_by_category).map(
+                          ([cat, skills]) =>
+                            skills.length > 0 && (
+                              <div key={cat} className="flex items-baseline gap-2">
+                                <span className="font-semibold text-zinc-900 w-32 flex-shrink-0">
+                                  {cat}:
+                                </span>
+                                <span>{skills.join(', ')}</span>
+                              </div>
+                            )
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Overleaf LaTeX Source Code */}
             {activeTab === 'latex' && (
               <div className="space-y-4">
                 <div className="rounded-lg bg-zinc-900/60 border border-zinc-800 p-4 text-xs text-zinc-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <ExternalLink className="h-4 w-4 text-emerald-400 flex-shrink-0" />
                     <span>
-                      <strong>How to use in Overleaf:</strong> 1. Copy the code below $\rightarrow$ 2. Open <a href="https://www.overleaf.com" target="_blank" rel="noreferrer" className="underline text-emerald-400">Overleaf.com</a> $\rightarrow$ 3. Create a New Project (Blank) $\rightarrow$ 4. Replace <code>main.tex</code> $\rightarrow$ 5. Click <strong>Recompile</strong>.
+                      <strong>How to compile in Overleaf:</strong> 1. Copy the code below $\rightarrow$ 2. Open <a href="https://www.overleaf.com" target="_blank" rel="noreferrer" className="underline text-emerald-400">Overleaf.com</a> $\rightarrow$ 3. Create a New Project (Blank) $\rightarrow$ 4. Replace <code>main.tex</code> $\rightarrow$ 5. Click <strong>Recompile</strong>.
                     </span>
                   </div>
                   <a
@@ -516,8 +978,57 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                 </div>
 
                 <div className="relative rounded-xl border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto max-h-[600px]">
-                  <pre className="whitespace-pre">{rewriteData.latex_source}</pre>
+                  <pre className="whitespace-pre">{activeLatexSource}</pre>
                 </div>
+              </div>
+            )}
+
+            {/* Tab 4: Tailored Cover Letter Studio */}
+            {activeTab === 'cover_letter' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg bg-zinc-900/60 border border-zinc-800 p-3.5 text-xs text-zinc-300">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                    <span>
+                      <strong>Fact-Grounded Cover Letter:</strong> Tailored directly to the JD requirements and company context, citing your top verified achievements without fabrications.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setCoverLetterMode('text')}
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        coverLetterMode === 'text'
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Formatted Text
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCoverLetterMode('latex')}
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                        coverLetterMode === 'latex'
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      Overleaf LaTeX
+                    </button>
+                  </div>
+                </div>
+
+                {coverLetterMode === 'text' ? (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-200 whitespace-pre-line leading-relaxed font-sans max-w-4xl mx-auto shadow-inner">
+                    {rewriteData.cover_letter_text}
+                  </div>
+                ) : (
+                  <div className="relative rounded-xl border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto max-h-[600px]">
+                    <pre className="whitespace-pre">{rewriteData.cover_letter_latex}</pre>
+                  </div>
+                )}
               </div>
             )}
           </div>

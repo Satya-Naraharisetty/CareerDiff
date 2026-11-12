@@ -19,12 +19,19 @@ from app.schemas.resume import (
     ResumeTextUploadRequest,
 )
 from app.schemas.resume_rewriter import (
+    RenderLatexRequest,
+    RenderLatexResponse,
     ResumeRewriteRequest,
     ResumeRewriteResponse,
+    TemplateMetadata,
 )
 from app.services.claim_extractor import analyze_resume_profile, extract_claims_from_text
 from app.services.pdf_extractor import extract_text_from_pdf_bytes
-from app.services.resume_rewriter import rewrite_resume_for_jd
+from app.services.resume_rewriter import (
+    AVAILABLE_TEMPLATES,
+    generate_latex_resume,
+    rewrite_resume_for_jd,
+)
 from app.services.storage import upload_resume_document
 
 router = APIRouter()
@@ -320,6 +327,17 @@ async def get_latest_resume(
 
 
 @router.get(
+    "/templates",
+    response_model=list[TemplateMetadata],
+    status_code=status.HTTP_200_OK,
+    summary="List supported Overleaf LaTeX resume templates",
+)
+async def list_templates() -> list[TemplateMetadata]:
+    """Retrieve metadata for all supported Overleaf LaTeX templates."""
+    return AVAILABLE_TEMPLATES
+
+
+@router.get(
     "/{resume_id}",
     response_model=ResumeRead,
     status_code=status.HTTP_200_OK,
@@ -370,4 +388,23 @@ async def rewrite_resume(
         resume_text=payload.resume_text,
         jd_text=payload.jd_text,
         candidate_seniority=payload.candidate_seniority,
+        template_style=payload.template_style,
     )
+
+
+@router.post(
+    "/render-latex",
+    response_model=RenderLatexResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Re-render LaTeX source for an edited profile with selected template",
+)
+async def render_latex_endpoint(
+    payload: RenderLatexRequest,
+) -> RenderLatexResponse:
+    """Render ready-to-compile LaTeX source code for a structured resume profile and template style."""
+    latex = generate_latex_resume(payload.profile, template_style=payload.template_style)
+    return RenderLatexResponse(
+        latex_source=latex,
+        template_style=payload.template_style,
+    )
+

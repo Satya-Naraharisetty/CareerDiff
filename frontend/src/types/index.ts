@@ -500,6 +500,25 @@ export interface EvaluationTriggerResponse {
 // ---------------------------------------------------------------------------
 // Resume Rewriter & LaTeX Studio Schemas
 // ---------------------------------------------------------------------------
+export type TemplateStyle = 'jakes_resume' | 'modern_tech' | 'executive_serif' | 'minimalist_sans';
+
+export interface TemplateMetadata {
+  id: TemplateStyle;
+  name: string;
+  description: string;
+  font_family: string;
+  ats_rating: string;
+  recommended_for: string;
+}
+
+export interface PageFitEstimate {
+  total_bullets: number;
+  total_characters: number;
+  estimated_pages: number;
+  density_status: string;
+  fit_recommendation: string;
+}
+
 export interface RewriteSuggestionItem {
   section: string;
   target_item: string;
@@ -544,6 +563,17 @@ export interface ResumeRewriteRequest {
   resume_text: string;
   jd_text: string;
   candidate_seniority?: SeniorityLevel;
+  template_style?: TemplateStyle;
+}
+
+export interface RenderLatexRequest {
+  profile: RewrittenResumeProfile;
+  template_style?: TemplateStyle;
+}
+
+export interface RenderLatexResponse {
+  latex_source: string;
+  template_style: TemplateStyle;
 }
 
 export interface ResumeRewriteResponse {
@@ -554,5 +584,10 @@ export interface ResumeRewriteResponse {
   missing_keywords: string[];
   suggestions: RewriteSuggestionItem[];
   latex_source: string;
+  template_style: TemplateStyle;
+  available_templates: TemplateMetadata[];
+  page_fit: PageFitEstimate;
+  cover_letter_text: string;
+  cover_letter_latex: string;
   rewritten_profile: RewrittenResumeProfile;
 }

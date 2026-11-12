@@ -24,6 +24,8 @@ import type {
   PasswordChangeResponse,
   PasswordRecoveryRequest,
   PasswordRecoveryResponse,
+  RenderLatexRequest,
+  RenderLatexResponse,
   ResumeAnalysisResponse,
   ResumeJdMatchRequest,
   ResumeJdMatchResponse,
@@ -31,6 +33,7 @@ import type {
   ResumeRewriteResponse,
   ResumeTextUploadRequest,
   RoleListResponse,
+  TemplateMetadata,
   TokenResponse,
   TurnRetakeRequest,
   TurnRetakeResponse,
@@ -258,6 +261,14 @@ export const resumesApi = {
 
   rewrite: (payload: ResumeRewriteRequest) =>
     fetchApi<ResumeRewriteResponse>('/api/v1/resumes/rewrite', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getTemplates: () => fetchApi<TemplateMetadata[]>('/api/v1/resumes/templates'),
+
+  renderLatex: (payload: RenderLatexRequest) =>
+    fetchApi<RenderLatexResponse>('/api/v1/resumes/render-latex', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
