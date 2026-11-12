@@ -7,9 +7,12 @@ import {
   Code2,
   Copy,
   Hand,
+  Layers,
   Loader2,
   Mic,
   MicOff,
+  Network,
+  Play,
   Radio,
   Send,
   Trash2,
@@ -22,10 +25,233 @@ interface InterviewRoomProps {
   onConclude: () => void;
 }
 
-const SCRATCHPAD_TEMPLATES = [
+interface DiagramPreset {
+  name: string;
+  syntax: string;
+  description: string;
+}
+
+const DIAGRAM_PRESETS: DiagramPreset[] = [
   {
-    name: 'SQL Ledger',
-    snippet: `-- Idempotent Financial Ledger Table
+    name: 'Microservices & Gateway',
+    description: 'Client -> API Gateway -> Auth / Orders / Payments -> DB & Kafka',
+    syntax: `flowchart TD
+    Client[Web & Mobile Clients] --> Gateway[API Gateway / Envoy]
+    Gateway --> Auth[Auth Service]
+    Gateway --> OrderSvc[Order Microservice]
+    Gateway --> PaymentSvc[Payment Service]
+    OrderSvc --> DB[(PostgreSQL Primary)]
+    PaymentSvc --> Bus[(Kafka Event Bus)]`,
+  },
+  {
+    name: 'Transactional Outbox',
+    description: 'Service -> ACID Commit -> Poller -> Kafka Broker -> Deduplicating Consumers',
+    syntax: `sequenceDiagram
+    App->>DB: 1. Begin Transaction
+    App->>DB: 2. Insert Order & Outbox Row
+    App->>DB: 3. Commit ACID Transaction
+    Poller->>DB: 4. SELECT FOR UPDATE SKIP LOCKED
+    Poller->>Kafka: 5. Publish Event (Idempotent)
+    Kafka-->>Consumer: 6. Consume & Deduplicate`,
+  },
+  {
+    name: 'Multi-Region Replicas',
+    description: 'Anycast LB -> Regional Clusters -> Primary DB with Read Replicas',
+    syntax: `flowchart LR
+    LB[Global Anycast LB] --> RegionA[Region US-East]
+    LB --> RegionB[Region EU-Central]
+    RegionA --> PrimaryDB[(Primary DB - Read/Write)]
+    RegionB --> ReplicaDB[(Read Replica - Read-Only)]
+    PrimaryDB -. Async Replication .-> ReplicaDB`,
+  },
+  {
+    name: 'Distributed Lock Cache',
+    description: 'Worker -> Redis Redlock Lease -> DB Ledger -> Unlock',
+    syntax: `sequenceDiagram
+    Worker->>Redis: SET lock:order_123 NX PX 5000
+    Redis-->>Worker: OK (Acquired)
+    Worker->>DB: UPDATE account SET balance = balance - 100
+    Worker->>Redis: EVAL release_lock_lua
+    Redis-->>Worker: Lock Released`,
+  },
+];
+
+const ARCHETYPE_CONFIG: Record<
+  string,
+  { label: string; badgeClass: string; icon: string }
+> = {
+  WARMUP_MOTIVATION: {
+    label: 'Warmup & Role Motivation',
+    badgeClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80',
+    icon: '☕',
+  },
+  SKILL_FUNDAMENTALS: {
+    label: 'Skill Fundamentals',
+    badgeClass: 'bg-amber-950/80 text-amber-300 border-amber-800/80',
+    icon: '⚡',
+  },
+  SYSTEM_ARCHITECTURE: {
+    label: 'System Architecture',
+    badgeClass: 'bg-indigo-950/80 text-indigo-300 border-indigo-800/80',
+    icon: '🏛️',
+  },
+  SCENARIO_DECISION: {
+    label: 'Architectural Dilemma',
+    badgeClass: 'bg-purple-950/80 text-purple-300 border-purple-800/80',
+    icon: '⚖️',
+  },
+  ANALYZING_DESIGN: {
+    label: 'System Design Framing',
+    badgeClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-800/80',
+    icon: '📐',
+  },
+  DEBUGGING_INCIDENT: {
+    label: 'Production Incident Triage',
+    badgeClass: 'bg-rose-950/80 text-rose-300 border-rose-800/80',
+    icon: '🐞',
+  },
+  CODE_REVIEW: {
+    label: 'Live Code Review',
+    badgeClass: 'bg-teal-950/80 text-teal-300 border-teal-800/80',
+    icon: '💻',
+  },
+  COMPANY_SPECIFIC: {
+    label: 'Company Domain Challenge',
+    badgeClass: 'bg-blue-950/80 text-blue-300 border-blue-800/80',
+    icon: '🏢',
+  },
+  REVERSE_QA: {
+    label: 'Candidate Reverse Q&A',
+    badgeClass: 'bg-violet-950/80 text-violet-300 border-violet-800/80',
+    icon: '❓',
+  },
+};
+
+const SvgDiagramPreview: React.FC<{ syntax: string }> = ({ syntax }) => {
+  const isSequence = syntax.trim().startsWith('sequenceDiagram');
+
+  if (isSequence) {
+    const lines = syntax
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('sequenceDiagram'));
+    const actors = Array.from(
+      new Set(
+        lines.flatMap((l) => {
+          const m = l.match(/([a-zA-Z0-9_]+)\s*(?:->>|-->>)\s*([a-zA-Z0-9_]+)/);
+          return m ? [m[1], m[2]] : [];
+        })
+      )
+    );
+
+    return (
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs overflow-x-auto space-y-3">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
+          <span className="flex items-center gap-1.5 text-sky-400 font-semibold">
+            <Layers className="h-3.5 w-3.5" /> Sequence Lifecycle Topology
+          </span>
+          <span className="text-[10px] text-zinc-500">{actors.length} Participants</span>
+        </div>
+        <div className="flex justify-around gap-2 pb-2">
+          {actors.map((actor) => (
+            <div
+              key={actor}
+              className="rounded-lg border border-sky-800/60 bg-sky-950/40 px-3 py-1 text-center font-bold text-sky-300 shadow-sm text-[11px]"
+            >
+              {actor}
+            </div>
+          ))}
+        </div>
+        <div className="space-y-1.5 pt-1 border-t border-zinc-800/80">
+          {lines.map((step, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-2 rounded bg-zinc-900/80 px-2.5 py-1.5 border border-zinc-800/80 text-zinc-300 text-[11px]"
+            >
+              <span className="text-zinc-500 font-bold">{idx + 1}.</span>
+              <span className="text-sky-400">⟶</span>
+              <span className="truncate">{step.replace(/^[a-zA-Z0-9_]+\s*(?:->>|-->>)\s*[a-zA-Z0-9_]+:\s*/, '')}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Flowchart visualizer
+  const nodeMatches = Array.from(
+    syntax.matchAll(/([a-zA-Z0-9_]+)(?:\[(.*?)\]|\(\[(.*?)\]\))/g)
+  );
+  const nodes = nodeMatches.map((m) => ({
+    id: m[1],
+    label: m[2] || m[3] || m[1],
+    isDb: syntax.includes(`${m[1]}[(`),
+  }));
+
+  const connections = Array.from(
+    syntax.matchAll(/([a-zA-Z0-9_]+)\s*(?:-->|-\.->)\s*([a-zA-Z0-9_]+)/g)
+  ).map((m) => ({ from: m[1], to: m[2] }));
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs overflow-x-auto space-y-4">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
+        <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+          <Network className="h-3.5 w-3.5" /> Architecture Component Graph
+        </span>
+        <span className="text-[10px] text-zinc-500">{nodes.length} Components, {connections.length} Edges</span>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-3 py-2">
+        {nodes.map((node, i) => (
+          <React.Fragment key={node.id}>
+            <div
+              className={`rounded-xl px-3.5 py-2 text-center shadow-md border transition-all ${
+                node.isDb
+                  ? 'border-indigo-700/80 bg-indigo-950/40 text-indigo-300 ring-1 ring-indigo-500/20'
+                  : 'border-zinc-700 bg-zinc-900 text-zinc-200'
+              }`}
+            >
+              <div className="text-[10px] text-zinc-500 font-mono uppercase">
+                {node.isDb ? 'Storage / Queue' : 'Service Node'}
+              </div>
+              <div className="text-xs font-bold font-sans mt-0.5">{node.label}</div>
+            </div>
+            {i < nodes.length - 1 && (
+              <span className="text-emerald-400 text-sm font-bold animate-pulse">➔</span>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {connections.length > 0 && (
+        <div className="border-t border-zinc-800/80 pt-2 flex flex-wrap gap-2 text-[10px] text-zinc-400">
+          <span className="text-zinc-500">Connections:</span>
+          {connections.map((c, idx) => (
+            <span
+              key={idx}
+              className="rounded bg-zinc-900 px-2 py-0.5 border border-zinc-800 font-mono text-zinc-300"
+            >
+              {c.from} ➔ {c.to}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ScratchpadTemplate {
+  name: string;
+  snippet: string;
+  language: string;
+}
+
+const getLanguageTemplates = (lang: string = 'Python'): ScratchpadTemplate[] => {
+  const common: ScratchpadTemplate[] = [
+    {
+      name: 'SQL Ledger',
+      language: 'SQL',
+      snippet: `-- Idempotent Financial Ledger Table
 CREATE TABLE ledger_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     idempotency_key VARCHAR(128) NOT NULL UNIQUE,
@@ -35,27 +261,217 @@ CREATE TABLE ledger_entries (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_ledger_account_created ON ledger_entries (account_id, created_at DESC);`,
-  },
-  {
-    name: 'Redlock Concurrency',
-    snippet: `# Distributed Lock with Lease TTL
+    },
+    {
+      name: 'Kafka Partitioning',
+      language: 'Topology',
+      snippet: `[Payment Producer] 
+       | (Partition Key: account_id)
+       v
+[Kafka Topic: payment-events]
+   |---> [Partition 0] ---> [Consumer Worker A (Strict In-Order)]
+   |---> [Partition 1] ---> [Consumer Worker B (Strict In-Order)]`,
+    },
+  ];
+
+  switch (lang.toLowerCase()) {
+    case 'java':
+      return [
+        {
+          name: 'Virtual Threads',
+          language: 'Java',
+          snippet: `// Java 21+ Virtual Threads High-Throughput Executor
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    IntStream.range(0, 10_000).forEach(i -> {
+        executor.submit(() -> {
+            Thread.sleep(Duration.ofMillis(10));
+            return i;
+        });
+    });
+}`,
+        },
+        {
+          name: 'Concurrent LRU',
+          language: 'Java',
+          snippet: `// Thread-Safe LRU Cache with ReentrantReadWriteLock
+public class ConcurrentLRUCache<K, V> {
+    private final int capacity;
+    private final Map<K, V> cache;
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    public ConcurrentLRUCache(int cap) {
+        this.capacity = cap;
+        this.cache = new LinkedHashMap<>(cap, 0.75f, true) {
+            protected boolean removeEldestEntry(Map.Entry<K, V> e) {
+                return size() > capacity;
+            }
+        };
+    }
+}`,
+        },
+        ...common,
+      ];
+    case 'go':
+      return [
+        {
+          name: 'Worker Pool',
+          language: 'Go',
+          snippet: `// Buffered Worker Pool with Context Cancellation
+func RunWorkerPool(ctx context.Context, jobs <-chan int, results chan<- int, workers int) {
+    var wg sync.WaitGroup
+    for w := 1; w <= workers; w++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            for {
+                select {
+                case <-ctx.Done():
+                    return
+                case j, ok := <-jobs:
+                    if !ok { return }
+                    results <- j * 2
+                }
+            }
+        }(w)
+    }
+    wg.Wait()
+}`,
+        },
+        {
+          name: 'Sliding Limiter',
+          language: 'Go',
+          snippet: `// Sliding Window Rate Limiter with sync.Mutex
+type Limiter struct {
+    mu      sync.Mutex
+    history []time.Time
+    limit   int
+    window  time.Duration
+}
+func (l *Limiter) Allow() bool {
+    l.mu.Lock()
+    defer l.mu.Unlock()
+    now := time.Now()
+    cutoff := now.Add(-l.window)
+    valid := l.history[:0]
+    for _, t := range l.history {
+        if t.After(cutoff) { valid = append(valid, t) }
+    }
+    if len(valid) >= l.limit { return false }
+    l.history = append(valid, now)
+    return true
+}`,
+        },
+        ...common,
+      ];
+    case 'typescript':
+    case 'javascript':
+      return [
+        {
+          name: 'Async Pool',
+          language: 'TypeScript',
+          snippet: `// Bounded Concurrent Promise Worker Pool
+async function asyncPool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const ret: Promise<R>[] = [];
+  const executing = new Set<Promise<R>>();
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item));
+    ret.push(p);
+    executing.add(p);
+    const clean = () => executing.delete(p);
+    p.then(clean).catch(clean);
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.all(ret);
+}`,
+        },
+        {
+          name: 'Sliding Limiter',
+          language: 'TypeScript',
+          snippet: `// Sliding-window rate limiter
+function checkRateLimit(timestamps: number[], limit = 5, windowMs = 60000): boolean {
+  const now = Date.now();
+  const valid = timestamps.filter(ts => now - ts < windowMs);
+  if (valid.length >= limit) return false;
+  valid.push(now);
+  return true;
+}
+console.log("Allowed:", checkRateLimit([Date.now() - 5000]));`,
+        },
+        ...common,
+      ];
+    case 'rust':
+      return [
+        {
+          name: 'Channel Pipeline',
+          language: 'Rust',
+          snippet: `// MPSC Channel Pipeline with Tokio
+use tokio::sync::mpsc;
+#[tokio::main]
+async fn main() {
+    let (tx, mut rx) = mpsc::channel(100);
+    tokio::spawn(async move {
+        for i in 0..5 {
+            tx.send(format!("event_{}", i)).await.unwrap();
+        }
+    });
+    while let Some(msg) = rx.recv().await {
+        println!("Processed: {}", msg);
+    }
+}`,
+        },
+        ...common,
+      ];
+    default: // Python
+      return [
+        {
+          name: 'RRF Fusion (RAG)',
+          language: 'Python',
+          snippet: `def reciprocal_rank_fusion(dense_ranks: dict[str, int], bm25_ranks: dict[str, int], k: int = 60) -> list[tuple[str, float]]:
+    """Combines dense vector search and sparse BM25 ranks using RRF."""
+    rrf_scores: dict[str, float] = {}
+    for doc_id, rank in dense_ranks.items():
+        rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (k + rank))
+    for doc_id, rank in bm25_ranks.items():
+        rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (k + rank))
+    return sorted(rrf_scores.items(), key=lambda item: item[1], reverse=True)
+
+dense = {"doc_1": 1, "doc_2": 2, "doc_3": 3}
+bm25 = {"doc_2": 1, "doc_4": 2, "doc_1": 3}
+print("Fused rankings:", reciprocal_rank_fusion(dense, bm25))`,
+        },
+        {
+          name: 'Sliding Limiter',
+          language: 'Python',
+          snippet: `import time
+
+def check_rate_limit(request_timestamps: list[float], limit: int = 5, window_sec: float = 60.0) -> bool:
+    """Sliding-window rate limiter algorithm."""
+    now = time.time()
+    cutoff = now - window_sec
+    valid = [ts for ts in request_timestamps if ts > cutoff]
+    if len(valid) >= limit:
+        return False
+    valid.append(now)
+    return True
+
+print("Allowed:", check_rate_limit([time.time() - 10, time.time() - 5]))`,
+        },
+        {
+          name: 'Redlock Concurrency',
+          language: 'Python',
+          snippet: `# Distributed Lock with Lease TTL
 async def acquire_lock(redis, resource_id: str, ttl_ms: int = 5000):
     token = str(uuid.uuid4())
     acquired = await redis.set(f"lock:{resource_id}", token, px=ttl_ms, nx=True)
     if not acquired:
         raise LockContentionError(f"Resource {resource_id} is locked by another worker")
     return token`,
-  },
-  {
-    name: 'Kafka Partitioning',
-    snippet: `[Payment Producer] 
-       | (Partition Key: account_id)
-       v
-[Kafka Topic: payment-events]
-   |---> [Partition 0] ---> [Consumer Worker A (Strict In-Order)]
-   |---> [Partition 1] ---> [Consumer Worker B (Strict In-Order)]`,
-  },
-];
+        },
+        ...common,
+      ];
+  }
+};
 
 const AudioEqualizer: React.FC<{
   audioLevel: number;
@@ -123,6 +539,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     isInterviewerSpeaking,
     currentTopic,
     remainingSeconds,
+    preferredLanguage,
     error,
     startInterview,
     submitTextTurn,
@@ -136,8 +553,88 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [textInput, setTextInput] = useState('');
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [scratchpadCode, setScratchpadCode] = useState('');
+  const [scratchpadTab, setScratchpadTab] = useState<'CODE' | 'DIAGRAM'>('CODE');
+  const [diagramCode, setDiagramCode] = useState<string>(DIAGRAM_PRESETS[0].syntax);
   const [attachScratchpad, setAttachScratchpad] = useState(true);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [executionOutput, setExecutionOutput] = useState<string | null>(null);
+  const [isRunningCode, setIsRunningCode] = useState(false);
+
+  const activeTemplates = React.useMemo(
+    () => getLanguageTemplates(preferredLanguage || 'Python'),
+    [preferredLanguage]
+  );
+
+  const handleRunCode = async () => {
+    if (!scratchpadCode.trim()) return;
+    setIsRunningCode(true);
+    setExecutionOutput(null);
+
+    const langLower = (preferredLanguage || 'python').toLowerCase();
+
+    // Browser JavaScript / TypeScript Execution
+    if (langLower.includes('script')) {
+      const logs: string[] = [];
+      const originalLog = console.log;
+      try {
+        console.log = (...args: any[]) =>
+          logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+        const res = new Function(scratchpadCode)();
+        let out = logs.join('\n');
+        if (res !== undefined) out = out ? `${out}\nReturned: ${res}` : `Returned: ${res}`;
+        setExecutionOutput(out || '✓ JavaScript executed successfully with exit code 0.');
+      } catch (err: any) {
+        setExecutionOutput(`JavaScript Execution Error:\n${err.message || String(err)}`);
+      } finally {
+        console.log = originalLog;
+        setIsRunningCode(false);
+      }
+      return;
+    }
+
+    // Python WebAssembly Execution (Pyodide)
+    if (langLower === 'python') {
+      try {
+        const win = window as any;
+        if (!win.loadPyodide) {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+          document.head.appendChild(script);
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Failed to load WebAssembly Python runner'));
+          });
+        }
+        if (!win.__pyodideInstance) {
+          win.__pyodideInstance = await win.loadPyodide();
+        }
+        const pyodide = win.__pyodideInstance;
+        const stdoutBuffer: string[] = [];
+        pyodide.setStdout({
+          batched: (str: string) => {
+            stdoutBuffer.push(str);
+          },
+        });
+        const result = await pyodide.runPythonAsync(scratchpadCode);
+        let finalOut = stdoutBuffer.join('\n');
+        if (result !== undefined && result !== null) {
+          finalOut = finalOut ? `${finalOut}\nReturned: ${result}` : `Returned: ${result}`;
+        }
+        setExecutionOutput(finalOut || '✓ Python executed with exit code 0 (no output).');
+      } catch (err: any) {
+        setExecutionOutput(`Execution Error:\n${err.message || String(err)}`);
+      } finally {
+        setIsRunningCode(false);
+      }
+      return;
+    }
+
+    // Non-interpreted languages (Java, Go, Rust, C++, C#, SQL)
+    setExecutionOutput(
+      `ℹ️ ${preferredLanguage} Syntax Ready:\nIn-browser WebAssembly execution is active for Python and JavaScript.\nYour ${preferredLanguage} architecture snippet is formatted and will be automatically attached to your next turn for AI evaluation.`
+    );
+    setIsRunningCode(false);
+  };
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const hasStartedRef = useRef(false);
   const hasVoiceInitedRef = useRef(false);
@@ -199,7 +696,17 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     if (!textInput.trim() || isSubmitting) return;
 
     const msg = textInput;
-    const snippet = attachScratchpad && scratchpadCode.trim() ? scratchpadCode.trim() : undefined;
+    let snippet: string | undefined = undefined;
+    if (attachScratchpad) {
+      if (scratchpadTab === 'DIAGRAM' && diagramCode.trim()) {
+        snippet = `\`\`\`mermaid\n${diagramCode.trim()}\n\`\`\``;
+      } else if (scratchpadCode.trim()) {
+        snippet = scratchpadCode.trim();
+        if (executionOutput) {
+          snippet = `${snippet}\n\n[Console Output]:\n${executionOutput}`;
+        }
+      }
+    }
     setTextInput('');
     await submitTextTurn(msg, snippet);
   };
@@ -355,8 +862,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                         : 'rounded-tr-none border border-zinc-700 bg-zinc-800 text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-4 mb-1.5 font-mono">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 font-mono">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-semibold tracking-tight">
                           {isInterviewer ? 'IntervueX Evaluator' : 'Candidate'}
                         </span>
@@ -365,11 +872,35 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                             {turn.action_taken}
                           </span>
                         )}
+                        {turn.question_archetype && ARCHETYPE_CONFIG[turn.question_archetype] && (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${
+                              ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
+                            }`}
+                          >
+                            <span>{ARCHETYPE_CONFIG[turn.question_archetype].icon}</span>
+                            <span>{ARCHETYPE_CONFIG[turn.question_archetype].label}</span>
+                          </span>
+                        )}
                       </div>
                       <span className="text-[10px] text-zinc-500">Turn #{turn.turn_index}</span>
                     </div>
 
                     <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">{turn.transcript}</p>
+
+                    {turn.code_sample && (
+                      <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 overflow-x-auto shadow-inner">
+                        <div className="flex items-center justify-between text-[10px] text-zinc-400 border-b border-zinc-800/80 pb-1.5 mb-2">
+                          <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                            <span>💻</span> Attached Code Sample for Review
+                          </span>
+                          <span className="text-zinc-500 font-mono text-[9px]">Inspect concurrency / memory leaks</span>
+                        </div>
+                        <pre className="whitespace-pre font-mono text-xs text-zinc-300 leading-relaxed">
+                          {turn.code_sample}
+                        </pre>
+                      </div>
+                    )}
                   </div>
 
                   {!isInterviewer && (
@@ -495,31 +1026,78 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         {/* Scratchpad Panel */}
         {showScratchpad && (
           <div className="lg:col-span-5 flex flex-col min-h-0 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 backdrop-blur-sm shadow-sm font-mono space-y-3">
-            {/* Scratchpad Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+            {/* Scratchpad Header with Mode Switcher */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                <Code2 className="h-4 w-4 text-zinc-300" />
-                <span className="text-xs font-semibold text-zinc-200">Architecture Scratchpad</span>
+                <div className="flex items-center gap-1 bg-zinc-950 p-0.5 rounded-lg border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setScratchpadTab('CODE')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${
+                      scratchpadTab === 'CODE'
+                        ? 'bg-zinc-800 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <Code2 className="h-3 w-3" />
+                    <span>Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScratchpadTab('DIAGRAM')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium transition-colors ${
+                      scratchpadTab === 'DIAGRAM'
+                        ? 'bg-zinc-800 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    <Network className="h-3 w-3 text-sky-400" />
+                    <span>Architecture Diagram</span>
+                  </button>
+                </div>
+                {scratchpadTab === 'CODE' && (
+                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-zinc-700">
+                    {preferredLanguage || 'Python'}
+                  </span>
+                )}
               </div>
+
               <div className="flex items-center gap-1.5">
+                {scratchpadTab === 'CODE' && (
+                  <button
+                    type="button"
+                    onClick={handleRunCode}
+                    disabled={isRunningCode || !scratchpadCode.trim()}
+                    title={`Execute or prepare ${preferredLanguage || 'Python'} code`}
+                    className="flex items-center gap-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-800/80 px-2 py-1 text-[11px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {isRunningCode ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3 fill-emerald-400" />
+                    )}
+                    <span>{isRunningCode ? 'Running...' : 'Run Code'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(scratchpadCode);
+                    const content = scratchpadTab === 'CODE' ? scratchpadCode : diagramCode;
+                    navigator.clipboard.writeText(content);
                     setCopiedSnippet(true);
                     setTimeout(() => setCopiedSnippet(false), 2000);
                   }}
-                  disabled={!scratchpadCode.trim()}
-                  title="Copy code to clipboard"
+                  disabled={scratchpadTab === 'CODE' ? !scratchpadCode.trim() : !diagramCode.trim()}
+                  title="Copy to clipboard"
                   className="rounded p-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30"
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setScratchpadCode('')}
-                  disabled={!scratchpadCode.trim()}
-                  title="Clear scratchpad"
+                  onClick={() => (scratchpadTab === 'CODE' ? setScratchpadCode('') : setDiagramCode(''))}
+                  disabled={scratchpadTab === 'CODE' ? !scratchpadCode.trim() : !diagramCode.trim()}
+                  title="Clear"
                   className="rounded p-1 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 disabled:opacity-30"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -527,30 +1105,92 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               </div>
             </div>
 
-            {/* Quick Template Inserters */}
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-              <span className="text-zinc-500">Presets:</span>
-              {SCRATCHPAD_TEMPLATES.map((tmpl) => (
-                <button
-                  key={tmpl.name}
-                  type="button"
-                  onClick={() => setScratchpadCode(tmpl.snippet)}
-                  className="rounded bg-zinc-950 px-2 py-0.5 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 border border-zinc-800 transition-colors"
-                >
-                  {tmpl.name}
-                </button>
-              ))}
-            </div>
+            {scratchpadTab === 'CODE' ? (
+              <>
+                {/* Quick Template Inserters */}
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="text-zinc-500">Presets:</span>
+                  {activeTemplates.map((tmpl) => (
+                    <button
+                      key={tmpl.name}
+                      type="button"
+                      onClick={() => setScratchpadCode(tmpl.snippet)}
+                      className="rounded bg-zinc-950 px-2 py-0.5 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 border border-zinc-800 transition-colors"
+                    >
+                      {tmpl.name}
+                    </button>
+                  ))}
+                </div>
 
-            {/* Monospace Code Editor Area */}
-            <div className="flex-1 min-h-[220px] flex flex-col">
-              <textarea
-                value={scratchpadCode}
-                onChange={(e) => setScratchpadCode(e.target.value)}
-                placeholder="Draft SQL schemas, distributed lock algorithms, or ASCII system flow topologies here..."
-                className="w-full flex-1 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 resize-none leading-relaxed"
-              />
-            </div>
+                {/* Monospace Code Editor Area */}
+                <div className="flex-1 min-h-[220px] flex flex-col">
+                  <textarea
+                    value={scratchpadCode}
+                    onChange={(e) => setScratchpadCode(e.target.value)}
+                    placeholder="Draft SQL schemas, distributed lock algorithms, or concurrency primitives here..."
+                    className="w-full flex-1 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 resize-none leading-relaxed"
+                  />
+                </div>
+
+                {/* Live WebAssembly / JS Output Terminal */}
+                {executionOutput && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] text-zinc-300 space-y-1.5 shadow-inner">
+                    <div className="flex items-center justify-between text-zinc-500 border-b border-zinc-800/80 pb-1">
+                      <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {preferredLanguage || 'Execution'} Output
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setExecutionOutput(null)}
+                        className="text-[10px] text-zinc-400 hover:text-white"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <pre className="whitespace-pre-wrap overflow-x-auto max-h-36 text-zinc-200 font-mono text-[11px] leading-relaxed">
+                      {executionOutput}
+                    </pre>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Diagram Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="text-zinc-500">Diagram Presets:</span>
+                  {DIAGRAM_PRESETS.map((dp) => (
+                    <button
+                      key={dp.name}
+                      type="button"
+                      onClick={() => setDiagramCode(dp.syntax)}
+                      className="rounded bg-zinc-950 px-2 py-0.5 text-zinc-400 hover:text-sky-300 hover:border-sky-800 border border-zinc-800 transition-colors"
+                      title={dp.description}
+                    >
+                      {dp.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* SVG Visual Canvas */}
+                <SvgDiagramPreview syntax={diagramCode} />
+
+                {/* Diagram Syntax Editor */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500">
+                    <span>Mermaid Syntax Editor</span>
+                    <span>Supports flowchart TD/LR &amp; sequenceDiagram</span>
+                  </div>
+                  <textarea
+                    value={diagramCode}
+                    onChange={(e) => setDiagramCode(e.target.value)}
+                    placeholder="flowchart TD\n  Client --> Gateway\n  Gateway --> DB[(PostgreSQL)]"
+                    rows={4}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 font-mono text-[11px] text-zinc-300 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 resize-none leading-relaxed"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Attach to Turn Checkbox */}
             <div className="flex items-center justify-between pt-1 text-[11px] text-zinc-400">

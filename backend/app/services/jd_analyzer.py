@@ -2,13 +2,14 @@
 
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.role import Competency, JobRole, Rubric, RubricCriteria
-from app.services.claim_extractor import KNOWN_TECHNOLOGIES
+from app.services.claim_extractor import KNOWN_TECHNOLOGIES, normalize_technology
 
 
 @dataclass
@@ -21,6 +22,8 @@ class JdProfileAnalysis:
     key_requirements: list[str] = field(default_factory=list)
     matched_technologies: list[str] = field(default_factory=list)
     competency_blueprints: list[dict[str, str]] = field(default_factory=list)
+    suggested_company_name: str | None = None
+    suggested_persona: str | None = None
 
 
 def analyze_job_description(
@@ -242,6 +245,32 @@ def analyze_job_description(
             },
         ]
 
+    # 7. Extract Company Name and deduce Persona
+    extracted_company = None
+    company_patterns = [
+        r"(?:company|organization|employer):\s*([^\n\r,]+)",
+        r"(?:about|join|working\s+at)\s+([A-Z][a-zA-Z0-9\s&]{2,30}?)(?:,|\.|\n|\sis\b)",
+    ]
+    for pat in company_patterns:
+        m = re.search(pat, jd_text, re.IGNORECASE)
+        if m:
+            cand = m.group(1).strip()
+            if 2 <= len(cand) <= 40 and not any(w in cand.lower() for w in ["the team", "our team", "role", "us", "you"]):
+                extracted_company = cand
+                break
+
+    suggested_persona = None
+    if extracted_company:
+        from app.services.company_analyzer import (
+            classify_company_from_catalog,
+            heuristic_company_classification,
+        )
+
+        cat = classify_company_from_catalog(extracted_company) or heuristic_company_classification(
+            extracted_company, jd_text
+        )
+        suggested_persona = str(cat["detected_persona"])
+
     return JdProfileAnalysis(
         extracted_title=extracted_title,
         detected_seniority=detected_seniority,
@@ -249,6 +278,8 @@ def analyze_job_description(
         key_requirements=key_requirements,
         matched_technologies=sorted(list(matched_technologies)),
         competency_blueprints=competency_blueprints,
+        suggested_company_name=extracted_company,
+        suggested_persona=suggested_persona,
     )
 
 
@@ -323,3 +354,261 @@ async def get_or_create_custom_role_from_jd(
         select(JobRole).options(selectinload(JobRole.competencies)).where(JobRole.id == role.id)
     )
     return (await db.execute(stmt_reload)).scalar_one()
+
+
+@dataclass
+class ResumeJdMatchResult:
+    """Calculated alignment between a resume and target job description."""
+
+    match_score_pct: int
+    alignment_summary: str
+    seniority_fit: str
+    matched_skills: list[str]
+    missing_skills: list[str]
+    differentiating_skills: list[str]
+    adaptive_interview_strategy: str
+
+
+def match_resume_against_jd(
+    resume_text: str,
+    jd_text: str,
+    resume_skills: list[str] | None = None,
+    jd_technologies: list[str] | None = None,
+    candidate_seniority: str = "SENIOR",
+    required_seniority: str = "SENIOR",
+) -> ResumeJdMatchResult:
+    """Compute multidimensional match score and skill gaps between candidate resume and target JD."""
+    resume_lower = resume_text.lower()
+    jd_lower = jd_text.lower()
+
+    # 1. Skill overlap & Gap detection
+    active_resume_skills: list[str] = list(resume_skills) if resume_skills else []
+    if not active_resume_skills:
+        for tech in KNOWN_TECHNOLOGIES:
+            if re.search(r"\b" + re.escape(tech) + r"\b", resume_text, re.IGNORECASE):
+                active_resume_skills.append(tech)
+
+    active_jd_techs: list[str] = list(jd_technologies) if jd_technologies else []
+    if not active_jd_techs:
+        for tech in KNOWN_TECHNOLOGIES:
+            if re.search(r"\b" + re.escape(tech) + r"\b", jd_text, re.IGNORECASE):
+                active_jd_techs.append(tech)
+
+    resume_canonical_set = {normalize_technology(s) for s in active_resume_skills}
+    jd_canonical_list = list(dict.fromkeys(normalize_technology(s) for s in active_jd_techs))
+    jd_canonical_set = set(jd_canonical_list)
+
+    matched_skills = [s for s in jd_canonical_list if s in resume_canonical_set]
+    missing_skills = [s for s in jd_canonical_list if s not in resume_canonical_set]
+    differentiating_skills = [
+        s
+        for s in list(dict.fromkeys(normalize_technology(s) for s in active_resume_skills))
+        if s not in jd_canonical_set
+    ]
+
+    # 2. Skill Overlap Ratio
+    skill_ratio = (
+        len(matched_skills) / max(len(active_jd_techs), 1)
+        if active_jd_techs
+        else 0.8
+    )
+
+    # 3. Seniority Fit
+    seniority_map = {"JUNIOR": 1, "MID": 2, "SENIOR": 3, "STAFF": 4}
+    c_rank = seniority_map.get(candidate_seniority.upper(), 3)
+    r_rank = seniority_map.get(required_seniority.upper(), 3)
+
+    if c_rank >= r_rank:
+        seniority_fit = "MATCH" if c_rank == r_rank else "OVERQUALIFIED"
+        seniority_score = 1.0
+    elif c_rank == r_rank - 1:
+        seniority_fit = "STRETCH"
+        seniority_score = 0.75
+    else:
+        seniority_fit = "GAP"
+        seniority_score = 0.50
+
+    # 4. Domain & Architecture Term Overlap
+    arch_terms = [
+        "distributed",
+        "concurrency",
+        "kafka",
+        "postgres",
+        "redis",
+        "microservices",
+        "latency",
+        "scale",
+        "idempotency",
+    ]
+    jd_arch_count = sum(1 for term in arch_terms if term in jd_lower)
+    resume_arch_count = sum(
+        1 for term in arch_terms if term in resume_lower and term in jd_lower
+    )
+    arch_overlap = (resume_arch_count / max(jd_arch_count, 1)) if jd_arch_count else 0.8
+
+    # 5. Composite Score Calculation
+    raw_score = (skill_ratio * 0.55) + (seniority_score * 0.25) + (arch_overlap * 0.20)
+    match_score = min(98, max(20, round(raw_score * 100)))
+
+    # 6. Alignment Summary & Strategy
+    if match_score >= 80:
+        alignment_summary = (
+            f"Strong Alignment ({match_score}%). Resume directly demonstrates core tech stack and seniority requirements."
+        )
+    elif match_score >= 60:
+        alignment_summary = (
+            f"Moderate Alignment ({match_score}%). Core skills align well, with a few tooling or domain gaps."
+        )
+    else:
+        alignment_summary = (
+            f"Stretch Opportunity ({match_score}%). Foundational qualifications present, but target stack requirements have notable gaps."
+        )
+
+    matched_sample = ", ".join(matched_skills[:3]) if matched_skills else "general engineering principles"
+    gap_sample = ", ".join(missing_skills[:2]) if missing_skills else "none"
+
+    if missing_skills:
+        strategy = (
+            f"The Interview Engine will verify your proven experience in {matched_sample} via VERIFY_CLAIM probes, "
+            f"and test conceptual grasp in your identified gap areas ({gap_sample}) using SCENARIO questions."
+        )
+    else:
+        strategy = (
+            f"The Interview Engine will verify deep hands-on expertise in {matched_sample} via VERIFY_CLAIM and "
+            f"pressure-test system resilience and edge cases via CHALLENGE actions."
+        )
+
+    return ResumeJdMatchResult(
+        match_score_pct=match_score,
+        alignment_summary=alignment_summary,
+        seniority_fit=seniority_fit,
+        matched_skills=matched_skills,
+        missing_skills=missing_skills,
+        differentiating_skills=differentiating_skills[:6],
+        adaptive_interview_strategy=strategy,
+    )
+
+
+def compute_ats_score(
+    resume_text: str,
+    jd_text: str,
+    resume_skills: list[str] | None = None,
+    jd_technologies: list[str] | None = None,
+    candidate_seniority: str = "SENIOR",
+    required_seniority: str = "SENIOR",
+    years_experience: int = 5,
+) -> dict[str, Any]:
+    """Compute comprehensive Applicant Tracking System (ATS) score (0-100) and optimization advice wrt the JD."""
+    resume_lower = resume_text.lower()
+
+    # 1. Keyword & Technology Matching (40% weight)
+    active_resume_skills: list[str] = list(resume_skills) if resume_skills else []
+    if not active_resume_skills:
+        for tech in KNOWN_TECHNOLOGIES:
+            if re.search(r"\b" + re.escape(tech) + r"\b", resume_text, re.IGNORECASE):
+                active_resume_skills.append(tech)
+
+    active_jd_techs: list[str] = list(jd_technologies) if jd_technologies else []
+    if not active_jd_techs:
+        for tech in KNOWN_TECHNOLOGIES:
+            if re.search(r"\b" + re.escape(tech) + r"\b", jd_text, re.IGNORECASE):
+                active_jd_techs.append(tech)
+
+    resume_canonical_set = {normalize_technology(s) for s in active_resume_skills}
+    jd_canonical_list = list(dict.fromkeys(normalize_technology(s) for s in active_jd_techs))
+
+    matched_keywords = [s for s in jd_canonical_list if s in resume_canonical_set]
+    missing_critical_keywords = [s for s in jd_canonical_list if s not in resume_canonical_set]
+
+    keyword_ratio = (
+        len(matched_keywords) / max(len(jd_canonical_list), 1)
+        if jd_canonical_list
+        else 0.85
+    )
+    keyword_score = min(100, max(20, round(keyword_ratio * 100)))
+
+    # 2. Experience & Seniority Fit (25% weight)
+    seniority_map = {"JUNIOR": 1, "MID": 2, "SENIOR": 3, "STAFF": 4}
+    c_rank = seniority_map.get(candidate_seniority.upper(), 3)
+    r_rank = seniority_map.get(required_seniority.upper(), 3)
+
+    if c_rank >= r_rank:
+        experience_score = 95 if c_rank == r_rank else 90
+    elif c_rank == r_rank - 1:
+        experience_score = 75
+    else:
+        experience_score = 55
+
+    # 3. Quantifiable Impact & Metrics (20% weight)
+    # ATS parsers look for numbers, percentages, throughput indicators
+    metrics_patterns = [
+        r"\b\d+(?:\.\d+)?%",
+        r"\b\d+(?:\.\d+)?k\b",
+        r"\b\d+(?:\.\d+)?m\b",
+        r"\b\d+(?:\.\d+)?\s*(?:requests|qps|events|users|ms|seconds|minutes)\b",
+        r"\$\d+(?:\.\d+)?",
+        r"\b\d+\+?\s*years?\b",
+    ]
+    metric_hits = sum(len(re.findall(pat, resume_lower)) for pat in metrics_patterns)
+    if metric_hits >= 5:
+        quantified_impact_score = 95
+    elif metric_hits >= 3:
+        quantified_impact_score = 85
+    elif metric_hits >= 1:
+        quantified_impact_score = 70
+    else:
+        quantified_impact_score = 50
+
+    # 4. Standard Section Completeness & Layout (15% weight)
+    sections_found = 0
+    if re.search(r"\b(summary|profile|about)\b", resume_lower):
+        sections_found += 1
+    if re.search(r"\b(experience|employment|work history)\b", resume_lower):
+        sections_found += 1
+    if re.search(r"\b(skills|technologies|technical stack)\b", resume_lower):
+        sections_found += 1
+    if re.search(r"\b(education|university|degree|bachelor|master)\b", resume_lower):
+        sections_found += 1
+
+    section_structure_score = round((sections_found / 4.0) * 100) if sections_found else 75
+
+    # 5. Composite ATS Score (out of 100)
+    raw_ats = (
+        (keyword_score * 0.40)
+        + (experience_score * 0.25)
+        + (quantified_impact_score * 0.20)
+        + (section_structure_score * 0.15)
+    )
+    final_ats_score = min(98, max(25, round(raw_ats)))
+
+    # 6. Actionable ATS Optimization Tips
+    tips: list[str] = []
+    if missing_critical_keywords:
+        tips.append(
+            f"Add target keywords '{', '.join(missing_critical_keywords[:3])}' into your Skills and Experience bullet points to pass keyword filters."
+        )
+    if metric_hits < 4:
+        tips.append(
+            "Quantify your bullet points with measurable impact metrics (e.g., 'reduced latency by 35%', 'processed 50k events/sec')."
+        )
+    if sections_found < 4:
+        tips.append(
+            "Ensure standard ATS section headers (Summary, Experience, Skills, Education) are clearly formatted without table or multi-column nesting."
+        )
+    if not tips:
+        tips.append(
+            "Your resume structure and keyword density match the target Job Description exceptionally well for ATS screening."
+        )
+
+    return {
+        "ats_score": final_ats_score,
+        "keyword_score": keyword_score,
+        "experience_score": experience_score,
+        "quantified_impact_score": quantified_impact_score,
+        "section_structure_score": section_structure_score,
+        "matched_keywords": matched_keywords,
+        "missing_critical_keywords": missing_critical_keywords,
+        "optimization_tips": tips,
+    }
+
+

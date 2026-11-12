@@ -21,6 +21,20 @@ class EngineAction(StrEnum):
     CONCLUDE = "CONCLUDE"
 
 
+class QuestionArchetype(StrEnum):
+    """Comprehensive taxonomy of technical interview question categories."""
+
+    WARMUP_MOTIVATION = "WARMUP_MOTIVATION"
+    SKILL_FUNDAMENTALS = "SKILL_FUNDAMENTALS"
+    SYSTEM_ARCHITECTURE = "SYSTEM_ARCHITECTURE"
+    SCENARIO_DECISION = "SCENARIO_DECISION"
+    ANALYZING_DESIGN = "ANALYZING_DESIGN"
+    DEBUGGING_INCIDENT = "DEBUGGING_INCIDENT"
+    CODE_REVIEW = "CODE_REVIEW"
+    COMPANY_SPECIFIC = "COMPANY_SPECIFIC"
+    REVERSE_QA = "REVERSE_QA"
+
+
 class InterviewState(StrEnum):
     """Macro lifecycle states for an interview session."""
 
@@ -94,6 +108,8 @@ class InterviewerTurnResponse(BaseModel):
     action_taken: EngineAction
     session_state: str
     active_topic: str | None = None
+    question_archetype: str | None = None
+    code_sample: str | None = None
     created_at: datetime
 
 
@@ -104,6 +120,8 @@ class InterviewTurnRead(BaseModel):
     speaker: str
     transcript: str
     action_taken: str | None = None
+    question_archetype: str | None = None
+    code_sample: str | None = None
     audio_duration_ms: int | None = None
     created_at: datetime
 

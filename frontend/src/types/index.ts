@@ -180,6 +180,41 @@ export interface JdAnalysisResponse {
   key_requirements: string[];
   matched_technologies: string[];
   tailored_competencies: CompetencyRead[];
+  suggested_company_name?: string | null;
+  suggested_persona?: CompanyPersona | null;
+}
+
+export interface CompanyAnalysisRequest {
+  company_name: string;
+  jd_text?: string | null;
+}
+
+export interface CompanyAnalysisResponse {
+  company_name: string;
+  detected_persona: CompanyPersona;
+  scale_tier: string;
+  rationale: string;
+  architectural_focus: string[];
+  confidence: number;
+}
+
+export interface ResumeJdMatchRequest {
+  resume_text: string;
+  jd_text: string;
+  resume_skills?: string[];
+  jd_technologies?: string[];
+  candidate_seniority?: string;
+  required_seniority?: string;
+}
+
+export interface ResumeJdMatchResponse {
+  match_score_pct: number;
+  alignment_summary: string;
+  seniority_fit: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  differentiating_skills: string[];
+  adaptive_interview_strategy: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,11 +234,47 @@ export interface InterviewBlueprintRead {
   topics: BlueprintTopicRead[];
 }
 
+export type CompanyPersona = 'STANDARD' | 'BIG_TECH' | 'SCALE_UP' | 'FINTECH';
+
+export type QuestionArchetype =
+  | 'WARMUP_MOTIVATION'
+  | 'SKILL_FUNDAMENTALS'
+  | 'SYSTEM_ARCHITECTURE'
+  | 'SCENARIO_DECISION'
+  | 'ANALYZING_DESIGN'
+  | 'DEBUGGING_INCIDENT'
+  | 'CODE_REVIEW'
+  | 'COMPANY_SPECIFIC'
+  | 'REVERSE_QA';
+
 export interface InterviewCreateRequest {
   role_id: string;
   target_seniority: SeniorityLevel;
   duration_minutes: number;
   mode: InterviewMode;
+  preferred_language?: string;
+  jd_text?: string;
+  company_persona?: CompanyPersona;
+  target_company?: string;
+}
+
+export interface TurnRetakeRequest {
+  turn_index: number;
+  new_transcript: string;
+  code_snippet?: string | null;
+}
+
+export interface TurnRetakeResponse {
+  turn_index: number;
+  previous_transcript: string;
+  new_transcript: string;
+  previous_estimated_score: number;
+  new_score: number;
+  score_delta: number;
+  improved_tier: string;
+  coaching_feedback: string;
+  staff_model_answer: string;
+  key_strengths_improved: string[];
 }
 
 export interface InterviewCreateResponse {
@@ -243,6 +314,8 @@ export interface InterviewerTurnResponse {
   action_taken: EngineAction;
   session_state: InterviewState;
   active_topic: string | null;
+  question_archetype?: QuestionArchetype | string | null;
+  code_sample?: string | null;
   created_at: string;
 }
 
@@ -251,6 +324,8 @@ export interface InterviewTurnRead {
   speaker: Speaker;
   transcript: string;
   action_taken?: string | null;
+  question_archetype?: QuestionArchetype | string | null;
+  code_sample?: string | null;
   created_at?: string;
 }
 
@@ -370,6 +445,31 @@ export interface ClaimVerificationRead {
   verified_turn_index: number | null;
 }
 
+export interface AtsBreakdown {
+  ats_score: number;
+  keyword_score: number;
+  experience_score: number;
+  quantified_impact_score: number;
+  section_structure_score: number;
+  matched_keywords: string[];
+  missing_critical_keywords: string[];
+  optimization_tips: string[];
+}
+
+export interface CommunicationBreakdown {
+  communication_score: number;
+  speaking_rate_wpm: number;
+  pacing_grade: 'OPTIMAL' | 'GOOD' | 'SLOW / DELIBERATE' | 'FAST / RUSHED';
+  total_words: number;
+  total_speaking_time_sec: number;
+  avg_response_latency_sec: number;
+  filler_words_count: number;
+  filler_word_percentage: number;
+  longest_turn_sec: number;
+  monologue_risk: 'LOW' | 'MODERATE' | 'HIGH';
+  delivery_feedback: string[];
+}
+
 export interface AssessmentReportRead {
   report_id: string;
   interview_id: string;
@@ -381,6 +481,10 @@ export interface AssessmentReportRead {
   strengths: string[];
   knowledge_gaps: string[];
   study_recommendations: string[];
+  ats_score?: number | null;
+  ats_breakdown?: AtsBreakdown | null;
+  communication_score?: number | null;
+  communication_breakdown?: CommunicationBreakdown | null;
   competency_scores: CompetencyScoreRead[];
   claim_verifications: ClaimVerificationRead[];
   created_at: string;

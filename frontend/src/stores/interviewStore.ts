@@ -26,6 +26,7 @@ interface InterviewStoreState {
   isInterviewerSpeaking: boolean;
   currentTopic: string | null;
   remainingSeconds: number;
+  preferredLanguage: string;
   error: string | null;
 
   setInterview: (
@@ -33,7 +34,8 @@ interface InterviewStoreState {
     state: InterviewState,
     mode: InterviewMode,
     seniority: SeniorityLevel,
-    blueprint: InterviewBlueprintRead
+    blueprint: InterviewBlueprintRead,
+    preferredLanguage?: string
   ) => void;
   setMode: (mode: InterviewMode) => void;
   loadTurns: (interviewId: string) => Promise<void>;
@@ -68,15 +70,17 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   isInterviewerSpeaking: false,
   currentTopic: null,
   remainingSeconds: 1800,
+  preferredLanguage: 'Python',
   error: null,
 
-  setInterview: (id, state, mode, seniority, blueprint) => {
+  setInterview: (id, state, mode, seniority, blueprint, preferredLanguage) => {
     set({
       interviewId: id,
       state,
       mode,
       targetSeniority: seniority,
       blueprint,
+      preferredLanguage: preferredLanguage || 'Python',
       turns: [],
       partialTranscript: '',
       remainingSeconds: (blueprint.total_allocated_seconds || 1800),
@@ -157,6 +161,8 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         speaker: 'INTERVIEWER',
         transcript: res.transcript,
         action_taken: res.action_taken,
+        question_archetype: res.question_archetype,
+        code_sample: res.code_sample,
         created_at: res.created_at,
       };
 

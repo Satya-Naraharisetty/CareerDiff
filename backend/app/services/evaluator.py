@@ -17,7 +17,9 @@ from app.models.evaluation import (
 from app.models.interview import BlueprintTopic, Interview, InterviewBlueprint, InterviewTurn
 from app.models.outbox import WorkerExecution
 from app.models.resume import Resume, ResumeClaim
-from app.models.role import Competency, Rubric
+from app.models.role import Competency, JobRole, Rubric
+from app.services.jd_analyzer import compute_ats_score
+from app.services.voice_analytics import analyze_voice_and_communication
 
 logger = logging.getLogger("intervuex.evaluator")
 
@@ -34,7 +36,7 @@ class AssessmentEvaluator:
         db: AsyncSession,
         interview_id: uuid.UUID,
         idempotency_key: str | None = None,
-        model_used: str = "gemini-2.5-pro",
+        model_used: str = "gemini-4-argon",
     ) -> AssessmentReport:
         """Execute exhaustive rubric scoring, evidence grounding, and claim verification."""
         # 1. Enforce Durable Worker Idempotency via worker_executions table
@@ -228,7 +230,50 @@ class AssessmentEvaluator:
                     "Review database indexing under high-write workloads.",
                 ]
 
-            # 6. Create AssessmentReport
+            # 6. Compute ATS Score with respect to the calibrated Job Description
+            stmt_role = select(JobRole).where(JobRole.id == interview.role_id)
+            role = (await db.execute(stmt_role)).scalar_one_or_none()
+
+            jd_text = (
+                interview.session_policy.get("jd_text")
+                or (
+                    f"{role.name}\n{role.description or ''}\n"
+                    + ", ".join(c.name for c in competencies)
+                    if role
+                    else "Software Engineering Role"
+                )
+            )
+
+            resume_text = (
+                latest_resume.raw_extracted_text
+                if latest_resume and latest_resume.raw_extracted_text
+                else ""
+            )
+            if not resume_text and claims:
+                resume_text = "\n".join(c.claim_text for c in claims)
+
+            resume_skills: list[str] = []
+            if claims:
+                for c in claims:
+                    resume_skills.extend(c.technologies)
+
+            ats_data = compute_ats_score(
+                resume_text=resume_text,
+                jd_text=jd_text,
+                resume_skills=list(dict.fromkeys(resume_skills)),
+                candidate_seniority=interview.target_seniority,
+                required_seniority=interview.target_seniority,
+                years_experience=(
+                    interview.candidate_profile.years_experience
+                    if interview.candidate_profile
+                    else 5
+                ),
+            )
+
+            # 7. Compute Objective Voice & Technical Communication Delivery Analytics
+            comm_data = analyze_voice_and_communication(candidate_turns)
+
+            # 8. Create AssessmentReport with Interview Score, ATS Alignment, and Communication
             report = AssessmentReport(
                 interview_id=interview.id,
                 version=new_version,
@@ -241,6 +286,10 @@ class AssessmentEvaluator:
                 strengths=strengths,
                 knowledge_gaps=knowledge_gaps,
                 study_recommendations=study_recs,
+                ats_score=int(ats_data["ats_score"]),
+                ats_breakdown=ats_data,
+                communication_score=int(comm_data["communication_score"]),
+                communication_breakdown=comm_data,
             )
             db.add(report)
             await db.flush()
@@ -409,17 +458,26 @@ class AssessmentEvaluator:
         if depth_score >= 3:
             ev_type = "POSITIVE_MASTERY"
             ev_impact = "UPWEIGHT"
-            rationale = (
+            base_rationale = (
                 f"Candidate provided substantive architecture reasoning on {comp.name}, "
                 f"demonstrating clear grasp of production requirements."
             )
         else:
             ev_type = "SUPERFICIAL_EXPLANATION"
             ev_impact = "NEUTRAL"
-            rationale = (
+            base_rationale = (
                 f"Candidate demonstrated basic familiarity with {comp.name}, "
                 f"but lacked deep quantitative analysis of failure modes."
             )
+
+        # Generate Staff-Level Model Answer & Level-Up Guidance
+        model_answer = cls._get_model_answer(comp.slug)
+        level_up = cls._get_level_up_guidance(comp.slug, depth_score)
+        rationale = (
+            f"{base_rationale}\n\n"
+            f"🎯 **Staff-Level Model Answer**:\n{model_answer}\n\n"
+            f"💡 **How to Level Up to Tier 4**:\n{level_up}"
+        )
 
         evidence = EvaluationEvidence(
             interview_turn_id=relevant_turn.id,
@@ -430,10 +488,70 @@ class AssessmentEvaluator:
             end_char_offset=end_offset,
             evaluation_version=version,
             confidence=0.95,
-            rationale=rationale,
+            rationale=base_rationale,
         )
 
         return [evidence], depth_score, rationale
+
+    @classmethod
+    def _get_model_answer(cls, comp_slug: str) -> str:
+        """Provide a Staff/Principal-level model answer for competency."""
+        answers = {
+            "hybrid-retrieval-vector-search": (
+                "Combine dense semantic vector retrieval with sparse BM25 keyword search using "
+                "Reciprocal Rank Fusion: RRF(d) = sum(1 / (60 + rank_i(d))). Rank-based fusion overcomes "
+                "scale differences between cosine similarities and BM25 scores. Configure Qdrant HNSW graph "
+                "(M=16, efSearch=64) with payload-based pre-filtering to eliminate recall loss."
+            ),
+            "rag-architectures-reranking": (
+                "Employ two-stage retrieval: broad recall (dense + BM25) followed by a cross-encoder reranker "
+                "(e.g., Jina or BGE-Reranker-Large) with MMR diversification (lambda=0.7). Implement dynamic sliding "
+                "context windows and hierarchical chunk headers to maintain global semantic context across splits."
+            ),
+            "llm-observability-telemetry": (
+                "Instrument streaming Time to First Token (TTFT) and token generation velocity at the WebSocket "
+                "gateway. Automate DeepEval evaluation suites measuring Faithfulness and Context Relevance in "
+                "CI/CD regression gates with statistical confidence intervals to catch model regressions."
+            ),
+            "distributed-systems": (
+                "Enforce event ordering using partitioned log topics (Kafka) keyed by entity ID. Pair with "
+                "a Transactional Outbox in PostgreSQL to guarantee atomic event dispatch without dual-write "
+                "distributed failure modes, mitigating consumer group rebalance latency via cooperative assignors."
+            ),
+            "database-architecture": (
+                "Eliminate N+1 queries using async selectinload for 1-to-many collections. Configure composite "
+                "partial B-tree indexes, optimize PostgreSQL MVCC autovacuum thresholds for high-churn tables, and "
+                "enforce connection pooling parameters (pool_size=20, max_overflow=10, pool_timeout=30s)."
+            ),
+            "cicd-automation-release": (
+                "Implement automated GitOps deployment pipelines with blue-green traffic shifting, automated canary "
+                "analysis with Prometheus health thresholds, and instantaneous automated rollbacks upon error spikes."
+            ),
+            "distributed-stream-batch-processing": (
+                "Architect low-latency streaming pipelines with Kafka and Spark/Flink, tuning partition skew and "
+                "checkpoint intervals to guarantee exactly-once processing semantics under consumer failovers."
+            ),
+        }
+        return answers.get(
+            comp_slug,
+            "A Staff-level response articulates specific quantitative metrics, internal data structures, "
+            "concurrency primitives, and explicit trade-offs between consistency, availability, and latency.",
+        )
+
+    @classmethod
+    def _get_level_up_guidance(cls, comp_slug: str, current_score: int) -> str:
+        """Provide targeted coaching to advance candidate from current tier to Tier 4."""
+        if current_score >= 4:
+            return "Advanced mastery achieved! Continue demonstrating system trade-offs and concrete production SLAs."
+        if current_score == 3:
+            return (
+                "To reach Tier 4: Specifically articulate failure recovery mechanisms, network partition "
+                "scenarios, memory/CPU footprints, and mathematical formulas or exact configuration parameters."
+            )
+        return (
+            "To reach Tier 3/4: Move beyond naming tools and frameworks. Explain the internal data structures, "
+            "concurrency controls, and error handling strategies you used to make the system resilient under load."
+        )
 
     @classmethod
     def _verify_claim_against_turns(

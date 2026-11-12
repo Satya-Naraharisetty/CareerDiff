@@ -16,6 +16,7 @@ from app.schemas.adaptive import (
     EngineAction,
     InterviewerTurnResponse,
     InterviewState,
+    QuestionArchetype,
     SessionPolicy,
 )
 from app.services.interview_state_machine import InterviewStateMachine
@@ -89,13 +90,16 @@ class TurnService:
                     if not key_claim and latest_resume.claims:
                         key_claim = latest_resume.claims[0].claim_text
 
-        # Generate Turn 0: WARMUP Greeting grounded in candidate resume
+        # Generate Turn 0: WARMUP Greeting grounded in candidate resume & target company
+        raw_pol = interview.session_policy or {}
+        company_target: str | None = raw_pol.get("target_company") or raw_pol.get("company_name")
         greeting_text = TurnGenerator.generate_warmup_greeting(
             candidate_name=cand_name,
             target_seniority=interview.target_seniority,
             primary_discipline=profile.primary_discipline if profile else "BACKEND",
             top_skills=skills,
             key_claim=key_claim,
+            company_name=company_target,
         )
         turn_0 = InterviewTurn(
             interview_id=interview.id,
@@ -103,6 +107,7 @@ class TurnService:
             speaker="INTERVIEWER",
             transcript=greeting_text,
             action_taken=None,
+            question_archetype=QuestionArchetype.WARMUP_MOTIVATION.value,
         )
         db.add(turn_0)
         await db.commit()
@@ -208,6 +213,8 @@ class TurnService:
         active_topic = topics[fsm.current_topic_index]
         approved_action: EngineAction
         interviewer_text: str
+        question_archetype: str | None = None
+        code_sample: str | None = None
 
         # 4. Handle Phase Transitions
         if fsm.state == InterviewState.WARMUP:
@@ -230,6 +237,7 @@ class TurnService:
                 .where(CandidateProfile.id == interview.candidate_profile_id)
             )
             candidate_name = (await db.execute(stmt_user)).scalar_one_or_none()
+            company_name = raw_policy.get("target_company") or raw_policy.get("company_name")
 
             interviewer_text = TurnGenerator.generate_warmup_transition_question(
                 topic_name=active_topic.topic_name,
@@ -237,6 +245,12 @@ class TurnService:
                 target_seniority=interview.target_seniority,
                 claim_text=first_claim_text,
                 candidate_name=candidate_name,
+                company_name=company_name,
+            )
+            question_archetype = (
+                QuestionArchetype.COMPANY_SPECIFIC.value
+                if company_name
+                else QuestionArchetype.ANALYZING_DESIGN.value
             )
 
         elif fsm.state == InterviewState.TECHNICAL_CORE:
@@ -280,23 +294,41 @@ class TurnService:
             else:
                 fsm.record_action(approved_action)
 
-            # Generate phrasing
-            interviewer_text = TurnGenerator.generate_question(
+            # Generate phrasing with Gemini 3.8 Flash (falling back cleanly to deterministic rules)
+            preferred_language = raw_policy.get("preferred_language", "Python")
+            company_persona = raw_policy.get("company_persona", "STANDARD")
+            company_name = raw_policy.get("target_company") or raw_policy.get("company_name")
+            turn_result = await TurnGenerator.generate_question_async(
                 action=approved_action,
                 topic_name=active_topic.topic_name,
                 target_seniority=interview.target_seniority,
                 claim_text=claim_text,
                 candidate_last_answer=request.transcript,
+                preferred_language=preferred_language,
+                company_persona=company_persona,
+                company_name=company_name,
+                turn_index=next_turn_index,
             )
+            interviewer_text = turn_result.transcript
+            question_archetype = (
+                turn_result.archetype.value
+                if hasattr(turn_result.archetype, "value")
+                else str(turn_result.archetype)
+            )
+            code_sample = turn_result.code_sample
 
         elif fsm.state == InterviewState.CONCLUDING:
-            # Candidate answered wrap-up -> Complete interview
+            # Candidate answered reverse Q&A -> Roleplay Staff Engineer response and complete session
             fsm.transition(InterviewState.COMPLETED)
             approved_action = EngineAction.CONCLUDE
-            interviewer_text = (
-                "Thank you so much! That concludes our technical interview session today. "
-                "Your responses have been recorded and will now be evaluated against our "
-                "role rubrics."
+            question_archetype = QuestionArchetype.REVERSE_QA.value
+            company_name = raw_policy.get("target_company") or raw_policy.get("company_name")
+            preferred_language = raw_policy.get("preferred_language", "Python")
+            interviewer_text = await TurnGenerator.generate_reverse_qa_response_async(
+                candidate_question=request.transcript,
+                company_name=company_name,
+                preferred_language=preferred_language,
+                target_seniority=interview.target_seniority,
             )
         else:
             raise HTTPException(
@@ -312,6 +344,8 @@ class TurnService:
             speaker="INTERVIEWER",
             transcript=interviewer_text,
             action_taken=approved_action.value,
+            question_archetype=question_archetype,
+            code_sample=code_sample,
         )
         db.add(interviewer_turn)
 
@@ -339,10 +373,8 @@ class TurnService:
             transcript=interviewer_turn.transcript,
             action_taken=approved_action,
             session_state=interview.state,
-            active_topic=(
-                active_topic.topic_name
-                if interview.state != InterviewState.COMPLETED.value
-                else None
-            ),
+            active_topic=active_topic.topic_name if interview.state != InterviewState.COMPLETED.value else None,
+            question_archetype=question_archetype,
+            code_sample=code_sample,
             created_at=interviewer_turn.created_at,
         )

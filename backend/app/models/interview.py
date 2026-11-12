@@ -248,6 +248,14 @@ class InterviewTurn(Base):
         Integer,
         nullable=True,
     )
+    question_archetype: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    code_sample: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

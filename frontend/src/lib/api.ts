@@ -10,6 +10,8 @@ import type {
   AssessmentReportRead,
   BackupCodesRegenerateResponse,
   CandidateTurnRequest,
+  CompanyAnalysisRequest,
+  CompanyAnalysisResponse,
   EvaluationTriggerResponse,
   InterviewCreateRequest,
   InterviewCreateResponse,
@@ -23,9 +25,13 @@ import type {
   PasswordRecoveryRequest,
   PasswordRecoveryResponse,
   ResumeAnalysisResponse,
+  ResumeJdMatchRequest,
+  ResumeJdMatchResponse,
   ResumeTextUploadRequest,
   RoleListResponse,
   TokenResponse,
+  TurnRetakeRequest,
+  TurnRetakeResponse,
   UserLoginRequest,
   UserProfileResponse,
   UserRegisterRequest,
@@ -173,6 +179,16 @@ export const rolesApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  matchResumeJd: (payload: ResumeJdMatchRequest) =>
+    fetchApi<ResumeJdMatchResponse>('/api/v1/roles/match-resume-jd', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  analyzeCompany: (payload: CompanyAnalysisRequest) =>
+    fetchApi<CompanyAnalysisResponse>('/api/v1/roles/analyze-company', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const interviewsApi = {
@@ -211,6 +227,12 @@ export const interviewsApi = {
 
   getReport: (interviewId: string) =>
     fetchApi<AssessmentReportRead>(`/api/v1/interviews/${interviewId}/report`),
+
+  retakeTurn: (interviewId: string, payload: TurnRetakeRequest) =>
+    fetchApi<TurnRetakeResponse>(`/api/v1/interviews/${interviewId}/retake-turn`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 

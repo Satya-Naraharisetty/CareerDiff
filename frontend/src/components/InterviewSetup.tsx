@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   Briefcase,
+  Building2,
   CheckCircle2,
   Clock,
   Code2,
@@ -11,7 +13,10 @@ import {
   Lock,
   MessageSquare,
   Mic,
+  Search,
   ShieldCheck,
+  Sparkles,
+  Target,
   Upload,
   X,
 } from 'lucide-react';
@@ -19,11 +24,14 @@ import { interviewsApi, resumesApi, rolesApi } from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 import type {
+  CompanyAnalysisResponse,
+  CompanyPersona,
   InterviewBlueprintRead,
   InterviewMode,
   JdAnalysisResponse,
   JobRoleRead,
   ResumeAnalysisResponse,
+  ResumeJdMatchResponse,
   SeniorityLevel,
 } from '../types';
 
@@ -38,6 +46,50 @@ const SENIORITY_LEVELS: { id: SeniorityLevel; title: string; desc: string }[] = 
   { id: 'SENIOR', title: 'Senior Engineer', desc: 'Distributed systems, fault tolerance, architectural guardrails' },
   { id: 'STAFF', title: 'Staff / Principal', desc: 'High-throughput topologies, multi-datacenter consensus, strategic vision' },
 ];
+
+const COMPANY_PERSONAS: {
+  id: CompanyPersona;
+  title: string;
+  badge: string;
+  icon: string;
+  desc: string;
+  focus: string;
+}[] = [
+  {
+    id: 'STANDARD',
+    title: 'Balanced Standard',
+    badge: 'Universal Core',
+    icon: '🌐',
+    desc: 'Core architecture fundamentals, clean modular interfaces, concurrency control, and pragmatic trade-offs.',
+    focus: 'Concurrency, REST/gRPC, Caching, DB Query Tuning',
+  },
+  {
+    id: 'BIG_TECH',
+    title: 'Hyperscale Big Tech',
+    badge: 'Google / Meta / AWS',
+    icon: '🏢',
+    desc: 'Distributed systems at massive scale (millions QPS), CAP theorem trade-offs, and multi-region consensus.',
+    focus: 'Consensus (Raft/Paxos), Multi-Region Replicas, Failure Partitions',
+  },
+  {
+    id: 'SCALE_UP',
+    title: 'High-Velocity Scale-Up',
+    badge: 'Stripe / Uber / Airbnb',
+    icon: '⚡',
+    desc: 'Pragmatic feature velocity, developer ergonomics, monolith modularization, and event queues.',
+    focus: 'Idempotency Keys, Event Bus, Fast Rollbacks, Observability',
+  },
+  {
+    id: 'FINTECH',
+    title: 'FinTech & Banking',
+    badge: 'Mission-Critical',
+    icon: '🛡️',
+    desc: 'Zero data loss, strict ACID transactions, double-entry audit ledgers, and deterministic states.',
+    focus: 'Audit Trails, Cryptographic Verification, Strict p99 Latency',
+  },
+];
+
+const SUPPORTED_LANGUAGES = ['Python', 'Java', 'TypeScript', 'JavaScript', 'Go', 'Rust', 'C++', 'C#', 'SQL'];
 
 const SAMPLE_RESUME_TEXT = `Alex Rivera
 Senior Distributed Systems & Backend Engineer
@@ -92,6 +144,11 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [seniority, setSeniority] = useState<SeniorityLevel>('SENIOR');
   const [duration, setDuration] = useState<number>(30);
   const [mode, setMode] = useState<InterviewMode>('VOICE');
+  const [preferredLanguage, setPreferredLanguage] = useState<string>('Python');
+  const [companyPersona, setCompanyPersona] = useState<CompanyPersona>('STANDARD');
+  const [targetCompany, setTargetCompany] = useState<string>('GlobalFinTech Corp');
+  const [isAnalyzingCompany, setIsAnalyzingCompany] = useState<boolean>(false);
+  const [companyAnalysisResult, setCompanyAnalysisResult] = useState<CompanyAnalysisResponse | null>(null);
 
   // Step 1: Resume Ingestion State (DEFAULT OPTION IS UPLOAD FILE)
   const [resumeTab, setResumeTab] = useState<'upload' | 'paste'>('upload');
@@ -112,7 +169,56 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [createdBlueprint, setCreatedBlueprint] = useState<InterviewBlueprintRead | null>(null);
+  const [matchAnalysis, setMatchAnalysis] = useState<ResumeJdMatchResponse | null>(null);
+  const [isMatching, setIsMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const detectedLanguages = React.useMemo(() => {
+    const all = [
+      ...(resumeAnalysis?.verified_skills || []),
+      ...(jdAnalysis?.matched_technologies || []),
+    ];
+    return SUPPORTED_LANGUAGES.filter((lang) =>
+      all.some((skill) => skill.toLowerCase() === lang.toLowerCase())
+    );
+  }, [resumeAnalysis, jdAnalysis]);
+
+  useEffect(() => {
+    if (detectedLanguages.length > 0 && !detectedLanguages.includes(preferredLanguage)) {
+      setPreferredLanguage(detectedLanguages[0]);
+    }
+  }, [detectedLanguages]);
+
+  // Comparative Intelligence: Compute Resume vs. JD fit matrix whenever context updates
+  useEffect(() => {
+    async function runComparativeMatch() {
+      if (!resumeAnalysis || (!jdAnalysis && !selectedRole)) {
+        setMatchAnalysis(null);
+        return;
+      }
+      setIsMatching(true);
+      try {
+        const jdBody = jdAnalysis
+          ? jdText
+          : `${selectedRole?.name || ''}\n${selectedRole?.description || ''}\n${(selectedRole?.competencies || []).map((c) => c.name).join(', ')}`;
+        const jdTechs = jdAnalysis?.matched_technologies || [];
+        const res = await rolesApi.matchResumeJd({
+          resume_text: resumeText || SAMPLE_RESUME_TEXT,
+          jd_text: jdBody,
+          resume_skills: resumeAnalysis.verified_skills,
+          jd_technologies: jdTechs,
+          candidate_seniority: seniority,
+          required_seniority: jdAnalysis?.detected_seniority || seniority,
+        });
+        setMatchAnalysis(res);
+      } catch (err) {
+        console.warn('Resume vs JD match calculation failed:', err);
+      } finally {
+        setIsMatching(false);
+      }
+    }
+    runComparativeMatch();
+  }, [resumeAnalysis, jdAnalysis, selectedRole, seniority, jdText, resumeText]);
 
   useEffect(() => {
     async function initData() {
@@ -225,6 +331,23 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
     }
   };
 
+  const runCompanyAnalysis = async (companyName: string) => {
+    if (!companyName.trim()) return;
+    setIsAnalyzingCompany(true);
+    try {
+      const res = await rolesApi.analyzeCompany({
+        company_name: companyName.trim(),
+        jd_text: jdAnalysis ? jdText : undefined,
+      });
+      setCompanyAnalysisResult(res);
+      setCompanyPersona(res.detected_persona);
+    } catch (err) {
+      console.warn('Company analysis failed:', err);
+    } finally {
+      setIsAnalyzingCompany(false);
+    }
+  };
+
   const handleAnalyzeJd = async () => {
     if (!isAuthenticated) {
       onOpenAuth();
@@ -244,6 +367,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       setJdAnalysis(res);
       setSelectedRole(res.role);
       setSeniority(res.detected_seniority);
+      if (res.suggested_company_name) {
+        setTargetCompany(res.suggested_company_name);
+        void runCompanyAnalysis(res.suggested_company_name);
+      } else if (res.suggested_persona) {
+        setCompanyPersona(res.suggested_persona);
+      }
       setJdSuccessMsg(`Calibrated interview track for '${res.extracted_title}' (${res.detected_seniority}) with ${res.tailored_competencies.length} tailored competencies!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to analyze Job Description';
@@ -272,6 +401,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         target_seniority: seniority,
         duration_minutes: duration,
         mode,
+        preferred_language: preferredLanguage,
+        jd_text: jdAnalysis ? jdText : undefined,
+        company_persona: companyPersona,
+        target_company: targetCompany.trim() || undefined,
       });
 
       setCreatedBlueprint(res.blueprint);
@@ -280,7 +413,8 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         res.state,
         mode,
         seniority,
-        res.blueprint
+        res.blueprint,
+        preferredLanguage
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Interview creation failed';
@@ -833,10 +967,136 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             )}
           </div>
 
-          {/* STEP 3: SENIORITY & DURATION */}
+          {/* STEP 3: COMPARATIVE INTELLIGENCE: RESUME VS JD ALIGNMENT */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-emerald-400" />
+                <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-200">
+                  Step 3: Comparative Alignment Matrix (Resume vs. Target JD)
+                </h2>
+              </div>
+              {matchAnalysis ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/70 border border-emerald-800/80 px-2.5 py-0.5 text-xs font-mono font-bold text-emerald-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {matchAnalysis.match_score_pct}% Match
+                  </span>
+                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-700">
+                    {matchAnalysis.seniority_fit} Fit
+                  </span>
+                </div>
+              ) : isMatching ? (
+                <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                  <span>Computing alignment matrix...</span>
+                </div>
+              ) : null}
+            </div>
+
+            {matchAnalysis ? (
+              <div className="space-y-4">
+                <p className="text-xs text-zinc-300 font-sans leading-relaxed">
+                  {matchAnalysis.alignment_summary}
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Direct Matches */}
+                  <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Direct Matched Skills ({matchAnalysis.matched_skills.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {matchAnalysis.matched_skills.length > 0 ? (
+                        matchAnalysis.matched_skills.map((s) => (
+                          <span
+                            key={s}
+                            className="rounded bg-emerald-950/40 text-emerald-300 border border-emerald-800/60 px-1.5 py-0.5 text-[11px] font-mono"
+                          >
+                            ✓ {s}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-zinc-500 font-mono">No direct tech overlap detected</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Identified Gaps */}
+                  <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Identified Gaps ({matchAnalysis.missing_skills.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {matchAnalysis.missing_skills.length > 0 ? (
+                        matchAnalysis.missing_skills.map((s) => (
+                          <span
+                            key={s}
+                            className="rounded bg-amber-950/30 text-amber-300 border border-amber-800/50 px-1.5 py-0.5 text-[11px] font-mono"
+                          >
+                            ⚠️ {s}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-zinc-500 font-mono">Zero core skill gaps found</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Differentiating Strengths */}
+                  <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      Candidate Strengths ({matchAnalysis.differentiating_skills.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {matchAnalysis.differentiating_skills.length > 0 ? (
+                        matchAnalysis.differentiating_skills.map((s) => (
+                          <span
+                            key={s}
+                            className="rounded bg-indigo-950/30 text-indigo-300 border border-indigo-800/50 px-1.5 py-0.5 text-[11px] font-mono"
+                          >
+                            ⭐ {s}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-zinc-500 font-mono">Standard stack alignment</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Adaptive Strategy Alert */}
+                <div className="rounded-lg border border-zinc-700/80 bg-zinc-950 p-3 text-xs text-zinc-300 font-sans flex items-start gap-2.5 shadow-sm">
+                  <Compass className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-white block mb-0.5 font-mono text-[11px]">
+                      Adaptive Interview Calibration:
+                    </span>
+                    <p className="text-zinc-400 leading-relaxed text-xs">
+                      {matchAnalysis.adaptive_interview_strategy}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-4 text-xs text-zinc-400 flex items-center gap-3">
+                <Compass className="h-4 w-4 text-zinc-500 shrink-0" />
+                <span>
+                  {resumeAnalysis
+                    ? 'Target role selected. Paste a custom Job Description in Step 2 to generate tailored skill gaps and match percentages.'
+                    : 'Upload your resume in Step 1 to unlock live comparative alignment, skill gap detection, and adaptive strategy calibration.'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* STEP 4: TARGET SENIORITY LEVEL */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
             <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-4 flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" /> 3. Target Seniority Level
+              <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" /> Step 4: Target Seniority Level
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {SENIORITY_LEVELS.map((lvl) => {
@@ -865,7 +1125,230 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             </div>
           </div>
 
-          {/* STEP 4: INTERACTION & DURATION */}
+          {/* STEP 5: PREFERRED IMPLEMENTATION LANGUAGE */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 backdrop-blur-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                <Code2 className="h-3.5 w-3.5 text-zinc-400" />
+                Step 5: Preferred Implementation Language
+              </h2>
+              {detectedLanguages.length > 0 && (
+                <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-400">
+                  <span className="text-emerald-400 font-medium">⚡ Detected in profile:</span>
+                  <div className="flex items-center gap-1">
+                    {detectedLanguages.map((lang) => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => setPreferredLanguage(lang)}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                          preferredLanguage === lang
+                            ? 'border-emerald-500 bg-emerald-950/80 text-emerald-300'
+                            : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500'
+                        }`}
+                      >
+                        {lang}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Select your primary coding language. The Adaptive Interview Engine will frame implementation questions, concurrency models, and scratchpad presets in this language.
+            </p>
+
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2 pt-1">
+              {SUPPORTED_LANGUAGES.map((lang) => {
+                const isSelected = preferredLanguage === lang;
+                const isDetected = detectedLanguages.includes(lang);
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => setPreferredLanguage(lang)}
+                    className={`relative rounded-lg py-2 px-2.5 text-xs font-mono font-semibold border transition-all text-center ${
+                      isSelected
+                        ? 'border-emerald-500 bg-emerald-950/50 text-emerald-300 ring-1 ring-emerald-500/30 shadow-sm'
+                        : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span>{lang}</span>
+                    {isDetected && !isSelected && (
+                      <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-zinc-900" title="Detected in resume / JD" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* STEP 6: COMPANY INTERVIEW PERSONA */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-zinc-400" />
+                Step 6: Company Interview Persona &amp; Scale Calibration
+              </h2>
+              <span className="text-[11px] font-mono text-zinc-400">
+                Calibrates questioning depth, scale expectations &amp; trade-off focus
+              </span>
+            </div>
+
+            {/* Target Company Name Search & Intelligence Bar */}
+            <div className="rounded-lg bg-zinc-950/70 border border-zinc-800 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <label className="flex items-center gap-1.5 text-zinc-300 font-semibold">
+                  <Building2 className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Target Company Archetype (Optional):</span>
+                </label>
+                <span className="text-[10px] text-zinc-500">Auto-deduces company scale &amp; culture</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+                  <input
+                    type="text"
+                    value={targetCompany}
+                    onChange={(e) => setTargetCompany(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        runCompanyAnalysis(targetCompany);
+                      }
+                    }}
+                    placeholder="Enter company name (e.g. Stripe, Google, JPMorgan, Databricks, Citadel, or any startup)..."
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-9 pr-3 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 font-sans"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => runCompanyAnalysis(targetCompany)}
+                  disabled={isAnalyzingCompany || !targetCompany.trim()}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0 font-mono"
+                >
+                  {isAnalyzingCompany ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  <span>{isAnalyzingCompany ? 'Analyzing...' : 'Calibrate Company'}</span>
+                </button>
+              </div>
+
+              {/* Quick Company Presets */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] font-mono">
+                <span className="text-zinc-500 text-[10px]">Popular:</span>
+                {[
+                  { name: 'Stripe', persona: 'SCALE_UP' },
+                  { name: 'Google', persona: 'BIG_TECH' },
+                  { name: 'JPMorgan', persona: 'FINTECH' },
+                  { name: 'Databricks', persona: 'SCALE_UP' },
+                  { name: 'Citadel', persona: 'FINTECH' },
+                  { name: 'Netflix', persona: 'BIG_TECH' },
+                  { name: 'Airbnb', persona: 'SCALE_UP' },
+                ].map((item) => (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => {
+                      setTargetCompany(item.name);
+                      runCompanyAnalysis(item.name);
+                    }}
+                    className={`rounded px-2 py-0.5 text-[10px] border transition-colors ${
+                      targetCompany.toLowerCase() === item.name.toLowerCase()
+                        ? 'border-indigo-500 bg-indigo-950/70 text-indigo-300 font-semibold'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Auto-Calibration Intelligence Result Card */}
+            {companyAnalysisResult && (
+              <div className="rounded-xl border border-indigo-900/60 bg-indigo-950/20 p-4 space-y-2.5 font-mono text-xs shadow-sm animate-in fade-in duration-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-900/40 pb-2">
+                  <div className="flex items-center gap-2 text-indigo-300 font-semibold">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    <span>Auto-Calibrated for "{companyAnalysisResult.company_name}"</span>
+                    <span className="rounded bg-indigo-900/60 px-2 py-0.5 text-[10px] text-indigo-200 border border-indigo-800">
+                      {companyAnalysisResult.scale_tier}
+                    </span>
+                  </div>
+                  <div>
+                    {companyPersona === companyAnalysisResult.detected_persona ? (
+                      <span className="rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2.5 py-0.5 text-[10px] font-bold">
+                        ✓ Active Persona Calibrated
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/80 px-2.5 py-0.5 text-[10px] font-bold">
+                        Manual Override Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-zinc-300 text-xs font-sans leading-relaxed">
+                  {companyAnalysisResult.rationale}
+                </p>
+                {companyAnalysisResult.architectural_focus.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] text-zinc-500 font-mono">Key Architecture Focus:</span>
+                    {companyAnalysisResult.architectural_focus.map((f, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded bg-zinc-950 px-2 py-0.5 text-[10px] text-indigo-300 border border-zinc-800"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4 Persona Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {COMPANY_PERSONAS.map((p) => {
+                const isSelected = companyPersona === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setCompanyPersona(p.id);
+                    }}
+                    className={`text-left rounded-lg p-3.5 border transition-all ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-950/30 text-white ring-1 ring-indigo-500/30 shadow-sm'
+                        : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 hover:bg-zinc-900/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{p.icon}</span>
+                        <span className="font-semibold text-zinc-100 text-xs sm:text-sm">{p.title}</span>
+                      </div>
+                      <span className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] font-mono font-medium text-indigo-400 border border-zinc-800">
+                        {p.badge}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-zinc-300 leading-relaxed font-sans">{p.desc}</p>
+                    <div className="mt-2 text-[10px] font-mono text-zinc-400 flex items-center gap-1">
+                      <span className="text-indigo-400">Focus:</span>
+                      <span>{p.focus}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* STEP 7: INTERACTION & DURATION */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 backdrop-blur-sm">
               <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-3 flex items-center gap-1.5">
@@ -999,6 +1482,16 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     <span>Protocol:</span>
                     <span className="font-medium text-zinc-200">{mode}</span>
                   </div>
+                  <div className="flex justify-between text-zinc-400">
+                    <span>Code Language:</span>
+                    <span className="font-medium text-emerald-400">{preferredLanguage}</span>
+                  </div>
+                  {matchAnalysis && (
+                    <div className="flex justify-between text-zinc-400 pt-1 border-t border-zinc-800/60">
+                      <span>JD Alignment:</span>
+                      <span className="font-medium text-emerald-400">{matchAnalysis.match_score_pct}% Match</span>
+                    </div>
+                  )}
                 </div>
 
                 <button

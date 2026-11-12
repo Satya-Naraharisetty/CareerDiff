@@ -20,11 +20,15 @@ def test_security_fenced_prompt_and_canary() -> None:
 
 def test_technology_extraction() -> None:
     """Verify technical keyword detection with word boundaries."""
-    text = "Implemented high-throughput Kafka streaming pipeline with PostgreSQL and Docker."
+    text = "Implemented high-throughput Kafka streaming pipeline with PostgreSQL, Docker, Java, Go, Rust, and TypeScript."
     techs = extract_technologies_from_text(text)
     assert "Docker" in techs
     assert "Kafka" in techs
     assert "PostgreSQL" in techs
+    assert "Java" in techs
+    assert "Go" in techs
+    assert "Rust" in techs
+    assert "TypeScript" in techs
 
 
 def test_claim_extraction_provenance_invariant() -> None:

@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     JSON,
@@ -74,7 +74,7 @@ class AssessmentReport(Base):
     )
     model_used: Mapped[str] = mapped_column(
         String(100),
-        default="gemini-2.5-pro",
+        default="gemini-4-argon",
         nullable=False,
     )
     overall_score: Mapped[float | None] = mapped_column(
@@ -99,6 +99,22 @@ class AssessmentReport(Base):
         JSON,
         default=list,
         nullable=False,
+    )
+    ats_score: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    ats_breakdown: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    communication_score: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    communication_breakdown: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON,
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

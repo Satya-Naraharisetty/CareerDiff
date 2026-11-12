@@ -87,6 +87,12 @@ class Settings(BaseModel):
     s3_secret_key: str = Field(default_factory=lambda: os.getenv("S3_SECRET_KEY", "minioadmin"))
 
     gemini_api_key: str | None = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY") or None)
+    gemini_turn_model: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_TURN_MODEL", "gemini-3.8-flash")
+    )
+    gemini_eval_model: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_EVAL_MODEL", "gemini-4-argon")
+    )
     deepgram_api_key: str | None = Field(
         default_factory=lambda: os.getenv("DEEPGRAM_API_KEY") or None
     )

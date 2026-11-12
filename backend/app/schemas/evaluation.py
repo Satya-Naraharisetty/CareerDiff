@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -101,6 +102,10 @@ class AssessmentReportRead(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     knowledge_gaps: list[str] = Field(default_factory=list)
     study_recommendations: list[str] = Field(default_factory=list)
+    ats_score: int | None = None
+    ats_breakdown: dict[str, Any] | None = None
+    communication_score: int | None = None
+    communication_breakdown: dict[str, Any] | None = None
     competency_scores: list[CompetencyScoreRead] = Field(default_factory=list)
     claim_verifications: list[ClaimVerificationRead] = Field(default_factory=list)
     created_at: datetime

@@ -8,9 +8,22 @@ from pydantic import BaseModel, Field
 # Known common technical keywords for automatic skill association
 KNOWN_TECHNOLOGIES = [
     "Python",
+    "Java",
+    "TypeScript",
+    "JavaScript",
+    "Go",
+    "Golang",
+    "Rust",
+    "C++",
+    "C#",
+    "Kotlin",
+    "Swift",
+    "Scala",
+    "SQL",
     "FastAPI",
     "Django",
     "Flask",
+    "Spring Boot",
     "PostgreSQL",
     "Postgres",
     "Redis",
@@ -21,7 +34,6 @@ KNOWN_TECHNOLOGIES = [
     "AWS",
     "GCP",
     "Azure",
-    "TypeScript",
     "React",
     "Node.js",
     "GraphQL",
@@ -40,6 +52,45 @@ KNOWN_TECHNOLOGIES = [
     "OAuth",
     "JWT",
 ]
+
+# Canonical synonym mapping to bridge lexical ATS variations (e.g. k8s -> Kubernetes, postgres -> PostgreSQL)
+TECH_SYNONYMS: dict[str, str] = {
+    "golang": "Go",
+    "go": "Go",
+    "k8s": "Kubernetes",
+    "kubernetes": "Kubernetes",
+    "postgres": "PostgreSQL",
+    "postgresql": "PostgreSQL",
+    "psql": "PostgreSQL",
+    "ts": "TypeScript",
+    "typescript": "TypeScript",
+    "js": "JavaScript",
+    "javascript": "JavaScript",
+    "react": "React",
+    "react.js": "React",
+    "reactjs": "React",
+    "next.js": "Next.js",
+    "nextjs": "Next.js",
+    "node": "Node.js",
+    "node.js": "Node.js",
+    "nodejs": "Node.js",
+    "gcp": "GCP",
+    "google cloud": "GCP",
+    "aws": "AWS",
+    "amazon web services": "AWS",
+    "kinesis": "AWS Kinesis",
+    "aws kinesis": "AWS Kinesis",
+    "kafka": "Kafka",
+    "apache kafka": "Kafka",
+    "spring": "Spring Boot",
+    "spring boot": "Spring Boot",
+}
+
+
+def normalize_technology(tech_name: str) -> str:
+    """Normalize a technical alias or variation to its canonical industry standard term."""
+    cleaned = tech_name.strip().lower()
+    return TECH_SYNONYMS.get(cleaned, tech_name.strip())
 
 
 class ExtractedClaimData(BaseModel):
@@ -91,12 +142,16 @@ def detect_section_header(line: str) -> str | None:
 
 
 def extract_technologies_from_text(text: str) -> list[str]:
-    """Find mentioned technologies in claim text using case-insensitive word boundaries."""
+    """Find mentioned technologies in claim text using case-insensitive word boundaries and canonical normalization."""
     found: set[str] = set()
     for tech in KNOWN_TECHNOLOGIES:
         pattern = r"\b" + re.escape(tech) + r"\b"
         if re.search(pattern, text, re.IGNORECASE):
-            found.add(tech)
+            found.add(normalize_technology(tech))
+    for alias, canonical in TECH_SYNONYMS.items():
+        pattern = r"\b" + re.escape(alias) + r"\b"
+        if re.search(pattern, text, re.IGNORECASE):
+            found.add(canonical)
     return sorted(list(found))
 
 

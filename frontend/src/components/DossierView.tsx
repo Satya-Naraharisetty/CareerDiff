@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   Check,
   CheckCircle2,
@@ -10,23 +11,67 @@ import {
   Download,
   FileText,
   Loader2,
+  Mic,
   RotateCcw,
+  ShieldCheck,
+  Sparkles,
   TrendingUp,
+  X,
   Zap,
 } from 'lucide-react';
 import { interviewsApi } from '../lib/api';
 import { useInterviewStore } from '../stores/interviewStore';
 import type {
   AssessmentReportRead,
+  AtsBreakdown,
   ClaimVerificationRead,
   ClaimVerificationStatus,
+  CommunicationBreakdown,
   CompetencyScoreRead,
   EvidenceType,
+  TurnRetakeResponse,
 } from '../types';
 
 interface DossierViewProps {
   onReset: () => void;
 }
+
+const RationaleCoachingView: React.FC<{ rationale: string }> = ({ rationale }) => {
+  const parts = rationale.split('\n\n');
+  const basePart = parts[0] || rationale;
+  const modelPart = parts.find((p) => p.includes('Staff-Level Model Answer'));
+  const levelUpPart = parts.find((p) => p.includes('How to Level Up'));
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-zinc-300 leading-relaxed font-sans">{basePart}</p>
+
+      {modelPart && (
+        <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3 text-xs font-mono space-y-1 shadow-sm">
+          <div className="flex items-center gap-1.5 font-semibold text-emerald-400 text-[11px] tracking-wide">
+            <Zap className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Staff-Level Model Answer</span>
+          </div>
+          <p className="text-zinc-300 text-xs leading-relaxed font-sans pl-5">
+            {modelPart.replace(/🎯\s*\*\*Staff-Level Model Answer\*\*:\s*/, '')}
+          </p>
+        </div>
+      )}
+
+      {levelUpPart && (
+        <div className="rounded-lg border border-indigo-900/60 bg-indigo-950/20 p-3 text-xs font-mono space-y-1 shadow-sm">
+          <div className="flex items-center gap-1.5 font-semibold text-indigo-400 text-[11px] tracking-wide">
+            <TrendingUp className="h-3.5 w-3.5 text-indigo-400" />
+            <span>How to Level Up to Tier 4</span>
+          </div>
+          <p className="text-zinc-300 text-xs leading-relaxed font-sans pl-5">
+            {levelUpPart.replace(/💡\s*\*\*How to Level Up to Tier 4\*\*:\s*/, '')}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ScoreRingGauge: React.FC<{ score: number; maxScore?: number; tier: string }> = ({
   score,
@@ -87,6 +132,568 @@ const ScoreRingGauge: React.FC<{ score: number; maxScore?: number; tier: string 
   );
 };
 
+const AtsScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
+  const size = 110;
+  const strokeWidth = 7;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const normalizedScore = Math.min(100, Math.max(0, score));
+  const progressPercent = normalizedScore / 100;
+  const strokeDashoffset = circumference - progressPercent * circumference;
+
+  const tier =
+    normalizedScore >= 80
+      ? 'Strong Match'
+      : normalizedScore >= 65
+      ? 'Moderate Match'
+      : 'Needs Work';
+
+  const strokeColor =
+    normalizedScore >= 80 ? '#34d399' : normalizedScore >= 65 ? '#fbbf24' : '#f87171';
+
+  return (
+    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 min-w-[160px] font-mono shadow-sm">
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="rotate-[-90deg]">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke="#27272a"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
+            {Math.round(score)}
+          </span>
+          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ 100 ATS</span>
+        </div>
+      </div>
+
+      <div className="mt-2 text-center">
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-semibold border ${
+            normalizedScore >= 80
+              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/40'
+              : normalizedScore >= 65
+              ? 'bg-amber-950/60 text-amber-400 border-amber-800/40'
+              : 'bg-rose-950/60 text-rose-400 border-rose-800/40'
+          }`}
+        >
+          {tier}
+        </span>
+        <span className="block text-[10px] text-zinc-500 mt-1">JD Alignment</span>
+      </div>
+    </div>
+  );
+};
+
+const CommunicationScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
+  const size = 110;
+  const strokeWidth = 7;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const normalizedScore = Math.min(100, Math.max(0, score));
+  const progressPercent = normalizedScore / 100;
+  const strokeDashoffset = circumference - progressPercent * circumference;
+
+  const tier =
+    normalizedScore >= 85
+      ? 'Articulate'
+      : normalizedScore >= 70
+      ? 'Clear & Direct'
+      : 'Developing';
+
+  const strokeColor =
+    normalizedScore >= 85 ? '#38bdf8' : normalizedScore >= 70 ? '#818cf8' : '#fbbf24';
+
+  return (
+    <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 min-w-[160px] font-mono shadow-sm">
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="rotate-[-90deg]">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke="#27272a"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
+            {Math.round(score)}
+          </span>
+          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ 100 COMMS</span>
+        </div>
+      </div>
+
+      <div className="mt-2 text-center">
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-semibold border ${
+            normalizedScore >= 85
+              ? 'bg-sky-950/60 text-sky-400 border-sky-800/40'
+              : normalizedScore >= 70
+              ? 'bg-indigo-950/60 text-indigo-400 border-indigo-800/40'
+              : 'bg-amber-950/60 text-amber-400 border-amber-800/40'
+          }`}
+        >
+          {tier}
+        </span>
+        <span className="block text-[10px] text-zinc-500 mt-1">Verbal Delivery</span>
+      </div>
+    </div>
+  );
+};
+
+const CommunicationDeliveryCard: React.FC<{
+  breakdown: CommunicationBreakdown;
+  commScore: number;
+}> = ({ breakdown, commScore }) => {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 shadow-sm backdrop-blur-md space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800 pb-3">
+        <div className="flex items-center gap-2">
+          <Mic className="h-4 w-4 text-sky-400" />
+          <h2 className="text-sm sm:text-base font-bold text-white font-sans">
+            Objective Verbal Delivery &amp; Technical Communication
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-950 border border-zinc-800 px-2.5 py-0.5 text-[11px] font-mono text-zinc-400">
+            <ShieldCheck className="h-3 w-3 text-emerald-400" />
+            Zero-Biometrics (NYC LL144 &amp; EU AI Act Compliant)
+          </span>
+          <span className="rounded-full bg-sky-950/70 border border-sky-800/80 px-3 py-1 text-xs font-mono font-bold text-sky-400">
+            {commScore} / 100 Verbal Score
+          </span>
+        </div>
+      </div>
+
+      {/* 4 Delivery Dimensions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-400 text-[11px]">Speech Rate</span>
+            <span className="text-sky-400 font-bold">{breakdown.speaking_rate_wpm} WPM</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+            <span>Ideal: 120–165 WPM</span>
+            <span className="text-emerald-400 font-medium">{breakdown.pacing_grade}</span>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-400 text-[11px]">Response Latency</span>
+            <span className="text-sky-400 font-bold">{breakdown.avg_response_latency_sec}s avg</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+            <span>Ideal: 1.0–3.0s</span>
+            <span className="text-emerald-400 font-medium">Deliberate</span>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-400 text-[11px]">Filler Word Density</span>
+            <span className="text-sky-400 font-bold">{breakdown.filler_word_percentage}%</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+            <span>{breakdown.filler_words_count} fillers found</span>
+            <span className="text-zinc-400">&lt; 3% optimal</span>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-zinc-400 text-[11px]">Monologue Risk</span>
+            <span className="text-sky-400 font-bold">{breakdown.monologue_risk}</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+            <span>Max turn: {breakdown.longest_turn_sec}s</span>
+            <span>Total: {breakdown.total_speaking_time_sec}s</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Actionable Delivery Feedback */}
+      {breakdown.delivery_feedback.length > 0 && (
+        <div className="rounded-lg border border-sky-900/60 bg-sky-950/20 p-4 space-y-2 shadow-sm font-sans">
+          <div className="flex items-center gap-2 font-mono text-xs font-semibold text-sky-400 uppercase tracking-wide">
+            <Sparkles className="h-4 w-4 text-sky-400" />
+            <span>Verbal Pacing &amp; Delivery Coaching</span>
+          </div>
+          <ul className="space-y-1.5 text-xs text-zinc-300 pl-6 list-disc">
+            {breakdown.delivery_feedback.map((item, idx) => (
+              <li key={idx} className="leading-relaxed">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TurnRetakeModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  interviewId: string;
+  turnIndex: number;
+  originalExcerpt: string;
+  competencyName: string;
+}> = ({ isOpen, onClose, interviewId, turnIndex, originalExcerpt, competencyName }) => {
+  const [newTranscript, setNewTranscript] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<TurnRetakeResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleSubmitRetake = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTranscript.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await interviewsApi.retakeTurn(interviewId, {
+        turn_index: turnIndex,
+        new_transcript: newTranscript.trim(),
+      });
+      setResult(res);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Turn re-take evaluation failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-5 w-5 text-amber-400" />
+            <div>
+              <h2 className="text-base font-bold text-white font-sans">
+                Flight Recorder Turn Re-take (Turn #{turnIndex})
+              </h2>
+              <span className="text-xs text-zinc-400 font-mono">
+                Target Competency: <span className="text-emerald-400 font-semibold">{competencyName}</span>
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Original Weakness Excerpt */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2 font-mono text-xs">
+          <div className="flex items-center justify-between text-zinc-400">
+            <span className="font-semibold text-amber-400">Recorded Answer Excerpt:</span>
+            <span className="text-[10px] text-zinc-500">Historical Turn #{turnIndex}</span>
+          </div>
+          <p className="text-zinc-300 italic bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
+            "{originalExcerpt}"
+          </p>
+        </div>
+
+        {!result ? (
+          <form onSubmit={handleSubmitRetake} className="space-y-4 font-sans">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 font-mono mb-1.5">
+                Draft Upgraded Response (Senior/Staff Level):
+              </label>
+              <textarea
+                value={newTranscript}
+                onChange={(e) => setNewTranscript(e.target.value)}
+                placeholder="State your technical trade-offs immediately (e.g. latency vs consistency), propose explicit patterns (Transactional Outbox, Redlock, idempotent consumer), and explain edge-case failure recovery..."
+                rows={5}
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3.5 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 font-sans leading-relaxed resize-none"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-rose-900/50 bg-rose-950/30 p-3 text-xs text-rose-300 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !newTranscript.trim()}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-4 py-2 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                <span>{isSubmitting ? 'Evaluating Re-take...' : 'Submit Re-take for Instant Rescore'}</span>
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4 font-sans animate-in fade-in duration-300">
+            {/* Score Delta Card */}
+            <div className="rounded-xl border border-emerald-900/60 bg-emerald-950/20 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <h3 className="text-sm font-bold text-white font-mono">Re-take Rescoring Completed</h3>
+                </div>
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="text-xs text-zinc-400">{result.previous_estimated_score.toFixed(1)} / 4.0</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-zinc-500" />
+                  <span className="rounded bg-emerald-950 border border-emerald-800 px-2 py-0.5 text-xs font-bold text-emerald-400">
+                    {result.new_score.toFixed(1)} / 4.0
+                  </span>
+                  <span className="rounded-full bg-emerald-500 text-zinc-950 font-bold px-2 py-0.5 text-[11px]">
+                    {result.score_delta >= 0 ? '+' : ''}{result.score_delta.toFixed(1)} Delta
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-emerald-300 font-mono font-medium">
+                Upgraded Classification: <span className="underline">{result.improved_tier}</span>
+              </div>
+
+              <p className="text-xs text-zinc-300 leading-relaxed font-sans pt-1">
+                {result.coaching_feedback}
+              </p>
+
+              {result.key_strengths_improved.length > 0 && (
+                <div className="pt-2 border-t border-emerald-900/40">
+                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 block mb-1">
+                    Demonstrated Improvements:
+                  </span>
+                  <ul className="space-y-1 text-xs text-zinc-300 pl-4 list-disc">
+                    {result.key_strengths_improved.map((s, idx) => (
+                      <li key={idx}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Staff Model Answer Benchmark */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-2 font-mono text-xs">
+              <div className="flex items-center gap-2 font-semibold text-indigo-400">
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Staff Engineer Gold-Standard Benchmark:</span>
+              </div>
+              <p className="text-zinc-300 text-xs leading-relaxed font-sans pl-5">
+                {result.staff_model_answer}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setResult(null);
+                  setNewTranscript('');
+                }}
+                className="rounded-lg px-3 py-1.5 text-xs font-mono font-medium text-zinc-400 hover:text-white hover:bg-zinc-800"
+              >
+                Try Another Re-take
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg bg-white px-4 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 shadow-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
+  breakdown,
+  atsScore,
+}) => {
+  return (
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 shadow-sm backdrop-blur-md space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800 pb-3">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-emerald-400" />
+          <h2 className="text-sm sm:text-base font-bold text-white font-sans">
+            ATS Resume vs. Job Description Compatibility Audit
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-emerald-950/70 border border-emerald-800/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
+            {atsScore} / 100 ATS Score
+          </span>
+        </div>
+      </div>
+
+      {/* 4 Dimension Progress Bars */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-400 text-[11px]">Keyword Density</span>
+            <span className="text-emerald-400 font-bold">{breakdown.keyword_score}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              style={{ width: `${breakdown.keyword_score}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-400 text-[11px]">Experience &amp; Seniority</span>
+            <span className="text-emerald-400 font-bold">{breakdown.experience_score}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              style={{ width: `${breakdown.experience_score}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-400 text-[11px]">Quantified Impact</span>
+            <span className="text-emerald-400 font-bold">{breakdown.quantified_impact_score}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              style={{ width: `${breakdown.quantified_impact_score}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-400 text-[11px]">Section Formatting</span>
+            <span className="text-emerald-400 font-bold">{breakdown.section_structure_score}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              style={{ width: `${breakdown.section_structure_score}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Keywords Breakdown */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Matched Keywords */}
+        <div className="rounded-lg bg-zinc-950/80 border border-zinc-800 p-3.5 space-y-2">
+          <span className="text-xs font-mono font-semibold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Matched ATS Keywords ({breakdown.matched_keywords.length})
+          </span>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {breakdown.matched_keywords.map((kw) => (
+              <span
+                key={kw}
+                className="rounded bg-emerald-950/40 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 text-xs font-mono"
+              >
+                ✓ {kw}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Missing Keywords */}
+        <div className="rounded-lg bg-zinc-950/80 border border-zinc-800 p-3.5 space-y-2">
+          <span className="text-xs font-mono font-semibold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Missing Critical Keywords ({breakdown.missing_critical_keywords.length})
+          </span>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {breakdown.missing_critical_keywords.length > 0 ? (
+              breakdown.missing_critical_keywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="rounded bg-amber-950/30 text-amber-300 border border-amber-800/50 px-2 py-0.5 text-xs font-mono"
+                >
+                  ⚠️ {kw}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-zinc-500 font-mono">
+                Zero critical keywords missing for this Job Description!
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Actionable Optimization Tips */}
+      {breakdown.optimization_tips.length > 0 && (
+        <div className="rounded-lg border border-indigo-900/60 bg-indigo-950/20 p-4 space-y-2 shadow-sm font-sans">
+          <div className="flex items-center gap-2 font-mono text-xs font-semibold text-indigo-400 uppercase tracking-wide">
+            <Zap className="h-4 w-4 text-indigo-400" />
+            <span>ATS Resume Optimization Advice</span>
+          </div>
+          <ul className="space-y-1.5 text-xs text-zinc-300 pl-6 list-disc">
+            {breakdown.optimization_tips.map((tip, idx) => (
+              <li key={idx} className="leading-relaxed">
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CompetencyLevelMeter: React.FC<{ score: number | null }> = ({ score }) => {
   const currentLevel = score ?? 1;
   const levels = [
@@ -130,6 +737,17 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   const [error, setError] = useState<string | null>(null);
   const [expandedCompId, setExpandedCompId] = useState<string | null>(null);
   const [copiedExcerptId, setCopiedExcerptId] = useState<string | null>(null);
+  const [retakeModalState, setRetakeModalState] = useState<{
+    isOpen: boolean;
+    turnIndex: number;
+    originalExcerpt: string;
+    competencyName: string;
+  }>({
+    isOpen: false,
+    turnIndex: 0,
+    originalExcerpt: '',
+    competencyName: '',
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -355,10 +973,34 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             </div>
           </div>
 
-          {/* Circular Score Ring Gauge */}
-          <ScoreRingGauge score={overallRating} tier={ratingTier} />
+          {/* Circular Score Ring Gauges: Interview Rubric, ATS JD Match, and Verbal Delivery */}
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <ScoreRingGauge score={overallRating} tier={ratingTier} />
+            {report.ats_score !== undefined && report.ats_score !== null && (
+              <AtsScoreRingGauge score={report.ats_score} />
+            )}
+            {report.communication_score !== undefined && report.communication_score !== null && (
+              <CommunicationScoreRingGauge score={report.communication_score} />
+            )}
+          </div>
         </div>
       </div>
+
+      {/* ATS Compatibility & Optimization Section */}
+      {report.ats_breakdown && (
+        <AtsAuditCard
+          breakdown={report.ats_breakdown}
+          atsScore={report.ats_score ?? 85}
+        />
+      )}
+
+      {/* Verbal Delivery & Communication Analysis Section */}
+      {report.communication_breakdown && (
+        <CommunicationDeliveryCard
+          breakdown={report.communication_breakdown}
+          commScore={report.communication_score ?? 85}
+        />
+      )}
 
       {/* Middle Grid: Radar Chart + Strengths & Gaps */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -478,7 +1120,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                 {/* Expanded Verbatim Citations */}
                 {isExpanded && (
                   <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3 animate-in fade-in duration-200">
-                    <p className="text-xs text-zinc-300 leading-relaxed font-sans">{cs.rationale}</p>
+                    <RationaleCoachingView rationale={cs.rationale} />
 
                     <div className="space-y-2">
                       <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
@@ -496,9 +1138,26 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                                 Turn #{ev.turn_index} [Offset {ev.start_char_offset}:{ev.end_char_offset}]
                               </span>
                             </div>
-                            <span className="text-[10px] text-zinc-500">
-                              Confidence: {Math.round(ev.confidence * 100)}%
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRetakeModalState({
+                                    isOpen: true,
+                                    turnIndex: ev.turn_index,
+                                    originalExcerpt: ev.transcript_excerpt,
+                                    competencyName: cs.competency_name,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80 px-2.5 py-1 text-[11px] font-mono font-medium transition-all active:scale-[0.98] shadow-sm"
+                              >
+                                <RotateCcw className="h-3 w-3 text-amber-400" />
+                                <span>Re-take Turn #{ev.turn_index}</span>
+                              </button>
+                              <span className="text-[10px] text-zinc-500">
+                                Confidence: {Math.round(ev.confidence * 100)}%
+                              </span>
+                            </div>
                           </div>
 
                           <div className="relative group rounded bg-zinc-900 p-2.5 pr-8 border border-zinc-800 text-xs text-zinc-200 italic font-mono">
@@ -597,6 +1256,18 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
           <RotateCcw className="h-3.5 w-3.5" /> Start Another Technical Practice Session
         </button>
       </div>
+
+      {/* Flight Recorder Turn Re-take Modal */}
+      {report && (
+        <TurnRetakeModal
+          isOpen={retakeModalState.isOpen}
+          onClose={() => setRetakeModalState((prev) => ({ ...prev, isOpen: false }))}
+          interviewId={report.interview_id}
+          turnIndex={retakeModalState.turnIndex}
+          originalExcerpt={retakeModalState.originalExcerpt}
+          competencyName={retakeModalState.competencyName}
+        />
+      )}
     </div>
   );
 };
