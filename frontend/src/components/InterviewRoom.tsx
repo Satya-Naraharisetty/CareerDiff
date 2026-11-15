@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Bot,
@@ -9,8 +9,6 @@ import {
   Hand,
   Layers,
   Loader2,
-  Mic,
-  MicOff,
   Network,
   Play,
   Send,
@@ -19,9 +17,12 @@ import {
   Video,
   VideoOff,
   Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import { useInterviewStore } from '../stores/interviewStore';
+import { BrowserSpeechSynthesizer } from '../lib/speechSynthesis';
+import { registerActiveStream, stopAllMediaHardware } from '../lib/audio';
 
 interface InterviewRoomProps {
   onConclude: () => void;
@@ -546,6 +547,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     initVoiceSession,
     startVoiceRecording,
     stopVoiceRecording,
+    disconnectVoiceSession,
     bargeIn,
     concludeSession,
   } = useInterviewStore();
@@ -562,8 +564,41 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [showCamera, setShowCamera] = useState<boolean>(true);
   const [isRoomCameraActive, setIsRoomCameraActive] = useState<boolean>(false);
   const [showTextFallbackInVoice, setShowTextFallbackInVoice] = useState<boolean>(false);
+  // Real-time typewriter and synchronized interviewer speech state
+  const [typingTurnIndex, setTypingTurnIndex] = useState<number | null>(null);
+  const [typedText, setTypedText] = useState<string>('');
+  const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('');
+
+  useEffect(() => {
+    const updateVoices = () => {
+      const list = BrowserSpeechSynthesizer.getAvailableVoices();
+      setAvailableVoices(list);
+      const best = BrowserSpeechSynthesizer.getBestVoice();
+      if (best) setSelectedVoice(best.name);
+    };
+    updateVoices();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, []);
+  const lastSpokenTurnRef = useRef<number | null>(null);
+  const activeSynthesizerCancelRef = useRef<(() => void) | null>(null);
   const roomVideoRef = useRef<HTMLVideoElement | null>(null);
   const roomStreamRef = useRef<MediaStream | null>(null);
+
+  const setRoomVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    roomVideoRef.current = node;
+    if (node && roomStreamRef.current) {
+      if (node.srcObject !== roomStreamRef.current) {
+        node.srcObject = roomStreamRef.current;
+      }
+      node.play().catch((err) => {
+        console.warn('Interview room camera play failed:', err);
+      });
+    }
+  }, []);
 
   const activeTemplates = React.useMemo(
     () => getLanguageTemplates(preferredLanguage || 'Python'),
@@ -641,13 +676,45 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     setIsRunningCode(false);
   };
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnsCountRef = useRef(turns.length);
+  const isInitialMountRef = useRef(true);
   const hasStartedRef = useRef(false);
   const hasVoiceInitedRef = useRef(false);
 
-  // Auto-scroll on turns or partial text updates
+  // Guarantee window stays anchored at top when opening interview room
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, []);
+
+  // Confine auto-scrolling to internal chat container on new turns or speech updates (without scrolling the page)
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      turnsCountRef.current = turns.length;
+      return;
+    }
+
+    if (turns.length > turnsCountRef.current || partialTranscript || isInterviewerSpeaking) {
+      turnsCountRef.current = turns.length;
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
+    }
   }, [turns, partialTranscript, isInterviewerSpeaking]);
+
+  // Keep latest words visible within the chat container during real-time typewriter playback
+  useEffect(() => {
+    if (!typingTurnIndex || !chatContainerRef.current) return;
+    const container = chatContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    if (isNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [typedText, typingTurnIndex]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -665,15 +732,22 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   useEffect(() => {
     let active = true;
     if (showCamera) {
+      const preferredVideoId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_preferred_video_device') : null;
       navigator.mediaDevices
         ?.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 360 },
+            facingMode: 'user',
+            ...(preferredVideoId ? { deviceId: { ideal: preferredVideoId } } : {}),
+          },
         })
         .then((stream) => {
           if (!active) {
             stream.getTracks().forEach((t) => t.stop());
             return;
           }
+          registerActiveStream(stream);
           roomStreamRef.current = stream;
           setIsRoomCameraActive(true);
           if (roomVideoRef.current) {
@@ -696,21 +770,146 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         roomStreamRef.current.getTracks().forEach((track) => track.stop());
         roomStreamRef.current = null;
       }
+      if (roomVideoRef.current) {
+        roomVideoRef.current.pause();
+        roomVideoRef.current.srcObject = null;
+      }
     };
   }, [showCamera]);
+
+  // Synchronize stream to video DOM element whenever camera is active
+  useEffect(() => {
+    if (roomVideoRef.current && roomStreamRef.current && isRoomCameraActive) {
+      if (roomVideoRef.current.srcObject !== roomStreamRef.current) {
+        roomVideoRef.current.srcObject = roomStreamRef.current;
+      }
+      roomVideoRef.current.play().catch(() => {});
+    }
+  }, [isRoomCameraActive]);
+
+  // Synchronized real-time speech synthesis and typewriter effect for interviewer questions
+  useEffect(() => {
+    if (turns.length === 0) return;
+    const latestTurn = turns[turns.length - 1];
+
+    if (
+      latestTurn.speaker === 'INTERVIEWER' &&
+      latestTurn.turn_index !== lastSpokenTurnRef.current
+    ) {
+      lastSpokenTurnRef.current = latestTurn.turn_index;
+      setTypingTurnIndex(latestTurn.turn_index);
+      setTypedText('');
+
+      if (activeSynthesizerCancelRef.current) {
+        activeSynthesizerCancelRef.current();
+        activeSynthesizerCancelRef.current = null;
+      }
+
+      useInterviewStore.setState({ isInterviewerSpeaking: true });
+
+      const onTypingProgress = (current: string) => {
+        setTypedText(current);
+      };
+
+      const onEnd = () => {
+        setTypingTurnIndex(null);
+        useInterviewStore.setState({ isInterviewerSpeaking: false });
+        activeSynthesizerCancelRef.current = null;
+        // As soon as the question completes, automatically activate candidate microphone in voice mode
+        if (mode === 'VOICE' && wsStatus === 'connected') {
+          startVoiceRecording().catch(() => {});
+        }
+      };
+
+      if (isVoiceMuted) {
+        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.fallbackTypewriter(
+          latestTurn.transcript,
+          { onTypingProgress, onEnd }
+        );
+      } else {
+        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
+          latestTurn.transcript,
+          {
+            rate: 0.96,
+            pitch: 1.0,
+            onTypingProgress,
+            onEnd,
+            onError: onEnd,
+          }
+        );
+      }
+    }
+  }, [turns, isVoiceMuted, mode, wsStatus, startVoiceRecording]);
+
+  // Cleanup speech synthesis on unmount
+  useEffect(() => {
+    return () => {
+      BrowserSpeechSynthesizer.stop();
+      if (activeSynthesizerCancelRef.current) {
+        activeSynthesizerCancelRef.current();
+        activeSynthesizerCancelRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleBargeIn = useCallback(() => {
+    BrowserSpeechSynthesizer.stop();
+    if (activeSynthesizerCancelRef.current) {
+      activeSynthesizerCancelRef.current();
+      activeSynthesizerCancelRef.current = null;
+    }
+    setTypingTurnIndex(null);
+    bargeIn();
+    if (mode === 'VOICE' && wsStatus === 'connected') {
+      startVoiceRecording().catch(() => {});
+    }
+  }, [bargeIn, mode, wsStatus, startVoiceRecording]);
+
+  const handleDoneSpeaking = useCallback(() => {
+    stopVoiceRecording();
+  }, [stopVoiceRecording]);
+
+  const cleanupHardwareMedia = useCallback(() => {
+    // 1. Immediately terminate all video/webcam tracks and release video DOM sink
+    if (roomStreamRef.current) {
+      roomStreamRef.current.getTracks().forEach((track) => track.stop());
+      roomStreamRef.current = null;
+    }
+    if (roomVideoRef.current) {
+      roomVideoRef.current.pause();
+      roomVideoRef.current.srcObject = null;
+    }
+
+    // 2. Terminate speech synthesizer
+    BrowserSpeechSynthesizer.stop();
+    if (activeSynthesizerCancelRef.current) {
+      activeSynthesizerCancelRef.current();
+      activeSynthesizerCancelRef.current = null;
+    }
+
+    // 3. Stop candidate microphone recording and disconnect voice session
+    stopVoiceRecording();
+    disconnectVoiceSession();
+
+    // 4. Global hardware sweep
+    stopAllMediaHardware();
+  }, [stopVoiceRecording, disconnectVoiceSession]);
 
   // Cleanup on unmount: guarantee hardware microphone and camera are stopped when leaving room
   useEffect(() => {
     return () => {
-      stopVoiceRecording();
-      if (roomStreamRef.current) {
-        roomStreamRef.current.getTracks().forEach((track) => track.stop());
-        roomStreamRef.current = null;
-      }
+      cleanupHardwareMedia();
     };
-  }, [stopVoiceRecording]);
+  }, [cleanupHardwareMedia]);
 
-  // Global ergonomics keyboard listeners (Space = Mic, Esc = Barge-In, S = Scratchpad)
+  // Immediate hardware teardown when session state reaches COMPLETED
+  useEffect(() => {
+    if (sessionState === 'COMPLETED') {
+      cleanupHardwareMedia();
+    }
+  }, [sessionState, cleanupHardwareMedia]);
+
+  // Global ergonomics keyboard listeners (Esc = Barge-In, Enter = Done Speaking, S = Scratchpad)
   useEffect(() => {
     const handleRoomKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -718,16 +917,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         return;
       }
 
-      if (e.code === 'Space' && mode === 'VOICE' && wsStatus === 'connected') {
+      if (e.key === 'Escape') {
         e.preventDefault();
-        if (isRecording) {
-          stopVoiceRecording();
-        } else {
-          startVoiceRecording();
-        }
-      } else if (e.key === 'Escape') {
+        handleBargeIn();
+      } else if (e.key === 'Enter' && mode === 'VOICE' && isRecording && !showTextFallbackInVoice) {
         e.preventDefault();
-        bargeIn();
+        handleDoneSpeaking();
       } else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setShowScratchpad((prev) => !prev);
@@ -736,11 +931,18 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
     window.addEventListener('keydown', handleRoomKeyDown);
     return () => window.removeEventListener('keydown', handleRoomKeyDown);
-  }, [mode, wsStatus, isRecording, stopVoiceRecording, startVoiceRecording, bargeIn]);
+  }, [mode, isRecording, showTextFallbackInVoice, handleDoneSpeaking, handleBargeIn]);
 
   const handleSendText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!textInput.trim() || isSubmitting) return;
+
+    BrowserSpeechSynthesizer.stop();
+    if (activeSynthesizerCancelRef.current) {
+      activeSynthesizerCancelRef.current();
+      activeSynthesizerCancelRef.current = null;
+    }
+    setTypingTurnIndex(null);
 
     const msg = textInput;
     let snippet: string | undefined = undefined;
@@ -759,10 +961,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   };
 
   const handleConclude = async () => {
-    const taskId = await concludeSession();
-    if (taskId !== null) {
-      onConclude();
-    }
+    setIsRoomCameraActive(false);
+    cleanupHardwareMedia();
+    await concludeSession();
+    onConclude();
   };
 
   const formatTimer = (seconds: number) => {
@@ -855,6 +1057,58 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               <span className="hidden sm:inline">Camera</span>
             </button>
 
+            {/* Interviewer Audio Output Voice Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsVoiceMuted((prev) => {
+                  if (!prev) {
+                    BrowserSpeechSynthesizer.stop();
+                    if (activeSynthesizerCancelRef.current) {
+                      activeSynthesizerCancelRef.current();
+                      activeSynthesizerCancelRef.current = null;
+                    }
+                  }
+                  return !prev;
+                });
+              }}
+              title={isVoiceMuted ? 'Unmute Interviewer Speech Voice' : 'Mute Interviewer Speech Voice'}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
+                !isVoiceMuted
+                  ? 'border-emerald-700/80 bg-emerald-950/40 text-emerald-300 shadow-sm'
+                  : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+              }`}
+            >
+              {!isVoiceMuted ? (
+                <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <VolumeX className="h-3.5 w-3.5 text-zinc-500" />
+              )}
+              <span className="hidden sm:inline">{!isVoiceMuted ? 'Voice' : 'Muted'}</span>
+            </button>
+
+            {/* High-Fidelity Natural Voice Selector */}
+            {availableVoices.length > 0 && !isVoiceMuted && (
+              <select
+                value={selectedVoice}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedVoice(v);
+                  if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('careerdiff_interviewer_voice', v);
+                  }
+                }}
+                title="Select Interviewer Natural Voice"
+                className="hidden xl:inline-block rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-[11px] font-mono text-zinc-300 focus:outline-none focus:border-zinc-600 max-w-[140px] truncate"
+              >
+                {availableVoices.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {v.name.replace(/(Microsoft|Google|Online|\(Natural\)|English \(United States\))/gi, '').trim() || v.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <button
               type="button"
               onClick={handleConclude}
@@ -894,7 +1148,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             <div className="absolute top-3 right-3 z-20 w-36 sm:w-44 rounded-xl border border-zinc-700 bg-zinc-950/90 shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
               <div className="relative aspect-video w-full bg-zinc-900">
                 <video
-                  ref={roomVideoRef}
+                  ref={setRoomVideoRef}
                   autoPlay
                   playsInline
                   muted
@@ -916,7 +1170,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 space-y-4 backdrop-blur-sm shadow-inner">
+          <div
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 space-y-4 backdrop-blur-sm shadow-inner"
+          >
             {turns.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center text-center text-zinc-500 py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-zinc-400 mb-3" />
@@ -967,21 +1224,35 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                       <span className="text-[10px] text-zinc-500">Turn #{turn.turn_index}</span>
                     </div>
 
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">{turn.transcript}</p>
+                    {(() => {
+                      const isCurrentlyTyping = isInterviewer && turn.turn_index === typingTurnIndex;
+                      const textToDisplay = isCurrentlyTyping ? typedText : turn.transcript;
 
-                    {turn.code_sample && (
-                      <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 overflow-x-auto shadow-inner">
-                        <div className="flex items-center justify-between text-[10px] text-zinc-400 border-b border-zinc-800/80 pb-1.5 mb-2">
-                          <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
-                            <span>💻</span> Attached Code Sample for Review
-                          </span>
-                          <span className="text-zinc-500 font-mono text-[9px]">Inspect concurrency / memory leaks</span>
-                        </div>
-                        <pre className="whitespace-pre font-mono text-xs text-zinc-300 leading-relaxed">
-                          {turn.code_sample}
-                        </pre>
-                      </div>
-                    )}
+                      return (
+                        <>
+                          <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                            {textToDisplay}
+                            {isCurrentlyTyping && (
+                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
+                            )}
+                          </p>
+
+                          {turn.code_sample && (!isCurrentlyTyping || typedText.length >= turn.transcript.length * 0.8) && (
+                            <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 overflow-x-auto shadow-inner animate-in fade-in duration-200">
+                              <div className="flex items-center justify-between text-[10px] text-zinc-400 border-b border-zinc-800/80 pb-1.5 mb-2">
+                                <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                                  <span>💻</span> Attached Code Sample for Review
+                                </span>
+                                <span className="text-zinc-500 font-mono text-[9px]">Inspect concurrency / memory leaks</span>
+                              </div>
+                              <pre className="whitespace-pre font-mono text-xs text-zinc-300 leading-relaxed">
+                                {turn.code_sample}
+                              </pre>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {!isInterviewer && (
@@ -993,18 +1264,47 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               );
             })}
 
-            {/* Live Partial Speech Feedback (Candidate speaking) */}
-            {partialTranscript && (
+            {/* Live Candidate Speaking Turn with Real-Time Transcription */}
+            {(isRecording || partialTranscript) && (
               <div className="flex justify-end gap-3 sm:gap-4 animate-in fade-in duration-150">
-                <div className="max-w-[75%] rounded-xl rounded-tr-none bg-zinc-900 border border-zinc-700 p-4 text-white shadow-sm font-mono">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-xs font-semibold text-zinc-300">Live Transcription</span>
-                    <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                <div className="max-w-[85%] sm:max-w-[75%] rounded-xl rounded-tr-none bg-zinc-900 border border-emerald-500/40 p-4 text-white shadow-lg shadow-emerald-950/20 font-mono">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+                      <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span>Candidate Speaking (Live)</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-400">
+                      Turn #{(turns.length > 0 ? turns[turns.length - 1].turn_index : 0) + 1}
+                    </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-zinc-200">{partialTranscript}...</p>
+                  <p className="text-xs sm:text-sm text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
+                    {partialTranscript ? (
+                      <>
+                        {partialTranscript}
+                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
+                      </>
+                    ) : (
+                      <span className="text-zinc-500 italic font-mono text-xs">
+                        Microphone active... speak your answer naturally.
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400 border-t border-zinc-800/80 pt-2.5 mt-2.5">
+                    <span className="text-zinc-400 font-mono text-[10px]">
+                      Pause for 2s or click below when finished to get the followup.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleDoneSpeaking}
+                      className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-sm transition-all flex items-center gap-1 active:scale-[0.98]"
+                    >
+                      <CheckCircle className="h-3 w-3" />
+                      <span>Submit Answer →</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 border border-zinc-700">
-                  <User className="h-4 w-4 text-zinc-300" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-950 border border-emerald-600/50 text-emerald-300">
+                  <User className="h-4 w-4" />
                 </div>
               </div>
             )}
@@ -1033,44 +1333,49 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               /* Voice Mode Controls */
               <div className="space-y-3">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Mic Button & State */}
-                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-center sm:gap-4">
-                    <button
-                      type="button"
-                      onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                      disabled={wsStatus !== 'connected'}
-                      className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 sm:px-5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] ${
-                        isRecording
-                          ? 'bg-rose-600 text-white shadow-rose-600/20 hover:bg-rose-500'
-                          : 'bg-white text-zinc-950 hover:bg-zinc-200 shadow-sm'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {isRecording ? (
-                        <>
-                          <MicOff className="h-4 w-4" />
-                          <span>Stop Recording</span>
-                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-rose-700 text-white rounded border border-rose-500/50">Space</kbd>
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="h-4 w-4" />
-                          <span>Speak</span>
-                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">Space</kbd>
-                        </>
-                      )}
-                    </button>
+                  {/* Dynamic Voice Controls: Barge-In when interviewer speaks; Auto-Mic & Done Speaking when candidate speaks */}
+                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    {/* While interviewer is speaking: only the Barge-In preemption button is presented */}
+                    {(isInterviewerSpeaking || typingTurnIndex !== null) && (
+                      <button
+                        type="button"
+                        onClick={handleBargeIn}
+                        title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/40 px-4 py-2.5 text-xs sm:text-sm font-semibold hover:bg-amber-500/30 transition-all active:scale-[0.98] shadow-sm animate-pulse"
+                      >
+                        <Hand className="h-4 w-4 text-amber-300" />
+                        <span>Barge-In / Interrupt</span>
+                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-amber-300 rounded border border-amber-500/30">Esc</kbd>
+                      </button>
+                    )}
 
-                    {/* Instant Barge-In Preemption Button */}
-                    <button
-                      type="button"
-                      onClick={bargeIn}
-                      title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
-                      className="flex items-center justify-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-3 sm:px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 hover:text-white transition-all active:scale-[0.98]"
-                    >
-                      <Hand className="h-3.5 w-3.5 text-zinc-300" />
-                      <span>Barge-In</span>
-                      <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-700">Esc</kbd>
-                    </button>
+                    {/* When question has finished and candidate mic is live */}
+                    {isRecording && !isInterviewerSpeaking && typingTurnIndex === null && (
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <div className="flex items-center gap-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 px-3 py-2 text-xs font-mono text-emerald-300">
+                          <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span>Mic Active • Listening to you</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDoneSpeaking}
+                          title="Finish speaking and submit answer for interviewer followup (Key: Enter or 2s pause)"
+                          className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] shadow-sm animate-pulse"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          <span>Submit Answer & Get Followup</span>
+                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-emerald-700 text-emerald-100 rounded border border-emerald-500/50">Enter</kbd>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Waiting / processing state */}
+                    {!isRecording && !isInterviewerSpeaking && typingTurnIndex === null && (
+                      <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 py-1.5">
+                        <span className="h-2 w-2 rounded-full bg-zinc-600" />
+                        <span>Ready for next question</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">

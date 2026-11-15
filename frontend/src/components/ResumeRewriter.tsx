@@ -16,6 +16,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { resumesApi } from '../lib/api';
+import { getScoreTheme } from '../lib/scoring';
 import type {
   ResumeRewriteResponse,
   RewrittenResumeProfile,
@@ -450,12 +451,17 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 space-y-6">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b border-zinc-800/80 pb-6">
                 <div className="flex items-center gap-5">
-                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-emerald-500/30 bg-emerald-950/40 text-emerald-400 font-extrabold text-2xl shadow-inner">
-                    {rewriteData.ats_score}
-                    <span className="text-[10px] font-normal text-emerald-500/70 absolute -bottom-1">
-                      /100
-                    </span>
-                  </div>
+                  {(() => {
+                    const atsTheme = getScoreTheme(rewriteData.ats_score);
+                    return (
+                      <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 ${atsTheme.ringBorder} ${atsTheme.ringBg} ${atsTheme.text} font-extrabold text-2xl shadow-inner`}>
+                        {rewriteData.ats_score}
+                        <span className={`text-[10px] font-normal ${atsTheme.text} opacity-70 absolute -bottom-1`}>
+                          /100
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-lg font-bold text-white">ATS Compatibility Score</h2>
@@ -472,26 +478,26 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                 <div className="flex flex-wrap gap-2 text-xs">
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
                     <div className="text-[10px] uppercase text-zinc-500 font-semibold">Keywords</div>
-                    <div className="text-sm font-bold text-emerald-400">
-                      {rewriteData.ats_breakdown?.keyword_score || 85}%
+                    <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.keyword_score ?? 85).text}`}>
+                      {rewriteData.ats_breakdown?.keyword_score ?? 85}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
                     <div className="text-[10px] uppercase text-zinc-500 font-semibold">Experience</div>
-                    <div className="text-sm font-bold text-emerald-400">
-                      {rewriteData.ats_breakdown?.experience_score || 80}%
+                    <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.experience_score ?? 80).text}`}>
+                      {rewriteData.ats_breakdown?.experience_score ?? 80}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
                     <div className="text-[10px] uppercase text-zinc-500 font-semibold">Quantified</div>
-                    <div className="text-sm font-bold text-emerald-400">
-                      {rewriteData.ats_breakdown?.quantified_impact_score || 90}%
+                    <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.quantified_impact_score ?? 90).text}`}>
+                      {rewriteData.ats_breakdown?.quantified_impact_score ?? 90}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
                     <div className="text-[10px] uppercase text-zinc-500 font-semibold">Structure</div>
-                    <div className="text-sm font-bold text-emerald-400">
-                      {rewriteData.ats_breakdown?.section_structure_score || 100}%
+                    <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.section_structure_score ?? 100).text}`}>
+                      {rewriteData.ats_breakdown?.section_structure_score ?? 100}%
                     </div>
                   </div>
                 </div>

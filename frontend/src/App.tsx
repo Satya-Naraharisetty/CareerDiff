@@ -11,6 +11,8 @@ import { DossierView } from './components/DossierView';
 import { ResumeRewriter } from './components/ResumeRewriter';
 import { useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
+import { BrowserSpeechSynthesizer } from './lib/speechSynthesis';
+import { stopAllMediaHardware } from './lib/audio';
 import { CareerDiffLogo } from './components/CareerDiffLogo';
 import { Cpu, Layers, ShieldCheck, Terminal } from 'lucide-react';
 import './App.css';
@@ -24,15 +26,49 @@ const queryClient = new QueryClient({
   },
 });
 
+const VIEW_STORAGE_KEY = 'careerdiff_active_view';
+
 export const AppContent: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
-  const [currentView, setCurrentView] = useState<'home' | 'setup' | 'interview' | 'dossier' | 'rewriter'>(
-    isAuthenticated ? 'setup' : 'home'
-  );
+  const { isAuthenticated, rehydrateProfile } = useAuthStore();
+  const [currentView, setCurrentView] = useState<'home' | 'setup' | 'interview' | 'dossier' | 'rewriter'>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved && ['home', 'setup', 'interview', 'dossier', 'rewriter'].includes(saved)) {
+        if (!isAuthenticated && saved !== 'home') return 'home';
+        // Avoid getting stuck on interview loader on cold refresh without active session
+        if (saved === 'interview') return 'setup';
+        return saved as 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter';
+      }
+    }
+    return isAuthenticated ? 'setup' : 'home';
+  });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const { reset: resetInterview } = useInterviewStore();
+
+  // Rehydrate profile on mount if token is present
+  useEffect(() => {
+    if (isAuthenticated) {
+      rehydrateProfile();
+    }
+  }, [isAuthenticated, rehydrateProfile]);
+
+  // Derive active view from authentication guard
+  const activeView = !isAuthenticated ? 'home' : currentView;
+
+  const handleNavigate = (view: 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter') => {
+    if (view !== 'interview') {
+      useInterviewStore.getState().disconnectVoiceSession();
+      BrowserSpeechSynthesizer.stop();
+      stopAllMediaHardware();
+    }
+    setCurrentView(view);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {}
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  };
 
   // Global Cmd+K / Ctrl+K keyboard shortcut listener
   useEffect(() => {
@@ -48,14 +84,14 @@ export const AppContent: React.FC = () => {
 
   const handleAuthSuccess = () => {
     setIsAuthOpen(false);
-    if (currentView === 'home') {
-      setCurrentView('setup');
+    if (activeView === 'home') {
+      handleNavigate('setup');
     }
   };
 
   // Dynamic SEO Page Title & Meta Updates per state
   useEffect(() => {
-    switch (currentView) {
+    switch (activeView) {
       case 'home':
         document.title = 'CareerDiff — Autonomous Technical Interview Simulator & Rubric Engine';
         break;
@@ -74,19 +110,25 @@ export const AppContent: React.FC = () => {
       default:
         document.title = 'CareerDiff — Autonomous Technical Interview Simulator & Rubric Engine';
     }
-  }, [currentView]);
+  }, [activeView]);
 
   const handleStartInterview = () => {
-    setCurrentView('interview');
+    handleNavigate('interview');
   };
 
   const handleConcludeInterview = () => {
-    setCurrentView('dossier');
+    useInterviewStore.getState().disconnectVoiceSession();
+    BrowserSpeechSynthesizer.stop();
+    stopAllMediaHardware();
+    handleNavigate('dossier');
   };
 
   const handleReset = () => {
+    useInterviewStore.getState().disconnectVoiceSession();
+    BrowserSpeechSynthesizer.stop();
+    stopAllMediaHardware();
     resetInterview();
-    setCurrentView('setup');
+    handleNavigate('setup');
   };
 
   return (
@@ -94,42 +136,43 @@ export const AppContent: React.FC = () => {
       <Navbar
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
-        currentView={currentView}
-        onNavigate={(view) => setCurrentView(view)}
+        currentView={activeView}
+        onNavigate={handleNavigate}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
 
       <main className="flex-1" id="main-content" role="main">
-        {currentView === 'home' && (
+        {activeView === 'home' && (
           <HomePage
             onGetStarted={() => {
               if (isAuthenticated) {
-                setCurrentView('setup');
+                handleNavigate('setup');
               } else {
                 setIsAuthOpen(true);
               }
             }}
             onOpenAuth={() => setIsAuthOpen(true)}
+            onOpenDashboard={() => handleNavigate('dossier')}
           />
         )}
 
-        {currentView === 'setup' && (
+        {activeView === 'setup' && (
           <InterviewSetup
             onStartInterview={handleStartInterview}
             onOpenAuth={() => setIsAuthOpen(true)}
           />
         )}
 
-        {currentView === 'interview' && (
+        {activeView === 'interview' && (
           <InterviewRoom onConclude={handleConcludeInterview} />
         )}
 
-        {currentView === 'dossier' && (
+        {activeView === 'dossier' && (
           <DossierView onReset={handleReset} />
         )}
 
-        {currentView === 'rewriter' && (
-          <ResumeRewriter onBackToInterview={() => setCurrentView('setup')} />
+        {activeView === 'rewriter' && (
+          <ResumeRewriter onBackToInterview={() => handleNavigate('setup')} />
         )}
       </main>
 

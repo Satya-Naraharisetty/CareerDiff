@@ -16,8 +16,8 @@ def test_warmup_greeting_with_resume_claims() -> None:
         top_skills=["FastAPI", "PostgreSQL", "Kafka"],
         key_claim="Architected low-latency Kafka pipeline processing 50k events/sec",
     )
-    assert "Alex Rivera" in greeting
-    assert "Senior" in greeting
+    assert "Alex" in greeting
+    assert "senior" in greeting.lower()
     assert "FastAPI" in greeting
     assert "Architected low-latency Kafka pipeline" in greeting
 

@@ -13,7 +13,7 @@ def test_default_settings() -> None:
     assert "postgresql+asyncpg" in cfg.database_url
     assert "redis://" in cfg.redis_url
     assert cfg.jwt_algorithm == "HS256"
-    assert cfg.jwt_access_token_expire_minutes == 15
+    assert cfg.jwt_access_token_expire_minutes == 10080
     assert cfg.s3_endpoint_url == "http://localhost:9000"
     assert cfg.s3_bucket_name == "careerdiff-resumes"
 

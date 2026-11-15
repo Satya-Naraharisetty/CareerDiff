@@ -212,41 +212,40 @@ class TurnGenerator:
         resume_summary: str | None = None,
         company_name: str | None = None,
     ) -> str:
-        """Generate welcoming opener for the WARMUP phase grounded in candidate resume & company motivation."""
-        name_str = f" {candidate_name}" if candidate_name else ""
-        skills_str = ", ".join(top_skills[:3]) if top_skills and len(top_skills) > 0 else None
+        """Generate welcoming opener for the WARMUP phase grounded in candidate resume & company motivation.
+        
+        Framed like a warm, conversational human technical interview rather than an exam.
+        """
+        first_name = candidate_name.split()[0] if candidate_name else None
+        name_str = f" {first_name}" if first_name else ""
+        skills_str = ", ".join(top_skills[:2]) if top_skills and len(top_skills) > 0 else None
         company_phrase = (
             f" for our {target_seniority.lower()} engineering team at {company_name}"
             if company_name
             else ""
         )
-        motivation_probe = (
-            f" Along with your recent work, what excites you about the engineering challenges here at {company_name}?"
-            if company_name
-            else " What technical problems have you been most excited about solving lately?"
-        )
 
         if key_claim and skills_str:
+            # Concise reference to background without reading verbatim essay quotes
+            claim_brief = key_claim.split(".")[0].strip()
+            if len(claim_brief) > 60:
+                claim_brief = claim_brief[:60].rstrip() + "..."
             return (
-                f"Hello{name_str}! Welcome to your technical interview session{company_phrase}. "
-                f"I've reviewed your resume and noticed your strong background as a {target_seniority.capitalize()} "
-                f"{primary_discipline.capitalize()} Engineer, particularly in {skills_str} "
-                f"where you '{key_claim}'. To kick things off, could you walk me through your recent role, "
-                f"the architecture of the systems you've been designing, and{motivation_probe}"
+                f"Hi{name_str}, great to meet you! Welcome to your {target_seniority.lower()} engineering session{company_phrase}. "
+                f"I saw your background in {skills_str} and your work where you {claim_brief}. "
+                "To kick things off, could you tell me a little bit about yourself and what you've been focused on recently?"
             )
 
         if skills_str:
             return (
-                f"Hello{name_str}! Welcome to your technical interview session{company_phrase}. "
-                f"Looking over your background, I see strong experience across {skills_str} at the "
-                f"{target_seniority.lower()} level. To get us started, could you walk me through your recent role, "
-                f"the primary systems you've been building, and{motivation_probe}"
+                f"Hi{name_str}, great to meet you! Welcome to your {target_seniority.lower()} engineering session{company_phrase}. "
+                f"I saw your background in {skills_str}. "
+                "To get us started, could you tell me a little bit about yourself and what you've been working on recently?"
             )
 
         return (
-            f"Hello{name_str}! Welcome to your technical interview session{company_phrase}. "
-            "We will cover a few core architectural and systems topics today. To get started, could you give an "
-            f"overview of your technical background, the types of systems you've been building, and{motivation_probe}"
+            f"Hi{name_str}, great to meet you! Welcome to the interview{company_phrase}. "
+            "To get us started, could you give a brief overview of your background and what you've been working on recently?"
         )
 
     @staticmethod

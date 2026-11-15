@@ -108,6 +108,11 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  role?: string;
+  target_seniority?: string;
+  primary_discipline?: string;
+  years_experience?: number;
+  remaining_backup_codes?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -296,6 +301,29 @@ export interface InterviewDetailResponse {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+export interface InterviewHistoryItemRead {
+  id: string;
+  state: InterviewState;
+  target_seniority: SeniorityLevel;
+  role_title?: string | null;
+  scheduled_duration_minutes: number;
+  actual_duration_seconds?: number | null;
+  total_turns: number;
+  overall_score?: number | null;
+  ats_score?: number | null;
+  communication_score?: number | null;
+  created_at: string;
+  finished_at?: string | null;
+}
+
+export interface InterviewHistoryResponse {
+  items: InterviewHistoryItemRead[];
+  total_interviews: number;
+  average_score?: number | null;
+  score_improvement_delta?: number | null;
+  latest_score?: number | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { BrowserSpeechRecognizer } from '../lib/speechRecognition';
+import { registerActiveStream } from '../lib/audio';
 
 interface DeviceCheckModalProps {
   isOpen: boolean;
@@ -33,6 +34,10 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
   const [micStatus, setMicStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
   const [cameraDeviceName, setCameraDeviceName] = useState<string>('');
   const [micDeviceName, setMicDeviceName] = useState<string>('');
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>('');
+  const [selectedCameraDeviceId, setSelectedCameraDeviceId] = useState<string>('');
   const [isCameraEnabled, setIsCameraEnabled] = useState<boolean>(true);
   const [isMicMuted, setIsMicMuted] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number>(0);
@@ -58,6 +63,10 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
       cameraStreamRef.current.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
     setCameraStream(null);
 
     if (audioStreamRef.current) {
@@ -76,32 +85,74 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
 
   const setupAudioAnalyzer = useCallback((stream: MediaStream) => {
     try {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+
       const AudioContextClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioContextClass();
       audioContextRef.current = ctx;
 
+      // Ensure AudioContext is not suspended by browser autoplay policy
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.3;
       source.connect(analyser);
+
+      // Route through a zero-gain node to destination so Chrome keeps the audio graph rendering
+      const silentGain = ctx.createGain();
+      silentGain.gain.value = 0;
+      analyser.connect(silentGain);
+      silentGain.connect(ctx.destination);
+
       analyserRef.current = analyser;
 
-      const pcmData = new Uint8Array(analyser.frequencyBinCount);
+      const timeData = new Float32Array(analyser.fftSize);
+      let smoothed = 0;
 
       const checkVolume = () => {
         if (!analyserRef.current) return;
-        analyserRef.current.getByteFrequencyData(pcmData);
 
-        let sum = 0;
-        for (let i = 0; i < pcmData.length; i++) {
-          sum += pcmData[i];
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
         }
-        const avg = sum / pcmData.length;
-        // Normalize 0-255 to 0.0-1.0 with visual boost
-        const normalized = Math.min(1.0, (avg / 128) * 1.6);
-        setAudioLevel(normalized);
+
+        analyserRef.current.getFloatTimeDomainData(timeData);
+
+        // Root Mean Square (RMS) calculation of acoustic waveform
+        let sumSquares = 0;
+        for (let i = 0; i < timeData.length; i++) {
+          const val = timeData[i];
+          sumSquares += val * val;
+        }
+        const rms = Math.sqrt(sumSquares / timeData.length);
+
+        // Normal conversational speech RMS is ~0.015 - 0.20
+        // Multiply by 5.5 to map comfortably onto the 0.0 - 1.0 range
+        const target = Math.min(1.0, Math.max(0, rms * 5.5));
+
+        // Fast-attack, smooth-decay envelope follower
+        if (target > smoothed) {
+          smoothed = smoothed * 0.2 + target * 0.8;
+        } else {
+          smoothed = smoothed * 0.88 + target * 0.12;
+        }
+
+        // Noise floor gate
+        const displayValue = smoothed < 0.02 ? 0 : smoothed;
+        setAudioLevel(displayValue);
 
         animFrameRef.current = requestAnimationFrame(checkVolume);
       };
@@ -112,23 +163,97 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
     }
   }, []);
 
-  const requestMediaPermissions = useCallback(async () => {
-    setErrorMessage(null);
+  const handleSwitchAudioDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedAudioDeviceId(deviceId);
+      try {
+        localStorage.setItem('careerdiff_preferred_audio_device', deviceId);
+      } catch {
+        // localStorage not available
+      }
 
-    // 1. Request Camera Stream
-    setCameraStatus('requesting');
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((track) => track.stop());
+        audioStreamRef.current = null;
+      }
+
+      try {
+        const aStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: { exact: deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        registerActiveStream(aStream);
+        audioStreamRef.current = aStream;
+        setAudioStream(aStream);
+        setMicStatus('granted');
+        const aTrack = aStream.getAudioTracks()[0];
+        setMicDeviceName(aTrack?.label || 'Microphone');
+        setupAudioAnalyzer(aStream);
+      } catch (err) {
+        console.warn('Failed to switch audio device:', err);
+      }
+    },
+    [setupAudioAnalyzer]
+  );
+
+  const handleSwitchCameraDevice = useCallback(async (deviceId: string) => {
+    setSelectedCameraDeviceId(deviceId);
+    try {
+      localStorage.setItem('careerdiff_preferred_video_device', deviceId);
+    } catch {
+      // localStorage not available
+    }
+
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+
     try {
       const vStream = await navigator.mediaDevices.getUserMedia({
         video: {
+          deviceId: { exact: deviceId },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'user',
         },
       });
+      registerActiveStream(vStream);
       cameraStreamRef.current = vStream;
       setCameraStream(vStream);
       setCameraStatus('granted');
       const vTrack = vStream.getVideoTracks()[0];
+      setCameraDeviceName(vTrack?.label || 'Camera');
+    } catch (err) {
+      console.warn('Failed to switch camera device:', err);
+    }
+  }, []);
+
+  const requestMediaPermissions = useCallback(async () => {
+    setErrorMessage(null);
+
+    // 1. Request Camera Stream
+    setCameraStatus('requesting');
+    let vTrack: MediaStreamTrack | null = null;
+    try {
+      const savedVideoId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_preferred_video_device') : null;
+      const vStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+          ...(savedVideoId ? { deviceId: { ideal: savedVideoId } } : {}),
+        },
+      });
+      registerActiveStream(vStream);
+      cameraStreamRef.current = vStream;
+      setCameraStream(vStream);
+      setCameraStatus('granted');
+      vTrack = vStream.getVideoTracks()[0] || null;
       setCameraDeviceName(vTrack?.label || 'Default Camera');
     } catch (err: unknown) {
       console.warn('Camera permission denied or unavailable:', err);
@@ -137,18 +262,30 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
 
     // 2. Request Microphone Stream
     setMicStatus('requesting');
+    let aTrack: MediaStreamTrack | null = null;
     try {
+      const savedAudioId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_preferred_audio_device') : null;
+      // If a virtual line was previously saved, purge it so the OS default mic is always used
+      if (savedAudioId && (savedAudioId.toLowerCase().includes('virtual') || savedAudioId.toLowerCase().includes('utility'))) {
+        try {
+          localStorage.removeItem('careerdiff_preferred_audio_device');
+        } catch {}
+      }
+      const effectiveAudioId = savedAudioId && !savedAudioId.toLowerCase().includes('virtual') ? savedAudioId : 'default';
+
       const aStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          deviceId: { ideal: effectiveAudioId },
         },
       });
+      registerActiveStream(aStream);
       audioStreamRef.current = aStream;
       setAudioStream(aStream);
       setMicStatus('granted');
-      const aTrack = aStream.getAudioTracks()[0];
+      aTrack = aStream.getAudioTracks()[0] || null;
       setMicDeviceName(aTrack?.label || 'Default Microphone');
 
       // Setup audio level analyzer for live VU meter
@@ -160,7 +297,103 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
         'Microphone access was denied. Please allow microphone permissions in your browser address bar to participate in the interview.'
       );
     }
+
+    // 3. Enumerate connected hardware devices (always prioritizing default mic)
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      const rawAudios = allDevices.filter((d) => d.kind === 'audioinput' && d.deviceId);
+      const videos = allDevices.filter((d) => d.kind === 'videoinput' && d.deviceId);
+
+      // Sort audio devices: System Default first, real physical microphones next, virtual lines last
+      const audios = [...rawAudios].sort((a, b) => {
+        const aIsDef = a.deviceId === 'default' || a.label.toLowerCase().includes('default');
+        const bIsDef = b.deviceId === 'default' || b.label.toLowerCase().includes('default');
+        if (aIsDef && !bIsDef) return -1;
+        if (!aIsDef && bIsDef) return 1;
+
+        const aIsVirtual = a.label.toLowerCase().includes('virtual') || a.label.toLowerCase().includes('utility');
+        const bIsVirtual = b.label.toLowerCase().includes('virtual') || b.label.toLowerCase().includes('utility');
+        if (aIsVirtual && !bIsVirtual) return 1;
+        if (!aIsVirtual && bIsVirtual) return -1;
+
+        return 0;
+      });
+
+      setAudioDevices(audios);
+      setCameraDevices(videos);
+
+      // Always choose the default mic by default
+      const defaultAudio =
+        audios.find((d) => d.deviceId === 'default' || d.label.toLowerCase().includes('default')) ||
+        audios.find(
+          (d) => !d.label.toLowerCase().includes('virtual') && !d.label.toLowerCase().includes('utility')
+        ) ||
+        audios[0];
+
+      if (defaultAudio && defaultAudio.deviceId) {
+        setSelectedAudioDeviceId(defaultAudio.deviceId);
+        if (defaultAudio.label) {
+          setMicDeviceName(defaultAudio.label);
+        }
+
+        // Guarantee direct binding to the exact hardware endpoint of the default microphone
+        // (Mirrors the exact device switch logic that activates physical hardware audio)
+        try {
+          if (audioStreamRef.current) {
+            audioStreamRef.current.getTracks().forEach((t) => t.stop());
+            audioStreamRef.current = null;
+          }
+          let exactStream: MediaStream;
+          try {
+            exactStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                deviceId: { exact: defaultAudio.deviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+          } catch {
+            exactStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                deviceId: { ideal: defaultAudio.deviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+          }
+
+          registerActiveStream(exactStream);
+          audioStreamRef.current = exactStream;
+          setAudioStream(exactStream);
+          const boundTrack = exactStream.getAudioTracks()[0];
+          if (boundTrack?.label) {
+            setMicDeviceName(boundTrack.label);
+          }
+          setupAudioAnalyzer(exactStream);
+        } catch (bindErr) {
+          console.warn('Initial default mic direct binding fallback:', bindErr);
+        }
+      }
+
+      const activeVideoId = vTrack?.getSettings()?.deviceId;
+      if (activeVideoId) {
+        setSelectedCameraDeviceId(activeVideoId);
+      } else if (videos.length > 0) {
+        setSelectedCameraDeviceId(videos[0].deviceId);
+      }
+    } catch (enumErr) {
+      console.warn('Device enumeration failed:', enumErr);
+    }
   }, [setupAudioAnalyzer]);
+
+  // Guarantee unconditional hardware teardown when DeviceCheckModal unmounts
+  useEffect(() => {
+    return () => {
+      cleanupStreams();
+    };
+  }, [cleanupStreams]);
 
   // Initialize and request devices on modal open
   useEffect(() => {
@@ -175,6 +408,52 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
       cleanupStreams();
     };
   }, [isOpen, cleanupStreams, requestMediaPermissions]);
+
+  // Auto-resume AudioContext on any user interaction within the modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleUserInteraction = () => {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
+      }
+    };
+
+    window.addEventListener('pointerdown', handleUserInteraction);
+    window.addEventListener('click', handleUserInteraction);
+    window.addEventListener('keydown', handleUserInteraction);
+
+    return () => {
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [isOpen]);
+
+  // Callback ref to immediately attach stream when video element mounts
+  const setVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && cameraStreamRef.current && isCameraEnabled) {
+      if (node.srcObject !== cameraStreamRef.current) {
+        node.srcObject = cameraStreamRef.current;
+      }
+      node.play().catch((err) => {
+        console.warn('Camera preview play failed:', err);
+      });
+    }
+  }, [isCameraEnabled]);
+
+  // Synchronize stream whenever cameraStream or isCameraEnabled changes
+  useEffect(() => {
+    if (videoRef.current && cameraStream && isCameraEnabled) {
+      if (videoRef.current.srcObject !== cameraStream) {
+        videoRef.current.srcObject = cameraStream;
+      }
+      videoRef.current.play().catch((err) => {
+        console.warn('Camera preview play failed:', err);
+      });
+    }
+  }, [cameraStream, isCameraEnabled]);
 
   const toggleCamera = () => {
     if (!cameraStream) return;
@@ -302,7 +581,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
             <div className="relative aspect-video w-full rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center shadow-inner group">
               {cameraStatus === 'granted' && isCameraEnabled ? (
                 <video
-                  ref={videoRef}
+                  ref={setVideoRef}
                   autoPlay
                   playsInline
                   muted
@@ -332,14 +611,29 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
 
               {/* In-video floating controls */}
               {cameraStatus === 'granted' && (
-                <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between px-2 py-1.5 rounded-lg bg-zinc-950/70 backdrop-blur-md border border-zinc-800 text-[11px] text-zinc-300">
-                  <span className="truncate max-w-[150px] font-mono text-[10px] text-zinc-400">
-                    {cameraDeviceName || 'Connected Camera'}
-                  </span>
+                <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between px-2 py-1.5 rounded-lg bg-zinc-950/80 backdrop-blur-md border border-zinc-800 text-[11px] text-zinc-300 gap-2">
+                  {cameraDevices.length > 1 ? (
+                    <select
+                      value={selectedCameraDeviceId}
+                      onChange={(e) => handleSwitchCameraDevice(e.target.value)}
+                      className="bg-transparent border-0 text-[10px] font-mono text-zinc-300 focus:outline-none max-w-[140px] truncate cursor-pointer"
+                      title="Switch Camera Device"
+                    >
+                      {cameraDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId} className="bg-zinc-950 text-zinc-200">
+                          {d.label || `Camera (${d.deviceId.slice(0, 6)}...)`}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="truncate max-w-[140px] font-mono text-[10px] text-zinc-400">
+                      {cameraDeviceName || 'Connected Camera'}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors font-medium text-[10px]"
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors font-medium text-[10px] shrink-0"
                   >
                     {isCameraEnabled ? (
                       <>
@@ -370,9 +664,9 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
             {/* Microphone Check Card */}
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg border ${
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
                       micStatus === 'granted' && !isMicMuted
                         ? 'border-emerald-800/80 bg-emerald-950/60 text-emerald-400'
                         : 'border-zinc-800 bg-zinc-900 text-zinc-500'
@@ -380,15 +674,15 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                   >
                     {isMicMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h4 className="text-xs font-semibold text-zinc-200">Microphone Input</h4>
-                    <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[160px]">
+                    <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[150px]">
                       {micDeviceName || (micStatus === 'granted' ? 'Connected' : 'Not Connected')}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {micStatus === 'granted' && (
                     <button
                       type="button"
@@ -410,26 +704,50 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                 </div>
               </div>
 
+              {/* Input Device Selector if multiple mics detected */}
+              {micStatus === 'granted' && audioDevices.length > 1 && (
+                <div className="space-y-1">
+                  <label htmlFor="mic-select" className="text-[10px] text-zinc-400 font-medium flex items-center justify-between">
+                    <span>Select Microphone Device:</span>
+                    <span className="text-[9px] text-emerald-400/80 font-mono">Switch if using headset</span>
+                  </label>
+                  <select
+                    id="mic-select"
+                    value={selectedAudioDeviceId}
+                    onChange={(e) => handleSwitchAudioDevice(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-[11px] font-mono text-zinc-300 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                  >
+                    {audioDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Microphone (${d.deviceId.slice(0, 6)}...)`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Live VU Meter Audio Level Visualizer */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between text-[10px] font-mono text-zinc-400">
                   <span>Input Volume Level</span>
-                  <span>{Math.round(audioLevel * 100)}%</span>
+                  <span className={audioLevel > 0.05 ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}>
+                    {Math.round(audioLevel * 100)}%
+                  </span>
                 </div>
-                <div className="flex items-center gap-1 h-3 w-full bg-zinc-950 rounded border border-zinc-800 p-0.5">
+                <div className="flex items-center gap-1 h-3.5 w-full bg-zinc-950 rounded border border-zinc-800 p-0.5">
                   {Array.from({ length: 20 }).map((_, idx) => {
                     const threshold = (idx + 1) / 20;
                     const isActive = audioLevel >= threshold && !isMicMuted;
                     return (
                       <div
                         key={idx}
-                        className={`flex-1 h-full rounded-[1px] transition-colors duration-75 ${
+                        className={`flex-1 h-full rounded-[1px] transition-all duration-75 ${
                           isActive
                             ? idx > 15
-                              ? 'bg-rose-500'
+                              ? 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.6)]'
                               : idx > 10
-                              ? 'bg-amber-400'
-                              : 'bg-emerald-400'
+                              ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]'
+                              : 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]'
                             : 'bg-zinc-800/40'
                         }`}
                       />

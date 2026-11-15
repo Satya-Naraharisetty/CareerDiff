@@ -1,6 +1,7 @@
 """Schemas for Interview Sessions and Blueprints."""
 
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -85,3 +86,32 @@ class InterviewCreateResponse(BaseModel):
     state: str
     scheduled_duration_minutes: int
     blueprint: InterviewBlueprintRead
+
+
+class InterviewHistoryItemRead(BaseModel):
+    """Summary of a past interview session and its assessment report."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    state: str
+    target_seniority: str
+    role_title: str | None = None
+    scheduled_duration_minutes: int
+    actual_duration_seconds: int | None = None
+    total_turns: int = 0
+    overall_score: float | None = None
+    ats_score: float | None = None
+    communication_score: float | None = None
+    created_at: datetime
+    finished_at: datetime | None = None
+
+
+class InterviewHistoryResponse(BaseModel):
+    """Chronological performance history and progression metrics for a candidate."""
+
+    items: list[InterviewHistoryItemRead] = Field(default_factory=list)
+    total_interviews: int = 0
+    average_score: float | None = None
+    score_improvement_delta: float | None = None
+    latest_score: float | None = None

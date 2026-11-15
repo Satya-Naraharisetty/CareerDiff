@@ -52,7 +52,7 @@ async def test_outbox_claiming_and_lease_management() -> None:
         # Claim event
         claimed_events = await OutboxService.claim_pending_events(
             db=db,
-            batch_size=10,
+            batch_size=100,
             worker_id="test-worker-1",
             lease_seconds=60,
         )

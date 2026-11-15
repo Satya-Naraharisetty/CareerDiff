@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   FileText,
+  History,
   Loader2,
   Mic,
   RotateCcw,
@@ -20,7 +21,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { interviewsApi } from '../lib/api';
+import { getScoreTheme } from '../lib/scoring';
 import { useInterviewStore } from '../stores/interviewStore';
+import { PerformanceHistoryModal } from './PerformanceHistoryModal';
 import type {
   AssessmentReportRead,
   AtsBreakdown,
@@ -141,15 +144,7 @@ const AtsScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
   const progressPercent = normalizedScore / 100;
   const strokeDashoffset = circumference - progressPercent * circumference;
 
-  const tier =
-    normalizedScore >= 80
-      ? 'Strong Match'
-      : normalizedScore >= 65
-      ? 'Moderate Match'
-      : 'Needs Work';
-
-  const strokeColor =
-    normalizedScore >= 80 ? '#34d399' : normalizedScore >= 65 ? '#fbbf24' : '#f87171';
+  const { tier, stroke: strokeColor, badge: badgeClass } = getScoreTheme(normalizedScore);
 
   return (
     <div className="flex flex-col items-center justify-center p-3 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0 min-w-[160px] font-mono shadow-sm">
@@ -186,15 +181,7 @@ const AtsScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
       </div>
 
       <div className="mt-2 text-center">
-        <span
-          className={`rounded px-2 py-0.5 text-xs font-semibold border ${
-            normalizedScore >= 80
-              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/40'
-              : normalizedScore >= 65
-              ? 'bg-amber-950/60 text-amber-400 border-amber-800/40'
-              : 'bg-rose-950/60 text-rose-400 border-rose-800/40'
-          }`}
-        >
+        <span className={`rounded px-2 py-0.5 text-xs font-semibold border ${badgeClass}`}>
           {tier}
         </span>
         <span className="block text-[10px] text-zinc-500 mt-1">JD Alignment</span>
@@ -558,17 +545,23 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
   breakdown,
   atsScore,
 }) => {
+  const atsTheme = getScoreTheme(atsScore);
+  const keywordTheme = getScoreTheme(breakdown.keyword_score);
+  const expTheme = getScoreTheme(breakdown.experience_score);
+  const impactTheme = getScoreTheme(breakdown.quantified_impact_score);
+  const sectionTheme = getScoreTheme(breakdown.section_structure_score);
+
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 shadow-sm backdrop-blur-md space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-emerald-400" />
+          <FileText className={`h-4 w-4 ${atsTheme.text}`} />
           <h2 className="text-sm sm:text-base font-bold text-white font-sans">
             ATS Resume vs. Job Description Compatibility Audit
           </h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-emerald-950/70 border border-emerald-800/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
+          <span className={`rounded-full px-3 py-1 text-xs font-mono font-bold border ${atsTheme.badge}`}>
             {atsScore} / 100 ATS Score
           </span>
         </div>
@@ -579,11 +572,11 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
         <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
           <div className="flex justify-between text-xs">
             <span className="text-zinc-400 text-[11px]">Keyword Density</span>
-            <span className="text-emerald-400 font-bold">{breakdown.keyword_score}%</span>
+            <span className={`${keywordTheme.text} font-bold`}>{breakdown.keyword_score}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              className={`h-full ${keywordTheme.bg} rounded-full transition-all duration-500`}
               style={{ width: `${breakdown.keyword_score}%` }}
             />
           </div>
@@ -592,11 +585,11 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
         <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
           <div className="flex justify-between text-xs">
             <span className="text-zinc-400 text-[11px]">Experience &amp; Seniority</span>
-            <span className="text-emerald-400 font-bold">{breakdown.experience_score}%</span>
+            <span className={`${expTheme.text} font-bold`}>{breakdown.experience_score}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              className={`h-full ${expTheme.bg} rounded-full transition-all duration-500`}
               style={{ width: `${breakdown.experience_score}%` }}
             />
           </div>
@@ -605,11 +598,11 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
         <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
           <div className="flex justify-between text-xs">
             <span className="text-zinc-400 text-[11px]">Quantified Impact</span>
-            <span className="text-emerald-400 font-bold">{breakdown.quantified_impact_score}%</span>
+            <span className={`${impactTheme.text} font-bold`}>{breakdown.quantified_impact_score}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              className={`h-full ${impactTheme.bg} rounded-full transition-all duration-500`}
               style={{ width: `${breakdown.quantified_impact_score}%` }}
             />
           </div>
@@ -618,11 +611,11 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
         <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-1.5 font-mono">
           <div className="flex justify-between text-xs">
             <span className="text-zinc-400 text-[11px]">Section Formatting</span>
-            <span className="text-emerald-400 font-bold">{breakdown.section_structure_score}%</span>
+            <span className={`${sectionTheme.text} font-bold`}>{breakdown.section_structure_score}%</span>
           </div>
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
             <div
-              className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+              className={`h-full ${sectionTheme.bg} rounded-full transition-all duration-500`}
               style={{ width: `${breakdown.section_structure_score}%` }}
             />
           </div>
@@ -748,6 +741,16 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     originalExcerpt: '',
     competencyName: '',
   });
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+
+  const handleSelectHistoricalSession = (selectedId: string) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('careerdiff_active_interview_id', selectedId);
+      }
+    } catch {}
+    useInterviewStore.setState({ interviewId: selectedId });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -755,16 +758,32 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchOrPollReport() {
-      if (!interviewId) {
-        setIsLoading(false);
-        return;
+      let targetId = interviewId;
+
+      if (!targetId && typeof localStorage !== 'undefined') {
+        targetId = localStorage.getItem('careerdiff_active_interview_id');
       }
 
       try {
-        const data = await interviewsApi.getReport(interviewId);
+        let data: AssessmentReportRead;
+        if (targetId) {
+          data = await interviewsApi.getReport(targetId);
+        } else {
+          // If no target ID in state or localStorage, fetch candidate's latest report directly
+          data = await interviewsApi.getLatestReport();
+        }
+
         if (isMounted) {
           setReport(data);
           setIsLoading(false);
+          if (data?.interview_id) {
+            try {
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('careerdiff_active_interview_id', data.interview_id);
+              }
+            } catch {}
+            useInterviewStore.setState({ interviewId: data.interview_id });
+          }
         }
       } catch {
         // If report is still compiling in background, poll every 2.5s for up to 30s
@@ -772,8 +791,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
           pollCount++;
           pollTimeoutId = setTimeout(fetchOrPollReport, 2500);
         } else if (isMounted) {
-          setError('Evaluation report compilation is still pending. Please refresh in a moment.');
-          setIsLoading(false);
+          if (!targetId) {
+            setIsLoading(false);
+          } else {
+            setError('Evaluation report compilation is still pending. Please refresh in a moment.');
+            setIsLoading(false);
+          }
         }
       }
     }
@@ -961,7 +984,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
               Candidate Competency Grounding
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-sans">{report.summary}</p>
-            <div className="pt-2 flex items-center gap-2">
+            <div className="pt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -969,6 +992,14 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
               >
                 <Download className="h-3.5 w-3.5 text-zinc-400" />
                 Export / Print Dossier (PDF)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-900/60 bg-emerald-950/40 px-3 py-1.5 text-xs font-mono font-medium text-emerald-400 hover:bg-emerald-900/50 hover:border-emerald-700 transition-colors shadow-sm"
+              >
+                <History className="h-3.5 w-3.5 text-emerald-400" />
+                Performance Trends &amp; Past Sessions
               </button>
             </div>
           </div>
@@ -1268,6 +1299,15 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
           competencyName={retakeModalState.competencyName}
         />
       )}
+
+      {/* Candidate Performance Trends & Longitudinal History Modal */}
+      <PerformanceHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        currentInterviewId={report?.interview_id || interviewId}
+        onSelectSession={handleSelectHistoricalSession}
+        onStartNewSession={onReset}
+      />
     </div>
   );
 };

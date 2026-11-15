@@ -45,6 +45,8 @@ from app.schemas.interview import (
     InterviewBlueprintRead,
     InterviewCreateRequest,
     InterviewCreateResponse,
+    InterviewHistoryItemRead,
+    InterviewHistoryResponse,
     TurnRetakeRequest,
     TurnRetakeResponse,
 )
@@ -57,6 +59,96 @@ from app.services.turn_service import TurnService
 logger = logging.getLogger("CareerDiff.interviews")
 
 router = APIRouter()
+
+
+@router.get(
+    "",
+    response_model=InterviewHistoryResponse,
+    summary="List candidate's historical interview sessions and longitudinal performance progression",
+)
+async def list_interviews(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> InterviewHistoryResponse:
+    """Retrieve all historical interview sessions with reports and longitudinal progression metrics."""
+    stmt_profile = select(CandidateProfile).where(CandidateProfile.user_id == current_user.id)
+    profile = (await db.execute(stmt_profile)).scalar_one_or_none()
+    if not profile:
+        return InterviewHistoryResponse(
+            items=[],
+            total_interviews=0,
+            average_score=None,
+            score_improvement_delta=None,
+            latest_score=None,
+        )
+
+    stmt_interviews = (
+        select(Interview)
+        .options(
+            selectinload(Interview.role),
+            selectinload(Interview.turns),
+            selectinload(Interview.assessment_reports),
+        )
+        .where(Interview.candidate_profile_id == profile.id)
+        .order_by(Interview.created_at.desc())
+    )
+    interviews = list((await db.execute(stmt_interviews)).scalars().all())
+
+    items: list[InterviewHistoryItemRead] = []
+    scores_list: list[float] = []
+
+    for inv in interviews:
+        latest_rep = None
+        if inv.assessment_reports:
+            for rep in inv.assessment_reports:
+                if rep.is_latest:
+                    latest_rep = rep
+                    break
+            if not latest_rep and len(inv.assessment_reports) > 0:
+                latest_rep = inv.assessment_reports[0]
+
+        ov_score = latest_rep.overall_score if latest_rep else None
+        ats_sc = latest_rep.ats_score if latest_rep else None
+        comm_sc = latest_rep.communication_score if latest_rep else None
+
+        if ov_score is not None:
+            scores_list.append(ov_score)
+
+        role_name = inv.role.title if inv.role else "General Engineering"
+
+        items.append(
+            InterviewHistoryItemRead(
+                id=inv.id,
+                state=inv.state,
+                target_seniority=inv.target_seniority,
+                role_title=role_name,
+                scheduled_duration_minutes=inv.scheduled_duration_minutes,
+                actual_duration_seconds=inv.actual_duration_seconds,
+                total_turns=len(inv.turns),
+                overall_score=ov_score,
+                ats_score=ats_sc,
+                communication_score=comm_sc,
+                created_at=inv.created_at,
+                finished_at=inv.finished_at,
+            )
+        )
+
+    total_invs = len(items)
+    avg_score = round(sum(scores_list) / len(scores_list), 2) if scores_list else None
+    latest_score = scores_list[0] if scores_list else None
+
+    score_delta = None
+    if len(scores_list) >= 2:
+        oldest_score = scores_list[-1]
+        score_delta = round(latest_score - oldest_score, 2)
+
+    return InterviewHistoryResponse(
+        items=items,
+        total_interviews=total_invs,
+        average_score=avg_score,
+        score_improvement_delta=score_delta,
+        latest_score=latest_score,
+    )
 
 
 @router.post(
@@ -150,33 +242,8 @@ async def create_interview(
     )
 
 
-@router.get(
-    "/{interview_id}",
-    response_model=InterviewDetailResponse,
-    summary="Get interview session details and progress",
-)
-async def get_interview(
-    interview_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> InterviewDetailResponse:
-    """Retrieve detailed state and metadata of an interview session."""
-    stmt = (
-        select(Interview)
-        .options(
-            selectinload(Interview.blueprint).selectinload(InterviewBlueprint.topics),
-            selectinload(Interview.turns),
-        )
-        .where(Interview.id == interview_id)
-    )
-    interview = (await db.execute(stmt)).scalar_one_or_none()
-    if not interview:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Interview '{interview_id}' not found.",
-        )
-
-    # Determine current topic and consecutive probes
+def _build_interview_detail(interview: Interview) -> InterviewDetailResponse:
+    """Extract topic progress and format InterviewDetailResponse."""
     current_topic_name: str | None = None
     consecutive_probes = 0
     if interview.blueprint and interview.blueprint.topics:
@@ -208,6 +275,215 @@ async def get_interview(
         started_at=interview.started_at,
         finished_at=interview.finished_at,
     )
+
+
+async def _fetch_assessment_report(
+    db: AsyncSession,
+    interview_id: uuid.UUID,
+) -> AssessmentReportRead:
+    """Retrieve and format completed assessment report with claims and normalized evidence."""
+    stmt_rep = (
+        select(AssessmentReport)
+        .options(
+            selectinload(AssessmentReport.competency_scores)
+            .selectinload(CompetencyScore.evidence_items)
+            .selectinload(EvaluationEvidence.interview_turn),
+            selectinload(AssessmentReport.competency_scores).selectinload(
+                CompetencyScore.competency
+            ),
+        )
+        .where(
+            AssessmentReport.interview_id == interview_id,
+            AssessmentReport.is_latest.is_(True),
+        )
+        .order_by(AssessmentReport.version.desc())
+    )
+    report = (await db.execute(stmt_rep)).scalars().first()
+
+    if not report:
+        stmt_int = select(Interview).where(Interview.id == interview_id)
+        interview = (await db.execute(stmt_int)).scalar_one_or_none()
+        if not interview:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Interview '{interview_id}' not found.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No assessment report has been generated yet for interview '{interview_id}'.",
+        )
+
+    # Load claim verifications
+    stmt_claims = (
+        select(InterviewClaimVerification)
+        .options(
+            selectinload(InterviewClaimVerification.resume_claim),
+            selectinload(InterviewClaimVerification.verified_turn),
+        )
+        .where(InterviewClaimVerification.interview_id == interview_id)
+    )
+    claim_verifs = list((await db.execute(stmt_claims)).scalars().all())
+
+    comp_score_reads: list[CompetencyScoreRead] = []
+    for cs in report.competency_scores:
+        ev_reads: list[EvaluationEvidenceRead] = [
+            EvaluationEvidenceRead(
+                id=ev.id,
+                interview_turn_id=ev.interview_turn_id,
+                turn_index=ev.interview_turn.turn_index,
+                evidence_type=ev.evidence_type,  # type: ignore[arg-type]
+                assessment_impact=ev.assessment_impact,  # type: ignore[arg-type]
+                transcript_excerpt=ev.transcript_excerpt,
+                start_char_offset=ev.start_char_offset,
+                end_char_offset=ev.end_char_offset,
+                confidence=ev.confidence,
+                rationale=ev.rationale,
+            )
+            for ev in cs.evidence_items
+        ]
+        comp_score_reads.append(
+            CompetencyScoreRead(
+                competency_id=cs.competency_id,
+                competency_name=cs.competency.name if cs.competency else "Unknown",
+                score=cs.score,
+                status=cs.status,  # type: ignore[arg-type]
+                rationale=cs.rationale,
+                confidence=cs.confidence,
+                evidence_items=ev_reads,
+            )
+        )
+
+    claim_reads: list[ClaimVerificationRead] = [
+        ClaimVerificationRead(
+            claim_id=cv.resume_claim_id,
+            claim_text=cv.resume_claim.claim_text if cv.resume_claim else "",
+            category=cv.resume_claim.category if cv.resume_claim else "EXPLICIT_FACT",
+            status=cv.status,  # type: ignore[arg-type]
+            confidence=cv.confidence,
+            auditor_notes=cv.auditor_notes,
+            verified_turn_index=cv.verified_turn.turn_index if cv.verified_turn else None,
+        )
+        for cv in claim_verifs
+    ]
+
+    return AssessmentReportRead(
+        report_id=report.id,
+        interview_id=report.interview_id,
+        version=report.version,
+        is_latest=report.is_latest,
+        model_used=report.model_used,
+        overall_score=report.overall_score,
+        summary=report.summary,
+        strengths=report.strengths,
+        knowledge_gaps=report.knowledge_gaps,
+        study_recommendations=report.study_recommendations,
+        ats_score=report.ats_score,
+        ats_breakdown=report.ats_breakdown,
+        communication_score=report.communication_score,
+        communication_breakdown=report.communication_breakdown,
+        competency_scores=comp_score_reads,
+        claim_verifications=claim_reads,
+        created_at=report.created_at,
+    )
+
+
+@router.get(
+    "/latest",
+    response_model=InterviewDetailResponse,
+    summary="Get candidate's most recent interview session",
+)
+async def get_latest_interview(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> InterviewDetailResponse:
+    """Retrieve the candidate's most recently created or conducted interview."""
+    stmt_profile = select(CandidateProfile).where(CandidateProfile.user_id == current_user.id)
+    profile = (await db.execute(stmt_profile)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No candidate profile found for current user.",
+        )
+
+    stmt_interview = (
+        select(Interview)
+        .options(
+            selectinload(Interview.blueprint).selectinload(InterviewBlueprint.topics),
+            selectinload(Interview.turns),
+        )
+        .where(Interview.candidate_profile_id == profile.id)
+        .order_by(Interview.created_at.desc())
+    )
+    interview = (await db.execute(stmt_interview)).scalars().first()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No interviews found for current user.",
+        )
+
+    return _build_interview_detail(interview)
+
+
+@router.get(
+    "/latest/report",
+    response_model=AssessmentReportRead,
+    summary="Retrieve completed candidate assessment dossier for most recent interview",
+)
+async def get_latest_assessment_report(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AssessmentReportRead:
+    """Retrieve completed assessment report for candidate's latest session without needing the UUID."""
+    stmt_profile = select(CandidateProfile).where(CandidateProfile.user_id == current_user.id)
+    profile = (await db.execute(stmt_profile)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No candidate profile found for current user.",
+        )
+
+    stmt_interview = (
+        select(Interview)
+        .where(Interview.candidate_profile_id == profile.id)
+        .order_by(Interview.created_at.desc())
+    )
+    interview = (await db.execute(stmt_interview)).scalars().first()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No interviews found for current user.",
+        )
+
+    return await _fetch_assessment_report(db, interview.id)
+
+
+@router.get(
+    "/{interview_id}",
+    response_model=InterviewDetailResponse,
+    summary="Get interview session details and progress",
+)
+async def get_interview(
+    interview_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> InterviewDetailResponse:
+    """Retrieve detailed state and metadata of an interview session."""
+    stmt = (
+        select(Interview)
+        .options(
+            selectinload(Interview.blueprint).selectinload(InterviewBlueprint.topics),
+            selectinload(Interview.turns),
+        )
+        .where(Interview.id == interview_id)
+    )
+    interview = (await db.execute(stmt)).scalar_one_or_none()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview_id}' not found.",
+        )
+
+    return _build_interview_detail(interview)
 
 
 @router.post(
@@ -366,109 +642,7 @@ async def get_assessment_report(
     db: AsyncSession = Depends(get_db),
 ) -> AssessmentReportRead:
     """Retrieve completed evaluation report with normalized evidence citations and claim audit."""
-    stmt_rep = (
-        select(AssessmentReport)
-        .options(
-            selectinload(AssessmentReport.competency_scores)
-            .selectinload(CompetencyScore.evidence_items)
-            .selectinload(EvaluationEvidence.interview_turn),
-            selectinload(AssessmentReport.competency_scores).selectinload(
-                CompetencyScore.competency
-            ),
-        )
-        .where(
-            AssessmentReport.interview_id == interview_id,
-            AssessmentReport.is_latest.is_(True),
-        )
-        .order_by(AssessmentReport.version.desc())
-    )
-    report = (await db.execute(stmt_rep)).scalars().first()
-
-    if not report:
-        stmt_int = select(Interview).where(Interview.id == interview_id)
-        interview = (await db.execute(stmt_int)).scalar_one_or_none()
-        if not interview:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Interview '{interview_id}' not found.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No assessment report has been generated yet for interview '{interview_id}'.",
-        )
-
-    # Load claim verifications
-    stmt_claims = (
-        select(InterviewClaimVerification)
-        .options(
-            selectinload(InterviewClaimVerification.resume_claim),
-            selectinload(InterviewClaimVerification.verified_turn),
-        )
-        .where(InterviewClaimVerification.interview_id == interview_id)
-    )
-    claim_verifs = list((await db.execute(stmt_claims)).scalars().all())
-
-    comp_score_reads: list[CompetencyScoreRead] = []
-    for cs in report.competency_scores:
-        ev_reads: list[EvaluationEvidenceRead] = [
-            EvaluationEvidenceRead(
-                id=ev.id,
-                interview_turn_id=ev.interview_turn_id,
-                turn_index=ev.interview_turn.turn_index,
-                evidence_type=ev.evidence_type,  # type: ignore[arg-type]
-                assessment_impact=ev.assessment_impact,  # type: ignore[arg-type]
-                transcript_excerpt=ev.transcript_excerpt,
-                start_char_offset=ev.start_char_offset,
-                end_char_offset=ev.end_char_offset,
-                confidence=ev.confidence,
-                rationale=ev.rationale,
-            )
-            for ev in cs.evidence_items
-        ]
-        comp_score_reads.append(
-            CompetencyScoreRead(
-                competency_id=cs.competency_id,
-                competency_name=cs.competency.name if cs.competency else "Unknown",
-                score=cs.score,
-                status=cs.status,  # type: ignore[arg-type]
-                rationale=cs.rationale,
-                confidence=cs.confidence,
-                evidence_items=ev_reads,
-            )
-        )
-
-    claim_reads: list[ClaimVerificationRead] = [
-        ClaimVerificationRead(
-            claim_id=cv.resume_claim_id,
-            claim_text=cv.resume_claim.claim_text if cv.resume_claim else "",
-            category=cv.resume_claim.category if cv.resume_claim else "EXPLICIT_FACT",
-            status=cv.status,  # type: ignore[arg-type]
-            confidence=cv.confidence,
-            auditor_notes=cv.auditor_notes,
-            verified_turn_index=cv.verified_turn.turn_index if cv.verified_turn else None,
-        )
-        for cv in claim_verifs
-    ]
-
-    return AssessmentReportRead(
-        report_id=report.id,
-        interview_id=report.interview_id,
-        version=report.version,
-        is_latest=report.is_latest,
-        model_used=report.model_used,
-        overall_score=report.overall_score,
-        summary=report.summary,
-        strengths=report.strengths,
-        knowledge_gaps=report.knowledge_gaps,
-        study_recommendations=report.study_recommendations,
-        ats_score=report.ats_score,
-        ats_breakdown=report.ats_breakdown,
-        communication_score=report.communication_score,
-        communication_breakdown=report.communication_breakdown,
-        competency_scores=comp_score_reads,
-        claim_verifications=claim_reads,
-        created_at=report.created_at,
-    )
+    return await _fetch_assessment_report(db, interview_id)
 
 
 @router.post(

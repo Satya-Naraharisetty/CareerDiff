@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Command, FileText, Home, LogOut, Menu, Radio, X } from 'lucide-react';
+import { BarChart3, Command, FileText, Home, LogOut, Menu, Play, Radio, X } from 'lucide-react';
 import { CareerDiffLogo } from './CareerDiffLogo';
 import { useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
@@ -39,122 +39,148 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isSessionActive = interviewState !== 'CREATED' && interviewState !== 'COMPLETED';
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-850/80 bg-zinc-950/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo - Crisp Developer Monospace Pill */}
         <div
-          className="flex items-center gap-2 cursor-pointer shrink-0 group"
+          className="flex items-center gap-2.5 cursor-pointer shrink-0 group"
           onClick={() => onNavigate('home')}
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm group-hover:bg-zinc-800 transition-colors">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-750 text-zinc-100 shadow-sm group-hover:border-zinc-600 group-hover:bg-zinc-850 transition-all">
             <CareerDiffLogo className="h-4 w-4 text-zinc-100" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white font-mono">
             CareerDiff
           </span>
-          <span className="hidden sm:inline-block rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+          <span className="hidden sm:inline-block rounded-md border border-zinc-800 bg-zinc-900/90 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
             Engine v1.0
           </span>
         </div>
 
-        {/* Desktop Center Navigation - Minimalist & Focused */}
-        <nav className="hidden lg:flex items-center gap-1 font-sans" aria-label="Main Navigation">
+        {/* Desktop Center Navigation - Segmented Dock Control */}
+        <nav
+          className="hidden lg:flex items-center bg-zinc-900/70 border border-zinc-800/90 rounded-full p-1 shadow-inner backdrop-blur-sm"
+          aria-label="Main Navigation"
+        >
           <button
+            type="button"
             onClick={() => onNavigate('home')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'home'
-                ? 'bg-zinc-900 text-white border border-zinc-800'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'home'
+                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+            }`}
           >
-            Home
+            <Home className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Home</span>
           </button>
 
           <button
+            type="button"
             onClick={() => handleGuardedNavigate('setup')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'setup'
-                ? 'bg-zinc-900 text-white border border-zinc-800'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'setup'
+                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+            }`}
           >
-            Setup
+            <Play className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Practice</span>
           </button>
 
           <button
-            onClick={() => handleGuardedNavigate('interview')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'interview'
-                ? 'bg-zinc-900 text-white border border-zinc-800'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-              }`}
+            type="button"
+            onClick={() => handleGuardedNavigate(isSessionActive ? 'interview' : 'setup')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'interview'
+                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+            }`}
           >
+            <Radio className={`h-3.5 w-3.5 ${isSessionActive ? 'text-emerald-400' : 'text-zinc-400'}`} />
+            <span>Live Session</span>
             {isSessionActive && (
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="relative flex h-2 w-2 ml-0.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
             )}
-            Live Session
           </button>
 
           <button
+            type="button"
             onClick={() => handleGuardedNavigate('dossier')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'dossier'
-                ? 'bg-zinc-900 text-white border border-zinc-800'
-                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'dossier'
+                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+            }`}
           >
-            Dossier
+            <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Dashboard</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onNavigate('rewriter')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${currentView === 'rewriter'
-                ? 'bg-zinc-900 text-emerald-400 border border-emerald-500/30'
-                : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900/60'
-              }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'rewriter'
+                ? 'bg-zinc-800 text-emerald-400 shadow-sm border border-emerald-500/30'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+            }`}
           >
-            <FileText className="h-3.5 w-3.5 text-emerald-400" />
-            Resume Studio (LaTeX)
+            <FileText className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Resume Studio</span>
+            <span className="rounded bg-zinc-800/90 border border-zinc-700/60 px-1 py-0.2 text-[9px] font-mono text-zinc-400">
+              LaTeX
+            </span>
           </button>
         </nav>
 
-        {/* Desktop Right Actions - Command Palette Trigger & Profile */}
-        <div className="hidden lg:flex items-center gap-2.5">
+        {/* Desktop Right Actions - Command Palette Trigger & Unified Identity Chip */}
+        <div className="hidden lg:flex items-center gap-3">
           {onOpenCommandPalette && (
             <button
               type="button"
               onClick={onOpenCommandPalette}
               title="Open Command Palette (Cmd+K / Ctrl+K)"
-              className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/80 px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors shadow-sm"
+              className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors shadow-sm"
             >
               <Command className="h-3.5 w-3.5 text-zinc-500" />
-              <span className="font-mono text-[11px]">⌘K</span>
+              <span className="font-mono text-[10px] text-zinc-400">⌘K</span>
             </button>
           )}
 
           {isAuthenticated && user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-full border border-zinc-800 bg-zinc-900/90 p-1 pl-1.5 shadow-sm">
               <button
                 type="button"
                 onClick={onOpenProfile}
-                title="View Profile & Security Settings"
-                className="flex items-center gap-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 px-2.5 py-1.5 border border-zinc-800 text-xs text-zinc-300 hover:text-white transition-colors"
+                title="View Candidate Profile & Settings"
+                className="flex items-center gap-2 pr-2 text-xs text-zinc-300 hover:text-white transition-colors group"
               >
-                <div className="h-5 w-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-300">
+                <div className="h-6 w-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[11px] font-semibold text-emerald-400 shadow-inner group-hover:scale-105 transition-transform">
                   {(user.full_name || user.email)[0].toUpperCase()}
                 </div>
-                <span className="max-w-[120px] truncate font-medium">
+                <span className="font-medium text-xs max-w-[110px] truncate text-zinc-200 group-hover:text-white">
                   {user.full_name?.split(' ')[0] || 'Account'}
                 </span>
               </button>
+              <div className="h-3.5 w-px bg-zinc-800" />
               <button
+                type="button"
                 onClick={handleLogout}
                 title="Sign Out"
-                className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-900 rounded-lg transition-colors"
+                className="ml-1 p-1 text-zinc-500 hover:text-rose-400 rounded-full hover:bg-zinc-800/80 transition-colors"
+                aria-label="Sign Out"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
             <button
               onClick={onOpenAuth}
-              className="rounded-lg bg-white hover:bg-zinc-200 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-sm transition-all active:scale-[0.98]"
+              className="rounded-full bg-white hover:bg-zinc-200 px-4 py-1.5 text-xs font-semibold text-zinc-950 shadow-sm transition-all active:scale-[0.98]"
             >
               Sign In
             </button>
@@ -184,9 +210,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenProfile}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-2 py-1 border border-zinc-800 text-xs text-zinc-200"
+              className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-2 py-1 border border-zinc-800 text-xs text-zinc-200"
             >
-              <div className="h-4 w-4 rounded-full bg-zinc-800 flex items-center justify-center text-[9px] font-bold text-zinc-300">
+              <div className="h-5 w-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[10px] font-bold text-emerald-400">
                 {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
               </div>
               <span className="max-w-[70px] truncate">{user?.full_name?.split(' ')[0] || 'User'}</span>
@@ -207,20 +233,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="border-b border-zinc-850 bg-zinc-950/95 px-4 pt-3 pb-5 lg:hidden backdrop-blur-xl animate-in slide-in-from-top-2 duration-200 shadow-2xl">
+        <div className="border-b border-zinc-800 bg-zinc-950/95 px-4 pt-3 pb-5 lg:hidden backdrop-blur-xl animate-in slide-in-from-top-2 duration-200 shadow-2xl">
           <nav className="flex flex-col space-y-1" aria-label="Mobile Navigation">
             <button
               onClick={() => {
                 onNavigate('home');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'home'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                currentView === 'home'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
+              }`}
             >
               <Home className="h-4 w-4 text-zinc-400" />
-              Home
+              <span>Home</span>
             </button>
 
             <button
@@ -228,31 +255,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                 handleGuardedNavigate('setup');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'setup'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                currentView === 'setup'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
+              }`}
             >
-              <FileText className="h-4 w-4 text-zinc-400" />
-              Calibration Setup
+              <Play className="h-4 w-4 text-zinc-400" />
+              <span>Practice Workspace</span>
             </button>
 
             <button
               onClick={() => {
-                handleGuardedNavigate('interview');
+                handleGuardedNavigate(isSessionActive ? 'interview' : 'setup');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'interview'
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                currentView === 'interview'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
+              }`}
             >
               <div className="flex items-center gap-2.5">
-                <Radio className="h-4 w-4 text-zinc-400" />
-                Live Session
+                <Radio className={`h-4 w-4 ${isSessionActive ? 'text-emerald-400' : 'text-zinc-400'}`} />
+                <span>Live Session</span>
               </div>
               {isSessionActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               )}
             </button>
 
@@ -261,13 +290,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                 handleGuardedNavigate('dossier');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'dossier'
+              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                currentView === 'dossier'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                }`}
+              }`}
             >
-              <FileText className="h-4 w-4 text-zinc-400" />
-              Assessment Dossier
+              <BarChart3 className="h-4 w-4 text-emerald-400" />
+              <span>Performance Dashboard</span>
             </button>
 
             <button
@@ -275,23 +305,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onNavigate('rewriter');
                 setMobileMenuOpen(false);
               }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${currentView === 'rewriter'
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                currentView === 'rewriter'
                   ? 'bg-zinc-800 text-emerald-400'
                   : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900'
-                }`}
+              }`}
             >
-              <FileText className="h-4 w-4 text-emerald-400" />
-              Resume Studio (LaTeX)
+              <div className="flex items-center gap-2.5">
+                <FileText className="h-4 w-4 text-emerald-400" />
+                <span>Resume Studio</span>
+              </div>
+              <span className="rounded bg-zinc-800 border border-zinc-700/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400">
+                LaTeX
+              </span>
             </button>
           </nav>
 
           {/* Mobile Auth Actions */}
-          <div className="mt-3 pt-3 border-t border-zinc-850">
+          <div className="mt-3 pt-3 border-t border-zinc-800">
             {isAuthenticated && user ? (
               <div className="flex items-center justify-between bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800">
                 <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
-                    {user.full_name ? user.full_name[0].toUpperCase() : 'U'}
+                  <div className="h-7 w-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-bold text-emerald-400">
+                    {(user.full_name || user.email || 'U')[0].toUpperCase()}
                   </div>
                   <div className="text-left">
                     <p className="text-xs font-medium text-white">{user.full_name || 'Candidate'}</p>

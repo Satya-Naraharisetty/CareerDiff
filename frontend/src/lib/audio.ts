@@ -4,6 +4,58 @@
  * Sub-150ms barge-in interruption capability.
  */
 
+const activeMediaStreams = new Set<MediaStream>();
+
+/**
+ * Register a MediaStream to be tracked globally so that on interview conclusion
+ * or view transitions, all hardware devices (camera & microphone) can be reliably terminated.
+ */
+export function registerActiveStream(stream: MediaStream): void {
+  activeMediaStreams.add(stream);
+  stream.getTracks().forEach((track) => {
+    track.addEventListener('ended', () => {
+      const allEnded = stream.getTracks().every((t) => t.readyState === 'ended');
+      if (allEnded) {
+        activeMediaStreams.delete(stream);
+      }
+    });
+  });
+}
+
+/**
+ * Comprehensive hardware media terminator.
+ * Stops all active MediaStreamTracks and clears any <video> element srcObject sinks
+ * across the DOM, immediately releasing camera and microphone hardware in the browser.
+ */
+export function stopAllMediaHardware(): void {
+  for (const stream of activeMediaStreams) {
+    try {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {
+          // Ignore individual track termination error
+        }
+      });
+    } catch {
+      // Ignore stream iteration error
+    }
+  }
+  activeMediaStreams.clear();
+
+  if (typeof document !== 'undefined') {
+    const videoElements = document.querySelectorAll('video');
+    videoElements.forEach((video) => {
+      try {
+        video.pause();
+        video.srcObject = null;
+      } catch {
+        // Ignore video detachment error
+      }
+    });
+  }
+}
+
 export class PcmPlayer {
   private audioCtx: AudioContext | null = null;
   private nextPlayTime: number = 0;
@@ -103,17 +155,34 @@ export class PcmRecorder {
     this.onDataChunk = onChunk;
     this.onVolumeChange = onVolume;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        sampleRate: 16000,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+    const preferredAudioId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_preferred_audio_device') : null;
+    const effectiveAudioId = preferredAudioId && !preferredAudioId.toLowerCase().includes('virtual') ? preferredAudioId : 'default';
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          deviceId: { ideal: effectiveAudioId },
+        },
+      });
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    }
 
     this.mediaStream = stream;
+    registerActiveStream(stream);
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.audioCtx = new AudioContextClass();
     const sampleRate = this.audioCtx.sampleRate;

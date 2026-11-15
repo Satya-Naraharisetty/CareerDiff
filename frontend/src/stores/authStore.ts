@@ -18,21 +18,60 @@ interface AuthState {
   login: (credentials: UserLoginRequest) => Promise<void>;
   register: (payload: UserRegisterRequest) => Promise<UserRegisterResponse>;
   recoverPassword: (payload: PasswordRecoveryRequest) => Promise<PasswordRecoveryResponse>;
+  rehydrateProfile: () => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
 
+const STORAGE_KEYS = [
+  'CareerDiff_auth_storage',
+  'careerdiff_auth_storage',
+  'intervuex_auth_storage',
+];
 const STORAGE_KEY = 'CareerDiff_auth_storage';
+
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp !== 'number') return false;
+    // Expired if current timestamp exceeds token exp with a 10s buffer
+    return payload.exp * 1000 <= Date.now() + 10000;
+  } catch {
+    return false;
+  }
+}
 
 const loadPersistedAuth = (): { token: string | null; user: UserProfile | null } => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { token: null, user: null };
-    const parsed = JSON.parse(raw);
-    return {
-      token: parsed?.state?.token || null,
-      user: parsed?.state?.user || null,
-    };
+    for (const key of STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const token = parsed?.state?.token || parsed?.token || parsed?.access_token || null;
+        const user = parsed?.state?.user || parsed?.user || null;
+
+        if (token) {
+          if (isTokenExpired(token)) {
+            try {
+              localStorage.removeItem(key);
+            } catch {}
+            continue;
+          }
+
+          if (key !== STORAGE_KEY) {
+            savePersistedAuth(token, user);
+            try {
+              localStorage.removeItem(key);
+            } catch {}
+          }
+          return { token, user };
+        }
+      }
+    }
+    return { token: null, user: null };
   } catch {
     return { token: null, user: null };
   }
@@ -40,13 +79,21 @@ const loadPersistedAuth = (): { token: string | null; user: UserProfile | null }
 
 const savePersistedAuth = (token: string | null, user: UserProfile | null) => {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        state: { token, user },
-        version: 1,
-      })
-    );
+    if (!token) {
+      STORAGE_KEYS.forEach((k) => {
+        try {
+          localStorage.removeItem(k);
+        } catch {}
+      });
+    } else {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          state: { token, user },
+          version: 1,
+        })
+      );
+    }
   } catch {
     // Storage quota or private browsing fallback
   }
@@ -54,7 +101,7 @@ const savePersistedAuth = (token: string | null, user: UserProfile | null) => {
 
 const initialAuth = loadPersistedAuth();
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   token: initialAuth.token,
   user: initialAuth.user,
   isAuthenticated: !!initialAuth.token,
@@ -65,13 +112,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await authApi.login(credentials);
-      // Construct fallback profile from credentials
-      const user: UserProfile = {
+      let user: UserProfile = {
         id: 'current-user',
         email: credentials.email,
         full_name: credentials.email.split('@')[0],
       };
       savePersistedAuth(res.access_token, user);
+
+      // Attempt to load full verified profile from server
+      try {
+        const profile = await authApi.getProfile();
+        user = {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name,
+          target_seniority: profile.target_seniority,
+          primary_discipline: profile.primary_discipline,
+        };
+        savePersistedAuth(res.access_token, user);
+      } catch {
+        // Fallback to credentials profile
+      }
+
       set({
         token: res.access_token,
         user,
@@ -133,6 +195,28 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  rehydrateProfile: async () => {
+    const { token } = get();
+    if (!token || isTokenExpired(token)) {
+      get().logout();
+      return;
+    }
+    try {
+      const profile = await authApi.getProfile();
+      const user: UserProfile = {
+        id: profile.id,
+        email: profile.email,
+        full_name: profile.full_name,
+        target_seniority: profile.target_seniority,
+        primary_discipline: profile.primary_discipline,
+      };
+      savePersistedAuth(token, user);
+      set({ user, isAuthenticated: true });
+    } catch {
+      // If profile fails due to 401, careerdiff:unauthorized handles logout
+    }
+  },
+
   logout: () => {
     savePersistedAuth(null, null);
     set({
@@ -145,3 +229,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('careerdiff:unauthorized', () => {
+    useAuthStore.getState().logout();
+  });
+}

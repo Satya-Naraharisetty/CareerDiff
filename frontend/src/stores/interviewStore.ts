@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { interviewsApi } from '../lib/api';
 import { PcmPlayer, PcmRecorder } from '../lib/audio';
 import { BrowserSpeechRecognizer } from '../lib/speechRecognition';
+import { BrowserSpeechSynthesizer } from '../lib/speechSynthesis';
 import type {
   EngineAction,
   InterviewBlueprintRead,
@@ -51,6 +52,8 @@ interface InterviewStoreState {
   reset: () => void;
 }
 
+const ACTIVE_INTERVIEW_ID_KEY = 'careerdiff_active_interview_id';
+
 let activeWs: WebSocket | null = null;
 let pcmPlayer: PcmPlayer | null = null;
 let pcmRecorder: PcmRecorder | null = null;
@@ -58,7 +61,7 @@ let speechRecognizer: BrowserSpeechRecognizer | null = null;
 let countdownTimer: number | null = null;
 
 export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
-  interviewId: null,
+  interviewId: typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_INTERVIEW_ID_KEY) : null,
   state: 'CREATED',
   mode: 'VOICE',
   targetSeniority: 'SENIOR',
@@ -76,6 +79,11 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   error: null,
 
   setInterview: (id, state, mode, seniority, blueprint, preferredLanguage) => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ACTIVE_INTERVIEW_ID_KEY, id);
+      }
+    } catch {}
     set({
       interviewId: id,
       state,
@@ -219,8 +227,8 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
       ws.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
-          // Inbound binary PCM audio from server TTS!
-          if (pcmPlayer) {
+          // If browser native TTS is unavailable, fallback to server binary PCM audio
+          if (!BrowserSpeechSynthesizer.isSupported() && pcmPlayer) {
             set({ isInterviewerSpeaking: true });
             pcmPlayer.feed(event.data);
           }
@@ -267,6 +275,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 }));
                 break;
               case 'interviewer_interrupted':
+                BrowserSpeechSynthesizer.stop();
                 if (pcmPlayer) {
                   pcmPlayer.stopAll();
                 }
@@ -330,9 +339,16 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       if (!speechRecognizer) {
         speechRecognizer = new BrowserSpeechRecognizer();
       }
-      speechRecognizer.start((liveTranscript) => {
-        set({ partialTranscript: liveTranscript });
-      });
+      speechRecognizer.start(
+        (liveTranscript) => {
+          set({ partialTranscript: liveTranscript });
+        },
+        undefined,
+        () => {
+          // Automatic 2.2s silence detection -> hands-free auto-commit candidate turn
+          get().stopVoiceRecording();
+        }
+      );
 
       set({ isRecording: true, error: null });
     } catch (err: unknown) {
@@ -363,11 +379,12 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         })
       );
     }
-    set({ isRecording: false, audioLevel: 0 });
+    set({ isRecording: false, audioLevel: 0, partialTranscript: '' });
   },
 
   bargeIn: () => {
     // 1. Instant local playback cutoff (<150ms preemption)
+    BrowserSpeechSynthesizer.stop();
     if (pcmPlayer) {
       pcmPlayer.stopAll();
     }
@@ -382,9 +399,15 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         })
       );
     }
+
+    // 3. Immediately activate candidate microphone for prompt response
+    if (!get().isRecording) {
+      get().startVoiceRecording().catch(() => {});
+    }
   },
 
   disconnectVoiceSession: () => {
+    BrowserSpeechSynthesizer.stop();
     if (speechRecognizer) {
       speechRecognizer.abort();
       speechRecognizer = null;
@@ -432,6 +455,12 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   },
 
   reset: () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(ACTIVE_INTERVIEW_ID_KEY);
+      }
+    } catch {}
+    BrowserSpeechSynthesizer.stop();
     get().disconnectVoiceSession();
     set({
       interviewId: null,

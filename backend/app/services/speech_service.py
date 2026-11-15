@@ -66,7 +66,7 @@ class STTService:
             except Exception:
                 pass
 
-        if allow_mock_fallback or settings.environment == "testing":
+        if allow_mock_fallback or settings.environment in ("development", "testing"):
             return (
                 "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
                 "and mitigated consumer group rebalance latency using cooperative sticky assignors."

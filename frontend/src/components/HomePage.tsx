@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowRight,
+  BarChart3,
   CheckCircle2,
   Cpu,
   FileCheck,
@@ -15,9 +16,10 @@ import { useAuthStore } from '../stores/authStore';
 interface HomePageProps {
   onGetStarted: () => void;
   onOpenAuth: () => void;
+  onOpenDashboard?: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, onOpenDashboard }) => {
   const { isAuthenticated } = useAuthStore();
   const [activePreviewTab, setActivePreviewTab] = useState<'interview' | 'provenance' | 'dossier'>('interview');
   const [wrapPreviewText, setWrapPreviewText] = useState(true);
@@ -64,6 +66,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth }) 
               {isAuthenticated ? 'Enter Practice Workspace' : 'Start Technical Practice'}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
+
+            {isAuthenticated && onOpenDashboard && (
+              <button
+                type="button"
+                onClick={onOpenDashboard}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-900/70 bg-emerald-950/40 px-5 py-3 text-xs font-semibold text-emerald-400 hover:bg-emerald-900/50 hover:border-emerald-600 transition-all shadow-sm"
+              >
+                <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+                Performance Dashboard
+              </button>
+            )}
 
             <a
               href="#architecture"

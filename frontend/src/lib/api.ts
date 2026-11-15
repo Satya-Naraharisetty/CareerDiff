@@ -16,6 +16,7 @@ import type {
   InterviewCreateRequest,
   InterviewCreateResponse,
   InterviewDetailResponse,
+  InterviewHistoryResponse,
   InterviewerTurnResponse,
   InterviewTurnRead,
   JdAnalysisRequest,
@@ -56,12 +57,23 @@ export class ApiError extends Error {
   }
 }
 
+const STORAGE_KEYS = [
+  'CareerDiff_auth_storage',
+  'careerdiff_auth_storage',
+  'intervuex_auth_storage',
+];
+
 const getAuthToken = (): string | null => {
   try {
-    const raw = localStorage.getItem('CareerDiff_auth_storage');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.state?.token || null;
+    for (const key of STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const token = parsed?.state?.token || parsed?.token || parsed?.access_token || null;
+        if (token) return token;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -109,6 +121,16 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
   });
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      !endpoint.includes('/auth/login') &&
+      !endpoint.includes('/auth/register')
+    ) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('careerdiff:unauthorized'));
+      }
+    }
+
     let errorDetail = `Request failed with status ${response.status}`;
     let errorData: unknown = null;
     try {
@@ -205,6 +227,15 @@ export const interviewsApi = {
 
   get: (interviewId: string) =>
     fetchApi<InterviewDetailResponse>(`/api/v1/interviews/${interviewId}`),
+
+  getLatest: () =>
+    fetchApi<InterviewDetailResponse>('/api/v1/interviews/latest'),
+
+  getLatestReport: () =>
+    fetchApi<AssessmentReportRead>('/api/v1/interviews/latest/report'),
+
+  listHistory: () =>
+    fetchApi<InterviewHistoryResponse>('/api/v1/interviews'),
 
   start: (interviewId: string) =>
     fetchApi<InterviewTurnRead>(`/api/v1/interviews/${interviewId}/start`, {
