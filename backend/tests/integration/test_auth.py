@@ -1,9 +1,14 @@
 """Integration tests for user registration, authentication, and JWT lifecycle."""
 
 import uuid
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+
+from app.core.config import get_settings
+
+settings = get_settings()
 
 
 @pytest.mark.asyncio
@@ -63,7 +68,7 @@ async def test_user_login_success(async_client: AsyncClient) -> None:
     data = response.json()
     assert "access_token" in data
     assert data["token_type"] == "bearer"
-    assert data["expires_in"] == 900
+    assert data["expires_in"] == settings.jwt_access_token_expire_minutes * 60
 
 
 @pytest.mark.asyncio
@@ -308,3 +313,171 @@ async def test_delete_account_lifecycle(async_client: AsyncClient) -> None:
         },
     )
     assert re_register.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_google_oauth_new_user_registration(async_client: AsyncClient) -> None:
+    """Verify new user registration via valid Google OIDC token returns JWT and creates profile."""
+    unique_sub = f"google-sub-{uuid.uuid4().hex[:12]}"
+    unique_email = f"google_cand_{uuid.uuid4().hex[:8]}@gmail.com"
+    mock_claims = {
+        "sub": unique_sub,
+        "email": unique_email,
+        "email_verified": True,
+        "name": "Alex Google Candidate",
+        "picture": "https://lh3.googleusercontent.com/photo.jpg",
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("app.api.v1.endpoints.auth.verify_google_id_token", return_value=mock_claims):
+        response = await async_client.post(
+            "/api/v1/auth/google",
+            json={"id_token": "valid.google.id.token"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+        # Verify profile can be fetched with returned JWT
+        headers = {"Authorization": f"Bearer {data['access_token']}"}
+        profile_res = await async_client.get("/api/v1/auth/me", headers=headers)
+        assert profile_res.status_code == 200
+        pdata = profile_res.json()
+        assert pdata["email"] == unique_email
+        assert pdata["full_name"] == "Alex Google Candidate"
+        assert pdata["auth_provider"] == "GOOGLE"
+        assert pdata["avatar_url"] == "https://lh3.googleusercontent.com/photo.jpg"
+        assert pdata["remaining_backup_codes"] == 8
+
+
+@pytest.mark.asyncio
+async def test_google_oauth_existing_user_linking(async_client: AsyncClient) -> None:
+    """Verify existing password-registered candidate can sign in and link Google account."""
+    unique_email = f"linking_{uuid.uuid4().hex[:8]}@example.com"
+    password = "SecurePassword123!"
+
+    # 1. Register with email + password
+    reg_res = await async_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": unique_email,
+            "password": password,
+            "full_name": "Password User",
+        },
+    )
+    assert reg_res.status_code == 201
+
+    # 2. Sign in via Google with the matching verified email
+    google_sub = f"google-sub-{uuid.uuid4().hex[:12]}"
+    mock_claims = {
+        "sub": google_sub,
+        "email": unique_email,
+        "email_verified": True,
+        "name": "Password User Linked",
+        "picture": "https://lh3.googleusercontent.com/avatar.png",
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("app.api.v1.endpoints.auth.verify_google_id_token", return_value=mock_claims):
+        google_res = await async_client.post(
+            "/api/v1/auth/google",
+            json={"id_token": "valid.google.token"},
+        )
+        assert google_res.status_code == 200
+        token = google_res.json()["access_token"]
+
+        # Profile reflects updated avatar
+        headers = {"Authorization": f"Bearer {token}"}
+        profile_res = await async_client.get("/api/v1/auth/me", headers=headers)
+        assert profile_res.status_code == 200
+        assert profile_res.json()["email"] == unique_email
+        assert profile_res.json()["avatar_url"] == "https://lh3.googleusercontent.com/avatar.png"
+
+
+@pytest.mark.asyncio
+async def test_google_oauth_subsequent_login(async_client: AsyncClient) -> None:
+    """Verify returning Google user authenticates cleanly by google_id."""
+    google_sub = f"google-sub-{uuid.uuid4().hex[:12]}"
+    unique_email = f"returning_{uuid.uuid4().hex[:8]}@gmail.com"
+    mock_claims = {
+        "sub": google_sub,
+        "email": unique_email,
+        "email_verified": True,
+        "name": "Returning Candidate",
+        "picture": None,
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("app.api.v1.endpoints.auth.verify_google_id_token", return_value=mock_claims):
+        # First login (provisions user)
+        res1 = await async_client.post("/api/v1/auth/google", json={"id_token": "token1"})
+        assert res1.status_code == 200
+
+        # Second login (authenticates existing user by google_id)
+        res2 = await async_client.post("/api/v1/auth/google", json={"id_token": "token2"})
+        assert res2.status_code == 200
+        assert "access_token" in res2.json()
+
+
+@pytest.mark.asyncio
+async def test_oauth_user_cannot_change_password_without_password(async_client: AsyncClient) -> None:
+    """Verify an OAuth-only user (no password) gets a 400 when attempting password change."""
+    unique_sub = f"google-sub-{uuid.uuid4().hex[:12]}"
+    unique_email = f"oauthonly_{uuid.uuid4().hex[:8]}@gmail.com"
+    mock_claims = {
+        "sub": unique_sub,
+        "email": unique_email,
+        "email_verified": True,
+        "name": "No Password User",
+        "picture": None,
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("app.api.v1.endpoints.auth.verify_google_id_token", return_value=mock_claims):
+        res = await async_client.post("/api/v1/auth/google", json={"id_token": "valid.token"})
+        assert res.status_code == 200
+        token = res.json()["access_token"]
+
+        headers = {"Authorization": f"Bearer {token}"}
+        change_res = await async_client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "any", "new_password": "NewPassword123!"},
+            headers=headers,
+        )
+        assert change_res.status_code == 400
+        assert change_res.json()["detail"] == "ACCOUNT_USES_OAUTH_NO_PASSWORD"
+
+
+@pytest.mark.asyncio
+async def test_oauth_user_can_delete_account_without_password(async_client: AsyncClient) -> None:
+    """Verify an OAuth-only user can exercise GDPR Right to Erasure without a password."""
+    unique_sub = f"google-sub-{uuid.uuid4().hex[:12]}"
+    unique_email = f"deleteoauth_{uuid.uuid4().hex[:8]}@gmail.com"
+    mock_claims = {
+        "sub": unique_sub,
+        "email": unique_email,
+        "email_verified": True,
+        "name": "Erasure OAuth User",
+        "picture": None,
+        "iss": "https://accounts.google.com",
+    }
+
+    with patch("app.api.v1.endpoints.auth.verify_google_id_token", return_value=mock_claims):
+        res = await async_client.post("/api/v1/auth/google", json={"id_token": "valid.token"})
+        assert res.status_code == 200
+        token = res.json()["access_token"]
+
+        headers = {"Authorization": f"Bearer {token}"}
+        del_res = await async_client.request(
+            "DELETE",
+            "/api/v1/auth/me",
+            json={"confirmation_text": "DELETE"},
+            headers=headers,
+        )
+        assert del_res.status_code == 200
+        assert "erased" in del_res.json()["message"].lower()
+
+        # Token is now invalid
+        me_res = await async_client.get("/api/v1/auth/me", headers=headers)
+        assert me_res.status_code == 401

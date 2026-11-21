@@ -55,10 +55,17 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Initialize async engine and execute migrations in online mode."""
+    target_url = config.get_main_option("sqlalchemy.url") or ""
+    connect_args: dict[str, int] = {}
+    if ":6543" in target_url or "pooler.supabase.com" in target_url:
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
 
     async with connectable.connect() as connection:

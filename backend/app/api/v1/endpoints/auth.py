@@ -14,6 +14,7 @@ from app.core.security import (
     get_current_user,
     hash_password,
     verify_and_consume_backup_code,
+    verify_google_id_token,
     verify_password,
 )
 from app.models.user import CandidateProfile, User
@@ -21,6 +22,7 @@ from app.schemas.auth import (
     AccountDeletionRequest,
     AccountDeletionResponse,
     BackupCodesRegenerateResponse,
+    GoogleLoginRequest,
     PasswordChangeRequest,
     PasswordChangeResponse,
     PasswordRecoveryRequest,
@@ -118,7 +120,7 @@ async def login_user(
     stmt = select(User).where(User.email == normalized_email)
     user = (await db.execute(stmt)).scalar_one_or_none()
 
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="INVALID_CREDENTIALS",
@@ -130,6 +132,100 @@ async def login_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="USER_INACTIVE",
         )
+
+    token = create_access_token(
+        subject=user.id,
+        claims={"email": user.email, "role": user.role},
+    )
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=settings.jwt_access_token_expire_minutes * 60,
+    )
+
+
+@router.post(
+    "/google",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Authenticate or register user via Google OIDC ID token",
+)
+async def login_with_google(
+    payload: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Verify Google OIDC ID token, provision or link user, and return JWT access token."""
+    id_info = verify_google_id_token(payload.id_token)
+
+    google_sub = id_info.get("sub")
+    email = id_info.get("email", "").lower().strip()
+    full_name = id_info.get("name") or email.split("@")[0] or "Candidate"
+    picture = id_info.get("picture")
+
+    if not google_sub or not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GOOGLE_TOKEN_MISSING_REQUIRED_CLAIMS",
+        )
+
+    # 1. Look up existing user by google_id
+    stmt = select(User).where(User.google_id == google_sub)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="USER_INACTIVE",
+            )
+        # Update avatar or name if changed
+        if picture and not user.avatar_url:
+            user.avatar_url = picture
+            await db.commit()
+    else:
+        # 2. Check if a user with this verified email already exists (account linking)
+        stmt_email = select(User).where(User.email == email)
+        user = (await db.execute(stmt_email)).scalar_one_or_none()
+
+        if user:
+            if not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="USER_INACTIVE",
+                )
+            # Link Google credentials to existing account
+            user.google_id = google_sub
+            if picture and not user.avatar_url:
+                user.avatar_url = picture
+            await db.commit()
+        else:
+            # 3. Provision brand new user
+            _, hashed_records = generate_backup_codes(count=8)
+            user = User(
+                email=email,
+                hashed_password=None,
+                full_name=full_name,
+                role="CANDIDATE",
+                is_active=True,
+                auth_provider="GOOGLE",
+                google_id=google_sub,
+                avatar_url=picture,
+                hashed_backup_codes=hashed_records,
+            )
+            db.add(user)
+            await db.flush()
+
+            profile = CandidateProfile(
+                user_id=user.id,
+                target_seniority="MID",
+                primary_discipline="BACKEND",
+                years_experience=0,
+                verified_skills=[],
+            )
+            db.add(profile)
+            await db.commit()
+            await db.refresh(user)
 
     token = create_access_token(
         subject=user.id,
@@ -241,6 +337,8 @@ async def get_current_user_profile(
         email=user.email,
         full_name=user.full_name,
         role=user.role,
+        auth_provider=user.auth_provider,
+        avatar_url=user.avatar_url,
         target_seniority=seniority,
         primary_discipline=discipline,
         years_experience=years_exp,
@@ -260,6 +358,12 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
 ) -> PasswordChangeResponse:
     """Verify existing password, hash new password with bcrypt, and update credentials."""
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ACCOUNT_USES_OAUTH_NO_PASSWORD",
+        )
+
     if not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -297,11 +401,14 @@ async def delete_current_user_account(
             detail="INVALID_CONFIRMATION_TEXT",
         )
 
-    if not verify_password(payload.current_password, current_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="INVALID_CURRENT_PASSWORD",
-        )
+    if current_user.hashed_password:
+        if not payload.current_password or not verify_password(
+            payload.current_password, current_user.hashed_password
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="INVALID_CURRENT_PASSWORD",
+            )
 
     await db.delete(current_user)
     await db.commit()

@@ -21,6 +21,7 @@ from app.schemas.adaptive import (
 )
 from app.services.interview_state_machine import InterviewStateMachine
 from app.services.live_answer_interpreter import LiveAnswerInterpreter
+from app.services.outbox_poller import OutboxPoller
 from app.services.outbox_service import OutboxService
 from app.services.policy_guardrails import PolicyGuardrails
 from app.services.turn_generator import TurnGenerator
@@ -366,6 +367,10 @@ class TurnService:
 
         await db.commit()
         await db.refresh(interviewer_turn)
+
+        # Trigger immediate in-process outbox processing if interview completed
+        if interview.state == InterviewState.COMPLETED.value:
+            OutboxPoller.trigger_dispatch_in_background()
 
         return InterviewerTurnResponse(
             turn_index=interviewer_turn.turn_index,

@@ -16,6 +16,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (credentials: UserLoginRequest) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (payload: UserRegisterRequest) => Promise<UserRegisterResponse>;
   recoverPassword: (payload: PasswordRecoveryRequest) => Promise<PasswordRecoveryResponse>;
   rehydrateProfile: () => Promise<void>;
@@ -128,6 +129,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           full_name: profile.full_name,
           target_seniority: profile.target_seniority,
           primary_discipline: profile.primary_discipline,
+          auth_provider: profile.auth_provider,
+          avatar_url: profile.avatar_url,
         };
         savePersistedAuth(res.access_token, user);
       } catch {
@@ -142,6 +145,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  loginWithGoogle: async (idToken: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await authApi.loginWithGoogle({ id_token: idToken });
+      let user: UserProfile = {
+        id: 'google-user',
+        email: 'candidate@google.com',
+        full_name: 'Candidate',
+      };
+      savePersistedAuth(res.access_token, user);
+
+      try {
+        const profile = await authApi.getProfile();
+        user = {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name,
+          role: profile.role,
+          target_seniority: profile.target_seniority,
+          primary_discipline: profile.primary_discipline,
+          auth_provider: profile.auth_provider,
+          avatar_url: profile.avatar_url,
+        };
+        savePersistedAuth(res.access_token, user);
+      } catch {
+        // Fallback
+      }
+
+      set({
+        token: res.access_token,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Google authentication failed';
       set({ error: message, isLoading: false });
       throw err;
     }

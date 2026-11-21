@@ -213,7 +213,7 @@ class TurnGenerator:
         company_name: str | None = None,
     ) -> str:
         """Generate welcoming opener for the WARMUP phase grounded in candidate resume & company motivation.
-        
+
         Framed like a warm, conversational human technical interview rather than an exam.
         """
         first_name = candidate_name.split()[0] if candidate_name else None

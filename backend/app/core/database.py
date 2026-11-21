@@ -26,10 +26,17 @@ def create_engine_and_session_factory(
     is_testing: bool = False,
 ) -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
     """Initialize async engine and sessionmaker for PostgreSQL with asyncpg."""
+    # Transaction poolers (e.g. Supabase port 6543 / PgBouncer) require disabling statement cache
+    connect_args: dict[str, int] = {}
+    if ":6543" in database_url or "pooler.supabase.com" in database_url:
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+
     if is_testing:
         engine = create_async_engine(
             database_url,
             poolclass=NullPool,
+            connect_args=connect_args,
         )
     else:
         engine = create_async_engine(
@@ -37,6 +44,7 @@ def create_engine_and_session_factory(
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
+            connect_args=connect_args,
         )
     session_factory = async_sessionmaker(
         bind=engine,

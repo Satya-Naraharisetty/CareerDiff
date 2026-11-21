@@ -70,6 +70,12 @@ class UserLoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    """Payload containing Google OIDC credential ID token."""
+
+    id_token: str = Field(min_length=1, description="Google OIDC ID Token")
+
+
 class TokenResponse(BaseModel):
     """JWT bearer token response."""
 
@@ -100,6 +106,8 @@ class UserProfileResponse(BaseModel):
     email: str
     full_name: str
     role: str
+    auth_provider: str = "LOCAL"
+    avatar_url: str | None = None
     target_seniority: str
     primary_discipline: str
     years_experience: int
@@ -109,9 +117,9 @@ class UserProfileResponse(BaseModel):
 class AccountDeletionRequest(BaseModel):
     """Payload for authenticated candidate requesting permanent account erasure."""
 
-    current_password: str = Field(
-        min_length=1,
-        description="Current plaintext password for re-authentication",
+    current_password: str | None = Field(
+        default=None,
+        description="Current plaintext password for re-authentication (optional for OAuth-only users)",
     )
     confirmation_text: str = Field(description="Must match 'DELETE' to confirm permanent erasure")
 

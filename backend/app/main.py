@@ -1,5 +1,6 @@
 """CareerDiff FastAPI Application Entrypoint."""
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -12,21 +13,51 @@ from fastapi.responses import PlainTextResponse
 from app.api.v1.endpoints.websocket import router as ws_router
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
-from app.core.database import engine
+from app.core.database import async_session_factory, engine
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.tracing import CorrelationIdMiddleware
+from app.services.outbox_poller import OutboxPoller
 
 settings = get_settings()
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
 logger = logging.getLogger("CareerDiff")
 
 
+async def run_outbox_loop(poll_interval_seconds: int = 15) -> None:
+    """Lightweight in-process background poller processing queued outbox events."""
+    logger.info("In-process Outbox background poller started (interval: %ds).", poll_interval_seconds)
+    while True:
+        try:
+            async with async_session_factory() as db:
+                await OutboxPoller.poll_and_dispatch_batch(db=db, worker_id="in-process-worker")
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.error("Error in background outbox poller: %s", exc)
+        await asyncio.sleep(poll_interval_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown lifecycle hooks."""
     logger.info("Initializing CareerDiff backend services in %s mode...", settings.environment)
+
+    outbox_task: asyncio.Task[None] | None = None
+    if settings.environment != "testing":
+        outbox_task = asyncio.create_task(run_outbox_loop())
+        logger.info("In-process Outbox background worker task spawned.")
+
     yield
+
     logger.info("Shutting down CareerDiff backend services...")
+    if outbox_task and not outbox_task.done():
+        outbox_task.cancel()
+        try:
+            await outbox_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("In-process Outbox background worker cleanly terminated.")
+
     await engine.dispose()
     logger.info("Database engine connections cleanly closed.")
 

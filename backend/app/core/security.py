@@ -5,12 +5,14 @@ import hmac
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -192,3 +194,49 @@ async def get_current_user(
         )
 
     return user
+
+
+def verify_google_id_token(token: str, client_id: str | None = None) -> dict[str, Any]:
+    """Verify Google OIDC ID token and return verified claims.
+
+    Verifies signature using Google's public JWKS, expiration, and audience.
+    """
+    try:
+        request = google_requests.Request()
+        target_audience = client_id or settings.google_client_id
+        id_info: dict[str, Any] = cast(
+            dict[str, Any],
+            google_id_token.verify_oauth2_token(  # type: ignore[no-untyped-call]
+                token,
+                request,
+                audience=target_audience,
+            ),
+        )
+        issuer = id_info.get("iss")
+        if issuer not in ("accounts.google.com", "https://accounts.google.com"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="INVALID_TOKEN_ISSUER",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not id_info.get("email_verified", False):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="GOOGLE_EMAIL_NOT_VERIFIED",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return id_info
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"INVALID_GOOGLE_TOKEN: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"GOOGLE_AUTH_ERROR: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e

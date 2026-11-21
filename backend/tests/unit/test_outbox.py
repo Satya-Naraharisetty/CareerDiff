@@ -1,5 +1,6 @@
 """Unit tests for Transactional Outbox pattern and poller dispatch."""
 
+import unittest.mock
 import uuid
 from datetime import datetime, timezone
 
@@ -124,7 +125,7 @@ async def test_outbox_retry_and_dead_letter_transition() -> None:
 
 @pytest.mark.asyncio
 async def test_outbox_poller_dispatches_batch() -> None:
-    """Verify OutboxPoller claims and dispatches interview.completed events."""
+    """Verify OutboxPoller claims and dispatches interview.completed events in-process."""
     async with async_session_factory() as db:
         interview_id = uuid.uuid4()
         event = OutboxService.create_event(
@@ -136,13 +137,53 @@ async def test_outbox_poller_dispatches_batch() -> None:
         )
         await db.commit()
 
-        count = await OutboxPoller.poll_and_dispatch_batch(
-            db=db,
-            batch_size=10,
-            worker_id="test-poller",
-        )
-        assert count >= 1
+        # Mock AssessmentEvaluator.evaluate_interview to isolate poller dispatch from LLM pipeline
+        with unittest.mock.patch(
+            "app.services.outbox_poller.AssessmentEvaluator.evaluate_interview",
+            new_callable=unittest.mock.AsyncMock,
+        ) as mock_eval:
+            mock_eval.return_value = unittest.mock.MagicMock(id=uuid.uuid4())
+
+            count = await OutboxPoller.poll_and_dispatch_batch(
+                db=db,
+                batch_size=10,
+                worker_id="test-poller",
+            )
+            assert count >= 1
+            mock_eval.assert_awaited_once()
 
         stmt = select(OutboxEvent).where(OutboxEvent.id == event.id)
         refreshed = (await db.execute(stmt)).scalar_one()
         assert refreshed.status == "PUBLISHED"
+
+
+@pytest.mark.asyncio
+async def test_outbox_poller_handles_dispatch_exception() -> None:
+    """Verify poller transitions event to FAILED and increments retry when in-process handler raises."""
+    async with async_session_factory() as db:
+        interview_id = uuid.uuid4()
+        event = OutboxService.create_event(
+            db=db,
+            event_type="interview.completed",
+            aggregate_type="interview",
+            aggregate_id=interview_id,
+            payload={"interview_id": str(interview_id)},
+        )
+        await db.commit()
+
+        # Mock AssessmentEvaluator.evaluate_interview to simulate transient error
+        with unittest.mock.patch(
+            "app.services.outbox_poller.AssessmentEvaluator.evaluate_interview",
+            side_effect=RuntimeError("Transient database lock timeout"),
+        ):
+            count = await OutboxPoller.poll_and_dispatch_batch(
+                db=db,
+                batch_size=10,
+                worker_id="test-poller-err",
+            )
+            assert count == 0
+
+        stmt = select(OutboxEvent).where(OutboxEvent.id == event.id)
+        refreshed = (await db.execute(stmt)).scalar_one()
+        assert refreshed.status == "PENDING"
+        assert refreshed.retry_count == 1

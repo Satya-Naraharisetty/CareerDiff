@@ -13,6 +13,7 @@ import type {
   CompanyAnalysisRequest,
   CompanyAnalysisResponse,
   EvaluationTriggerResponse,
+  GoogleLoginRequest,
   InterviewCreateRequest,
   InterviewCreateResponse,
   InterviewDetailResponse,
@@ -169,6 +170,12 @@ export const authApi = {
 
   login: (payload: UserLoginRequest) =>
     fetchApi<TokenResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  loginWithGoogle: (payload: GoogleLoginRequest) =>
+    fetchApi<TokenResponse>('/api/v1/auth/google', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

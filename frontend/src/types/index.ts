@@ -87,6 +87,8 @@ export interface UserProfileResponse {
   email: string;
   full_name: string;
   role: string;
+  auth_provider?: string;
+  avatar_url?: string | null;
   target_seniority: string;
   primary_discipline: string;
   years_experience: number;
@@ -96,6 +98,10 @@ export interface UserProfileResponse {
 export interface UserLoginRequest {
   email: string;
   password: string;
+}
+
+export interface GoogleLoginRequest {
+  id_token: string;
 }
 
 export interface TokenResponse {
@@ -109,6 +115,8 @@ export interface UserProfile {
   email: string;
   full_name: string;
   role?: string;
+  auth_provider?: string;
+  avatar_url?: string | null;
   target_seniority?: string;
   primary_discipline?: string;
   years_experience?: number;

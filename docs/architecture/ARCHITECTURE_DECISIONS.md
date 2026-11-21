@@ -247,3 +247,36 @@ Background workers evaluate completed interviews and generate reports. In the ev
 ### Consequences
 - **Positive**: Complete fault tolerance against broker, poller, and worker crashes; guarantees single durable report version even under concurrent worker executions; zero reliance on ephemeral Redis state for mission-critical idempotency.
 - **Negative**: Requires maintaining the `worker_executions` table and executing a lightweight periodic sweeper job.
+
+---
+
+## ADR-012: In-Process Asynchronous Background Evaluation via Transactional Outbox (Resource-Constrained & Free-Tier Architecture)
+
+### Status: Accepted (Supersedes separate Taskiq worker process requirement in ADR-001)
+
+### Context
+Running on resource-constrained or free-tier cloud environments (e.g. Render free tier with 512 MB RAM ceiling, Supabase Postgres, Upstash Redis) creates strict operational constraints:
+1. Render free tier does not support separate Background Worker processes without paid subscription.
+2. Spawning multiple OS processes (e.g. FastAPI uvicorn + Taskiq worker) in a 512 MB container risks out-of-memory (OOM) killed terminations.
+3. External queue broker limits (e.g. Upstash command quotas) add unnecessary failure modes when running in a single-instance modular monolith.
+
+### Decision
+We amend the worker architecture from ADR-001:
+1. **In-Process Asynchronous Dispatch**:
+   - The decoupled `AssessmentEvaluator` is executed **in-process** via an asynchronous dispatcher within FastAPI's asyncio event loop, instead of requiring a separate Taskiq worker process.
+2. **Strict Invariant Preservation via Transactional Outbox**:
+   - When an interview transitions to `COMPLETED`, the candidate turn and the `outbox_events` record (`event_type: 'interview.completed'`) are committed **atomically** in the same PostgreSQL transaction.
+   - Live turn endpoints (REST and WebSocket) **never block** for the evaluation report; they commit the turn and immediately trigger a non-blocking in-process dispatch task (`OutboxPoller.trigger_dispatch_in_background()`).
+3. **Fail-Safe Periodic Outbox Poller in Lifespan**:
+   - FastAPI's `lifespan` hook runs a lightweight periodic coroutine (`run_outbox_loop`, default interval 15 seconds) that queries for any unclaimed or uncompleted outbox events.
+   - If the server restarts or cold-boots from inactivity, the outbox lease reclamation protocol (ADR-011) automatically picks up and processes any pending evaluations.
+4. **Isolated Database Sessions**:
+   - Outbox event lease claims and assessment evaluation transactions execute in separate `AsyncSession` contexts to eliminate transaction lock contention.
+
+### Consequences
+- **Positive**: 
+  - Zero cost: runs entirely within Render's free Web Service tier.
+  - Low memory footprint: single Python process uses ~150–200 MB RAM, well below the 512 MB limit.
+  - Retains 100% of ADR-011 durability guarantees: evaluations are never lost across restarts because state is anchored in PostgreSQL `outbox_events`.
+  - Seamless future scale-out: because outbox leasing and `worker_executions` idempotency remain identical, migrating back to external workers (Taskiq/Celery) requires zero database schema changes.
+- **Negative**: Long-running synchronous CPU-bound operations must remain async/I/O-bound to prevent blocking the event loop.

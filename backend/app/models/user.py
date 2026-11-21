@@ -28,9 +28,25 @@ class User(Base):
         index=True,
         nullable=False,
     )
-    hashed_password: Mapped[str] = mapped_column(
+    hashed_password: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
+    )
+    auth_provider: Mapped[str] = mapped_column(
+        String(20),
+        default="LOCAL",
+        server_default="LOCAL",
         nullable=False,
+    )
+    google_id: Mapped[str | None] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
+    avatar_url: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
     )
     full_name: Mapped[str] = mapped_column(
         String(100),

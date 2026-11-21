@@ -31,6 +31,19 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
+def get_default_database_url() -> str:
+    """Resolve and validate database URL based on environment."""
+    raw = os.getenv("DATABASE_URL")
+    if not raw:
+        if os.getenv("ENVIRONMENT") == "production":
+            raise ValueError(
+                "CRITICAL: ENVIRONMENT='production' is set, but DATABASE_URL environment variable is missing. "
+                "Please configure DATABASE_URL in your hosting provider's dashboard."
+            )
+        raw = "postgresql+asyncpg://careerdiff:postgres@localhost:5432/careerdiff_dev"
+    return normalize_database_url(raw)
+
+
 # Load backend/.env or root .env on import if present
 for potential_path in [
     Path(__file__).resolve().parent.parent.parent / ".env",
@@ -46,14 +59,7 @@ class Settings(BaseModel):
     environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development"))
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
 
-    database_url: str = Field(
-        default_factory=lambda: normalize_database_url(
-            os.getenv(
-                "DATABASE_URL",
-                "postgresql+asyncpg://careerdiff:postgres@localhost:5432/careerdiff_dev",
-            )
-        )
-    )
+    database_url: str = Field(default_factory=get_default_database_url)
     test_database_url: str = Field(
         default_factory=lambda: normalize_database_url(
             os.getenv(
@@ -75,6 +81,12 @@ class Settings(BaseModel):
     jwt_algorithm: str = Field(default_factory=lambda: os.getenv("JWT_ALGORITHM", "HS256"))
     jwt_access_token_expire_minutes: int = Field(
         default_factory=lambda: int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
+    )
+    google_client_id: str | None = Field(
+        default_factory=lambda: os.getenv("GOOGLE_CLIENT_ID") or None
+    )
+    google_client_secret: str | None = Field(
+        default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET") or None
     )
 
     s3_endpoint_url: str = Field(

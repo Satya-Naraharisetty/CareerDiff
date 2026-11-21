@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from app.core.security import (
     create_access_token,
     decode_access_token,
     hash_password,
+    verify_google_id_token,
     verify_password,
 )
 
@@ -58,3 +60,63 @@ def test_invalid_jwt_token() -> None:
         decode_access_token("not.a.valid.jwt.token")
     assert exc_info.value.status_code == 401
     assert "invalid" in exc_info.value.detail.lower()
+
+
+def test_verify_google_id_token_success() -> None:
+    """Verify successful Google ID token verification returns claims."""
+    mock_payload = {
+        "sub": "google-user-12345",
+        "email": "candidate@gmail.com",
+        "email_verified": True,
+        "name": "Jane Doe",
+        "picture": "https://lh3.googleusercontent.com/photo.jpg",
+        "iss": "https://accounts.google.com",
+    }
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        claims = verify_google_id_token("mock-google-id-token", client_id="test-client-id")
+        assert claims["sub"] == "google-user-12345"
+        assert claims["email"] == "candidate@gmail.com"
+        assert claims["email_verified"] is True
+        assert claims["name"] == "Jane Doe"
+
+
+def test_verify_google_id_token_unverified_email() -> None:
+    """Verify token with email_verified=False is rejected with 401."""
+    mock_payload = {
+        "sub": "google-user-12345",
+        "email": "unverified@gmail.com",
+        "email_verified": False,
+        "iss": "https://accounts.google.com",
+    }
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        with pytest.raises(HTTPException) as exc_info:
+            verify_google_id_token("mock-google-id-token")
+        assert exc_info.value.status_code == 401
+        assert "GOOGLE_EMAIL_NOT_VERIFIED" in exc_info.value.detail
+
+
+def test_verify_google_id_token_invalid_issuer() -> None:
+    """Verify token with forged/unrecognized issuer is rejected with 401."""
+    mock_payload = {
+        "sub": "google-user-12345",
+        "email": "attacker@fake.com",
+        "email_verified": True,
+        "iss": "https://rogue-issuer.com",
+    }
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value=mock_payload):
+        with pytest.raises(HTTPException) as exc_info:
+            verify_google_id_token("mock-google-id-token")
+        assert exc_info.value.status_code == 401
+        assert "INVALID_TOKEN_ISSUER" in exc_info.value.detail
+
+
+def test_verify_google_id_token_invalid_signature() -> None:
+    """Verify ValueError from Google verification raises 401 INVALID_GOOGLE_TOKEN."""
+    with patch(
+        "google.oauth2.id_token.verify_oauth2_token",
+        side_effect=ValueError("Token expired or invalid signature"),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            verify_google_id_token("corrupt-token")
+        assert exc_info.value.status_code == 401
+        assert "INVALID_GOOGLE_TOKEN" in exc_info.value.detail
