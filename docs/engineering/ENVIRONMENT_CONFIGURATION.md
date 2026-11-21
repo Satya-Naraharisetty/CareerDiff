@@ -23,10 +23,6 @@ The project enforces a strict **two-file convention** for both backend and front
 | `JWT_ALGORITHM` | `string` | `HS256` | No | Token hashing algorithm. |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `int` | `10080` | No | Access token TTL in minutes (default 7 days). |
 | `CORS_ORIGINS` | `string` | `http://localhost:3000,...` | Yes | Comma-separated allowed frontend origins (e.g. `https://your-app.vercel.app,http://localhost:5173`). |
-| `S3_ENDPOINT_URL` | `string` | `http://localhost:9000` | No | S3 / MinIO endpoint. For Supabase Storage: `https://[REF].supabase.co/storage/v1/s3`. |
-| `S3_BUCKET_NAME` | `string` | `careerdiff-resumes` | Yes | Target storage bucket for resume uploads. |
-| `S3_ACCESS_KEY` | `string` | `minioadmin` | Yes | S3 Access Key ID. |
-| `S3_SECRET_KEY` | `string` | `minioadmin` | Yes | S3 Secret Access Key. |
 | `GEMINI_API_KEY` | `string` | `None` | Yes | Google Gemini API Key for semantic turns and evaluation. |
 | `GEMINI_TURN_MODEL` | `string` | `gemini-3.8-flash` | No | High-speed LLM model used for live turn adaptation. |
 | `GEMINI_EVAL_MODEL` | `string` | `gemini-4-argon` | No | High-rigor reasoning LLM model used for decoupled rubric evaluation. |

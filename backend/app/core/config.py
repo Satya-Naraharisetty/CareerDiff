@@ -89,15 +89,6 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET") or None
     )
 
-    s3_endpoint_url: str = Field(
-        default_factory=lambda: os.getenv("S3_ENDPOINT_URL", "http://localhost:9000")
-    )
-    s3_bucket_name: str = Field(
-        default_factory=lambda: os.getenv("S3_BUCKET_NAME", "careerdiff-resumes")
-    )
-    s3_access_key: str = Field(default_factory=lambda: os.getenv("S3_ACCESS_KEY", "minioadmin"))
-    s3_secret_key: str = Field(default_factory=lambda: os.getenv("S3_SECRET_KEY", "minioadmin"))
-
     gemini_api_key: str | None = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY") or None)
     gemini_turn_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_TURN_MODEL", "gemini-3.8-flash")

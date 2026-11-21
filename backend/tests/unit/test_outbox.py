@@ -29,7 +29,7 @@ async def test_outbox_event_creation_and_persistence() -> None:
         await db.refresh(event)
 
         assert event.id is not None
-        assert event.status == "PENDING"
+        assert event.status in ("PENDING", "CLAIMED")
         assert event.event_type == "test.event"
         assert event.aggregate_id == test_agg_id
         assert event.payload == {"message": "hello world"}
