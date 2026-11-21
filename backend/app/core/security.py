@@ -131,7 +131,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
     """Decode and cryptographically verify a JWT access token."""
     if (
         settings.skip_auth
-        and settings.environment.lower() != "production"
+        and settings.is_local_dev
         and token == "dev-local-bypass-token"
     ):
         return {
@@ -204,7 +204,7 @@ async def get_current_user(
 ) -> User:
     """FastAPI dependency resolving the authenticated User from the Bearer token."""
     # Check if local development skip_auth bypass is active
-    if settings.skip_auth and settings.environment.lower() != "production":
+    if settings.skip_auth and settings.is_local_dev:
         token_str = credentials.credentials if credentials else None
         if not token_str or token_str == "dev-local-bypass-token":
             return await _get_or_create_dev_user(db)
@@ -301,19 +301,18 @@ def verify_google_id_token(token: str, client_id: str | None = None) -> dict[str
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP address safely, respecting reverse-proxy headers if present."""
-    cf_ip = request.headers.get("CF-Connecting-IP")
-    if cf_ip:
-        return cf_ip.strip()
+    """Extract the real client IP.
 
-    x_real_ip = request.headers.get("X-Real-IP")
-    if x_real_ip:
-        return x_real_ip.strip()
-
+    Only the entries appended by our own trusted proxies (the right-hand side of
+    X-Forwarded-For) are trusted. The left-most entries and headers such as
+    CF-Connecting-IP / X-Real-IP are client-controlled and trivially spoofed.
+    """
+    hops = max(0, settings.trusted_proxy_hops)
     x_forwarded = request.headers.get("X-Forwarded-For")
-    if x_forwarded:
-        return x_forwarded.split(",")[0].strip()
-
+    if hops and x_forwarded:
+        chain = [p.strip() for p in x_forwarded.split(",") if p.strip()]
+        if len(chain) >= hops:
+            return chain[-hops]
     return request.client.host if request.client else "127.0.0.1"
 
 

@@ -89,8 +89,10 @@ class TemplateMetadata(BaseModel):
 class ResumeRewriteRequest(BaseModel):
     """Payload to trigger ATS scoring, suggestion generation, and LaTeX template rendering."""
 
-    resume_text: str = Field(..., min_length=20, description="Raw text of the candidate's resume")
-    jd_text: str = Field(..., min_length=20, description="Target Job Description text")
+    resume_text: str = Field(
+        ..., min_length=20, max_length=100000, description="Raw text of the candidate's resume"
+    )
+    jd_text: str = Field(..., min_length=20, max_length=50000, description="Target Job Description text")
     candidate_seniority: str = Field(default="SENIOR", description="Seniority level (JUNIOR, MID, SENIOR, STAFF)")
     template_style: TemplateStyle = Field(default="jakes_resume", description="Selected LaTeX template layout")
 

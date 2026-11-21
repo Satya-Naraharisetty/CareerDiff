@@ -5,11 +5,13 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+import jwt
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.redis import get_redis_client
+from app.core.config import get_settings
+from app.core.redis import get_shared_redis_client
 from app.core.security import get_client_ip
 
 logger = logging.getLogger("CareerDiff.rate_limit")
@@ -23,10 +25,11 @@ async def check_redis_rate_limit(
 ) -> tuple[bool, int, float]:
     """Atomic fixed-window rate limiter via Redis INCR and EXPIRE."""
     key = f"rl:{identifier}"
-    current = await redis_client.incr(key)
-    if current == 1:
-        await redis_client.expire(key, window_seconds)
-    ttl = await redis_client.ttl(key)
+    async with redis_client.pipeline(transaction=True) as pipe:
+        pipe.incr(key)
+        pipe.expire(key, window_seconds, nx=True)
+        pipe.ttl(key)
+        current, _, ttl = await pipe.execute()
     retry_after = float(max(1, ttl))
     if current > capacity:
         return False, 0, retry_after
@@ -74,6 +77,42 @@ class TokenBucket:
 
 
 default_limiter = TokenBucket(capacity=60, refill_rate=20.0)
+# Credential endpoints get a much tighter budget to slow down password / backup-code guessing.
+auth_limiter = TokenBucket(capacity=10, refill_rate=10 / 60)
+AUTH_SENSITIVE_PATHS = (
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/recover-password",
+    "/api/v1/auth/google",
+    "/api/v1/auth/change-password",
+)
+_MAX_MEMORY_BUCKETS = 50_000
+# Circuit breaker: after a Redis failure, use the in-memory limiter for a while instead of
+# paying a connection timeout on every single request.
+_REDIS_RETRY_AFTER_SECONDS = 30.0
+_redis_unavailable_until = 0.0
+
+
+def _identify_client(request: Request) -> str:
+    """Identify the caller by verified user id, falling back to client IP.
+
+    The JWT must verify: an unverified token would let an attacker rotate fake
+    identities to escape the limit.
+    """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            payload = jwt.decode(
+                auth_header[7:],
+                get_settings().jwt_secret_key,
+                algorithms=[get_settings().jwt_algorithm],
+            )
+            sub = payload.get("sub")
+            if sub:
+                return f"user:{sub}"
+        except jwt.PyJWTError:
+            pass
+    return f"ip:{get_client_ip(request)}"
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -117,35 +156,43 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)  # type: ignore[no-any-return]
 
-        # Extract client identifier: authenticated Bearer token sub or client IP
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            identifier = f"token:{auth_header[7:27]}"
-        else:
-            identifier = f"ip:{get_client_ip(request)}"
+        # The integration suite registers many users from one test client; keep the strict
+        # credential bucket for every real environment.
+        is_auth_path = path in AUTH_SENSITIVE_PATHS and get_settings().environment != "testing"
+        limiter = auth_limiter if is_auth_path else self.limiter
+        identifier = _identify_client(request)
+        if is_auth_path:
+            # Always bucket credential endpoints per IP, regardless of any token sent.
+            identifier = f"auth:ip:{get_client_ip(request)}"
 
         allowed = True
-        remaining = self.limiter.capacity
+        remaining = limiter.capacity
         retry_after = 0.0
 
         # Attempt distributed Redis rate limiting first if available
+        global _redis_unavailable_until
         redis_checked = False
-        try:
-            redis_client = get_redis_client()
+        redis_client = get_shared_redis_client() if time.monotonic() >= _redis_unavailable_until else None
+        if redis_client is not None:
             try:
                 allowed, remaining, retry_after = await check_redis_rate_limit(
                     redis_client=redis_client,
                     identifier=identifier,
-                    capacity=self.limiter.capacity,
+                    capacity=limiter.capacity,
                 )
                 redis_checked = True
-            finally:
-                await redis_client.aclose()
-        except Exception:
-            redis_checked = False
+            except Exception:
+                redis_checked = False
+                _redis_unavailable_until = time.monotonic() + _REDIS_RETRY_AFTER_SECONDS
+                logger.warning(
+                    "Redis rate limiter unavailable; using in-memory limiter for %ds",
+                    int(_REDIS_RETRY_AFTER_SECONDS),
+                )
 
         if not redis_checked:
-            allowed, remaining, retry_after = self.limiter.check(identifier)
+            if len(limiter._memory_buckets) > _MAX_MEMORY_BUCKETS:
+                limiter.reset()
+            allowed, remaining, retry_after = limiter.check(identifier)
 
         if not allowed:
             logger.warning(
@@ -164,12 +211,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 },
                 headers={
                     "Retry-After": str(int(retry_after) + 1),
-                    "X-RateLimit-Limit": str(self.limiter.capacity),
+                    "X-RateLimit-Limit": str(limiter.capacity),
                     "X-RateLimit-Remaining": "0",
                 },
             )
 
         response: Response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(self.limiter.capacity)
+        response.headers["X-RateLimit-Limit"] = str(limiter.capacity)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response

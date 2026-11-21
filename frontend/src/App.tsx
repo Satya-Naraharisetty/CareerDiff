@@ -28,9 +28,33 @@ const queryClient = new QueryClient({
 
 const VIEW_STORAGE_KEY = 'careerdiff_active_view';
 
+type View = 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter';
+const VIEW_PATHS: Record<View, string> = {
+  home: '/',
+  setup: '/practice',
+  interview: '/interview',
+  dossier: '/dashboard',
+  rewriter: '/resume-studio',
+};
+const viewFromPath = (path: string): View | null => {
+  const clean = path.replace(/\/+$/, '') || '/';
+  const match = (Object.keys(VIEW_PATHS) as View[]).find((v) => VIEW_PATHS[v] === clean);
+  return match ?? null;
+};
+const isInterviewLive = () => {
+  const { state, interviewId } = useInterviewStore.getState();
+  return !!interviewId && state !== 'CREATED' && state !== 'COMPLETED';
+};
+
 export const AppContent: React.FC = () => {
   const { isAuthenticated, rehydrateProfile } = useAuthStore();
-  const [currentView, setCurrentView] = useState<'home' | 'setup' | 'interview' | 'dossier' | 'rewriter'>(() => {
+  const [currentView, setCurrentView] = useState<View>(() => {
+    const fromUrl = typeof window !== 'undefined' ? viewFromPath(window.location.pathname) : null;
+    if (fromUrl) {
+      if (!isAuthenticated && !isSkipAuthEnabled() && fromUrl !== 'home') return 'home';
+      // Avoid getting stuck on interview loader on cold refresh without active session
+      return fromUrl === 'interview' ? 'setup' : fromUrl;
+    }
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
       if (saved && ['home', 'setup', 'interview', 'dossier', 'rewriter'].includes(saved)) {
@@ -50,14 +74,17 @@ export const AppContent: React.FC = () => {
   // Rehydrate profile on mount if token is present
   useEffect(() => {
     // Check for OAuth redirect token in URL query params on mount
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('auth_token') || params.get('token');
+    // OAuth full-page fallback delivers the token in the URL fragment (never sent to servers).
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const token = hashParams.get('auth_token');
     if (token) {
+      // Remove the token from the address bar / history immediately.
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
       useAuthStore.getState().loginWithToken(token).then(() => {
-        const cleanUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, document.title, cleanUrl);
+        applyView('setup', 'replace');
       }).catch((err) => {
         console.error('Failed to authenticate via URL token:', err);
+        useAuthStore.getState().logout();
       });
       return;
     }
@@ -70,7 +97,7 @@ export const AppContent: React.FC = () => {
   // Derive active view from authentication guard
   const activeView = (!isAuthenticated && !isSkipAuthEnabled()) ? 'home' : currentView;
 
-  const handleNavigate = (view: 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter') => {
+  const applyView = (view: View, historyMode: 'push' | 'replace' | 'none') => {
     if (view !== 'interview') {
       useInterviewStore.getState().disconnectVoiceSession();
       BrowserSpeechSynthesizer.stop();
@@ -80,8 +107,62 @@ export const AppContent: React.FC = () => {
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, view);
     } catch {}
+    const path = VIEW_PATHS[view];
+    if (historyMode === 'push' && window.location.pathname !== path) {
+      window.history.pushState({ view }, '', path);
+    } else if (historyMode === 'replace') {
+      window.history.replaceState({ view }, '', path);
+    }
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   };
+
+  /** Single navigation entry point: every nav surface (navbar, palette, footer) goes through here. */
+  const handleNavigate = (view: View, opts: { skipLeaveConfirm?: boolean } = {}) => {
+    if (
+      !opts.skipLeaveConfirm &&
+      currentView === 'interview' &&
+      view !== 'interview' &&
+      isInterviewLive() &&
+      !window.confirm('Leave the live interview? Your microphone will stop and the session will be paused. You can conclude it later from Practice.')
+    ) {
+      return;
+    }
+    if (view === 'interview' && !useInterviewStore.getState().interviewId) {
+      view = 'setup';
+    }
+    applyView(view, 'push');
+  };
+
+  // Keep the URL in sync on first render, and support the browser back/forward buttons.
+  useEffect(() => {
+    window.history.replaceState({ view: activeView }, '', VIEW_PATHS[activeView] + window.location.search);
+    const onPopState = () => {
+      const view = viewFromPath(window.location.pathname) ?? 'home';
+      if (view === 'interview' && !isInterviewLive()) {
+        // Never navigate back into a finished (or missing) interview room.
+        const fallback: View = useInterviewStore.getState().state === 'COMPLETED' ? 'dossier' : 'setup';
+        applyView(fallback, 'replace');
+        return;
+      }
+      applyView(view, 'none');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Warn before closing / reloading the tab during a live interview.
+  useEffect(() => {
+    if (activeView !== 'interview') return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isInterviewLive()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [activeView]);
 
   // Global Cmd+K / Ctrl+K keyboard shortcut listener
   useEffect(() => {
@@ -133,7 +214,7 @@ export const AppContent: React.FC = () => {
     useInterviewStore.getState().disconnectVoiceSession();
     BrowserSpeechSynthesizer.stop();
     stopAllMediaHardware();
-    handleNavigate('dossier');
+    handleNavigate('dossier', { skipLeaveConfirm: true });
   };
 
   const handleReset = () => {
@@ -193,7 +274,8 @@ export const AppContent: React.FC = () => {
       </main>
 
       {/* Semantic High-Craft Developer Footer */}
-      <footer className="border-t border-zinc-850/80 bg-zinc-950 px-4 py-10 text-xs text-zinc-500 sm:px-6 lg:px-8">
+      {activeView !== 'interview' && (
+      <footer className="border-t border-zinc-800/80 bg-zinc-950 px-4 py-10 text-xs text-zinc-500 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
             {/* Brand column */}
@@ -203,7 +285,7 @@ export const AppContent: React.FC = () => {
                   <CareerDiffLogo className="h-3.5 w-3.5" />
                 </div>
                 <span className="font-semibold text-white text-sm tracking-tight font-mono">CareerDiff</span>
-                <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
+                <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[11px] font-mono text-zinc-300">
                   Engine v1.0
                 </span>
               </div>
@@ -211,7 +293,7 @@ export const AppContent: React.FC = () => {
                 Autonomous technical interview practice platform for software engineers. Grounded in candidate resumes and calibrated to target job requirements.
               </p>
               <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono">
-                <ShieldCheck className="h-3.5 w-3.5" /> Zero Biometrics • Strict Rubrics
+                <ShieldCheck className="h-3.5 w-3.5" /> No biometric scoring • Rubric-based
               </div>
             </div>
 
@@ -221,10 +303,9 @@ export const AppContent: React.FC = () => {
                 <Terminal className="h-3 w-3 text-zinc-400" /> Capabilities
               </h4>
               <ul className="space-y-2 text-xs">
-                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('setup')}>Resume Claim Grounding</span></li>
-                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('setup')}>Job Description Calibration</span></li>
-                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('interview')}>Adaptive State Machine Probing</span></li>
-                <li><span className="text-zinc-400 hover:text-zinc-200 cursor-pointer transition-colors" onClick={() => setCurrentView('dossier')}>Decoupled Rubric Scoring</span></li>
+                <li><button type="button" className="text-zinc-400 hover:text-zinc-200 transition-colors" onClick={() => handleNavigate('setup')}>Practice interview setup</button></li>
+                <li><button type="button" className="text-zinc-400 hover:text-zinc-200 transition-colors" onClick={() => handleNavigate('dossier')}>Your reports</button></li>
+                <li><button type="button" className="text-zinc-400 hover:text-zinc-200 transition-colors" onClick={() => handleNavigate('rewriter')}>Resume Studio</button></li>
               </ul>
             </div>
 
@@ -250,28 +331,23 @@ export const AppContent: React.FC = () => {
                 <li>Normalized Character-Offset Citations</li>
                 <li>Deterministic Guardrails &amp; FSM</li>
                 <li>PostgreSQL Transactional Outbox</li>
-                <li>GDPR Comprehensive Right to Erasure</li>
+                <li>Account &amp; data deletion on request</li>
               </ul>
             </div>
           </div>
 
           <div className="mt-8 pt-6 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
             <p>© 2026 CareerDiff. Grounded Technical Practice &amp; Decoupled Evaluation.</p>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="hover:text-zinc-300 cursor-pointer transition-colors">Privacy &amp; Data Minimization</span>
-              <span>•</span>
-              <span className="hover:text-zinc-300 cursor-pointer transition-colors">Security Standards</span>
-              <span>•</span>
-              <span className="hover:text-zinc-300 cursor-pointer transition-colors">API v1 Protocol</span>
-            </div>
+            <p className="text-xs">You can delete your account and all data at any time from your profile.</p>
           </div>
         </div>
       </footer>
+      )}
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
-        onNavigate={(view) => setCurrentView(view)}
+        onNavigate={(view) => handleNavigate(view)}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
       />

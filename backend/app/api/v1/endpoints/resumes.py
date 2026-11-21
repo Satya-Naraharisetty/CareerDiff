@@ -107,11 +107,11 @@ async def upload_resume(
     if not any(lower_filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Unsupported file format. Only PDF and DOCX files are permitted.",
+            detail="Unsupported file format. Only PDF, DOCX and TXT files are permitted.",
         )
 
-    # 2. Read and validate file size
-    content = await file.read()
+    # 2. Read and validate file size (bounded read: never buffer more than the limit + 1 byte)
+    content = await file.read(MAX_FILE_SIZE_BYTES + 1)
     if len(content) == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -412,7 +412,7 @@ async def get_resume_by_id(
     status_code=status.HTTP_200_OK,
     summary="Rewrite resume targeting job description with ATS score and LaTeX export",
 )
-async def rewrite_resume(
+def rewrite_resume(
     payload: ResumeRewriteRequest,
     current_user: User = Depends(get_current_user),
 ) -> ResumeRewriteResponse:
@@ -431,7 +431,7 @@ async def rewrite_resume(
     status_code=status.HTTP_200_OK,
     summary="Re-render LaTeX source for an edited profile with selected template",
 )
-async def render_latex_endpoint(
+def render_latex_endpoint(
     payload: RenderLatexRequest,
     current_user: User = Depends(get_current_user),
 ) -> RenderLatexResponse:

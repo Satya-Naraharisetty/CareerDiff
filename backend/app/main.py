@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -81,16 +80,7 @@ app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 # CORS configuration for frontend dev server and production deployments
-default_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-env_cors = os.getenv("CORS_ORIGINS")
-cors_origins = (
-    [o.strip() for o in env_cors.split(",") if o.strip()] if env_cors else default_origins
-)
+cors_origins = settings.cors_origins
 
 app.add_middleware(
     CORSMiddleware,

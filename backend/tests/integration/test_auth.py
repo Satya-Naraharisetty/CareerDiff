@@ -198,7 +198,8 @@ async def test_change_password_and_get_profile(async_client: AsyncClient) -> Non
     assert p_data["full_name"] == "Change Pass Candidate"
     assert p_data["remaining_backup_codes"] == 8
 
-    # 3. Change password with wrong current password must fail 401
+    # 3. Change password with wrong current password must fail 400 (not 401, which the
+    #    client treats as an expired session and signs the user out)
     wrong_req = {
         "current_password": "WrongPassword123!",
         "new_password": new_password,
@@ -208,7 +209,7 @@ async def test_change_password_and_get_profile(async_client: AsyncClient) -> Non
         json=wrong_req,
         headers=auth_headers,
     )
-    assert wrong_res.status_code == 401
+    assert wrong_res.status_code == 400
     assert wrong_res.json()["detail"] == "INVALID_CURRENT_PASSWORD"
 
     # 4. Change password with correct current password succeeds
@@ -275,14 +276,14 @@ async def test_delete_account_lifecycle(async_client: AsyncClient) -> None:
     assert bad_confirm.status_code == 400
     assert bad_confirm.json()["detail"] == "INVALID_CONFIRMATION_TEXT"
 
-    # 4. Deletion with wrong password fails 401
+    # 4. Deletion with wrong password fails 400
     wrong_pw = await async_client.request(
         "DELETE",
         "/api/v1/auth/me",
         json={"current_password": "WrongPassword999!", "confirmation_text": "DELETE"},
         headers=headers,
     )
-    assert wrong_pw.status_code == 401
+    assert wrong_pw.status_code == 400
     assert wrong_pw.json()["detail"] == "INVALID_CURRENT_PASSWORD"
 
     # 5. Valid deletion succeeds with 200 OK
@@ -497,6 +498,20 @@ async def test_github_oauth_login_redirect_and_state_cookie(async_client: AsyncC
         assert "https://github.com/login/oauth/authorize" in res.headers["location"]
         assert "client_id=mock-gh-client-id" in res.headers["location"]
         assert "cd_github_oauth_state" in res.cookies
+
+
+@pytest.mark.asyncio
+async def test_github_oauth_login_rejects_untrusted_redirect(async_client: AsyncClient) -> None:
+    """An attacker-controlled redirect_url must be rejected (prevents token exfiltration)."""
+    with patch.object(settings, "github_client_id", "mock-gh-client-id"), patch(
+        "app.services.github_oauth.get_settings", return_value=settings
+    ):
+        for bad in ("https://evil.example", "javascript:alert(1)", "//evil.example"):
+            res = await async_client.get(
+                "/api/v1/auth/github/login", params={"redirect_url": bad}, follow_redirects=False
+            )
+            assert res.status_code == 400
+            assert res.json()["detail"] == "INVALID_REDIRECT_URL"
 
 
 @pytest.mark.asyncio

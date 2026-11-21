@@ -13,7 +13,9 @@ def test_default_settings() -> None:
     assert "postgresql+asyncpg" in cfg.database_url
     assert "redis" in cfg.redis_url
     assert cfg.jwt_algorithm == "HS256"
-    assert cfg.jwt_access_token_expire_minutes == 10080
+    assert cfg.jwt_access_token_expire_minutes == int(
+        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+    )
 
 
 def test_custom_environment_override() -> None:

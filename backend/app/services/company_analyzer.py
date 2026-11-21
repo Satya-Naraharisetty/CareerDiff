@@ -11,6 +11,7 @@ import re
 from typing import Any, Literal
 
 from app.core.config import get_settings
+from app.core.llm import make_genai_client
 
 logger = logging.getLogger("CareerDiff.company_analyzer")
 
@@ -505,9 +506,8 @@ async def classify_company_persona(
     settings = get_settings()
     if settings.gemini_api_key:
         try:
-            from google import genai
 
-            client = genai.Client(api_key=settings.gemini_api_key)
+            client = make_genai_client()
             jd_snippet = jd_text[:2000] if jd_text else "None provided"
             prompt = (
                 f"You are CareerDiff Corporate Engineering Archetype Classifier.\n\n"

@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Bot,
+  Camera,
+  CameraOff,
   CheckCircle,
+  Info,
+  Keyboard,
+  Send,
   Clock,
   Code2,
   Copy,
@@ -153,7 +158,7 @@ const SvgDiagramPreview: React.FC<{ syntax: string }> = ({ syntax }) => {
           <span className="flex items-center gap-1.5 text-sky-400 font-semibold">
             <Layers className="h-3.5 w-3.5" /> Sequence Lifecycle Topology
           </span>
-          <span className="text-[10px] text-zinc-500">{actors.length} Participants</span>
+          <span className="text-[11px] text-zinc-500">{actors.length} Participants</span>
         </div>
         <div className="flex justify-around gap-2 pb-2">
           {actors.map((actor) => (
@@ -201,11 +206,11 @@ const SvgDiagramPreview: React.FC<{ syntax: string }> = ({ syntax }) => {
         <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
           <Network className="h-3.5 w-3.5" /> Architecture Component Graph
         </span>
-        <span className="text-[10px] text-zinc-500">{nodes.length} Components, {connections.length} Edges</span>
+        <span className="text-[11px] text-zinc-500">{nodes.length} Components, {connections.length} Edges</span>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 py-2">
-        {nodes.map((node, i) => (
+        {nodes.map((node) => (
           <React.Fragment key={node.id}>
             <div
               className={`rounded-xl px-3.5 py-2 text-center shadow-md border transition-all ${node.isDb
@@ -213,20 +218,17 @@ const SvgDiagramPreview: React.FC<{ syntax: string }> = ({ syntax }) => {
                   : 'border-zinc-700 bg-zinc-900 text-zinc-200'
                 }`}
             >
-              <div className="text-[10px] text-zinc-500 font-mono uppercase">
+              <div className="text-[11px] text-zinc-500 font-mono uppercase">
                 {node.isDb ? 'Storage / Queue' : 'Service Node'}
               </div>
               <div className="text-xs font-bold font-sans mt-0.5">{node.label}</div>
             </div>
-            {i < nodes.length - 1 && (
-              <span className="text-emerald-400 text-sm font-bold animate-pulse">➔</span>
-            )}
           </React.Fragment>
         ))}
       </div>
 
       {connections.length > 0 && (
-        <div className="border-t border-zinc-800/80 pt-2 flex flex-wrap gap-2 text-[10px] text-zinc-400">
+        <div className="border-t border-zinc-800/80 pt-2 flex flex-wrap gap-2 text-[11px] text-zinc-400">
           <span className="text-zinc-500">Connections:</span>
           {connections.map((c, idx) => (
             <span
@@ -507,7 +509,7 @@ const AudioEqualizer: React.FC<{
           );
         })}
       </div>
-      <div className="flex flex-col text-[10px] font-mono leading-tight">
+      <div className="flex flex-col text-[11px] font-mono leading-tight">
         <span
           className={
             isRecording
@@ -519,7 +521,7 @@ const AudioEqualizer: React.FC<{
         >
           {isRecording ? 'PCM STREAM' : isInterviewerSpeaking ? 'INTERVIEWER' : 'STANDBY'}
         </span>
-        <span className="text-zinc-600 hidden sm:inline text-[9px]">16kHz Mono</span>
+        <span className="text-zinc-600 hidden sm:inline text-[11px]">16kHz Mono</span>
       </div>
     </div>
   );
@@ -543,6 +545,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     preferredLanguage,
     error,
     isVoiceMuted,
+    notice,
+    sendTypedAnswer,
     startInterview,
     initVoiceSession,
     startVoiceRecording,
@@ -560,7 +564,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isRunningCode, setIsRunningCode] = useState(false);
-  const [showCamera, setShowCamera] = useState<boolean>(true);
+  // Camera self-view is opt-in and never leaves the device.
+  const [showCamera, setShowCamera] = useState<boolean>(false);
+  const [typedAnswer, setTypedAnswer] = useState('');
+  const [showTypeFallback, setShowTypeFallback] = useState(false);
+  const [confirmingConclude, setConfirmingConclude] = useState(false);
+  const autoConcludedRef = useRef(false);
   const [isRoomCameraActive, setIsRoomCameraActive] = useState<boolean>(false);
   // Real-time typewriter and synchronized interviewer speech state
   const [typingTurnIndex, setTypingTurnIndex] = useState<number | null>(null);
@@ -612,23 +621,42 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
     const langLower = (preferredLanguage || 'python').toLowerCase();
 
-    // Browser JavaScript / TypeScript Execution
+    // Browser JavaScript execution, isolated in a Web Worker: no DOM, no localStorage (auth token),
+    // and a hard timeout so infinite loops cannot freeze the interview.
     if (langLower.includes('script')) {
-      const logs: string[] = [];
-      const originalLog = console.log;
-      try {
-        console.log = (...args: any[]) =>
-          logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-        const res = new Function(scratchpadCode)();
-        let out = logs.join('\n');
-        if (res !== undefined) out = out ? `${out}\nReturned: ${res}` : `Returned: ${res}`;
-        setExecutionOutput(out || '✓ JavaScript executed successfully with exit code 0.');
-      } catch (err: any) {
-        setExecutionOutput(`JavaScript Execution Error:\n${err.message || String(err)}`);
-      } finally {
-        console.log = originalLog;
+      const workerSrc = `
+        const logs = [];
+        const fmt = (a) => (typeof a === 'object' ? JSON.stringify(a) : String(a));
+        console.log = (...args) => logs.push(args.map(fmt).join(' '));
+        console.error = console.log;
+        self.onmessage = (e) => {
+          try {
+            const res = (0, eval)(e.data);
+            let out = logs.join('\\n');
+            if (res !== undefined) out = out ? out + '\\nReturned: ' + fmt(res) : 'Returned: ' + fmt(res);
+            self.postMessage({ ok: true, out });
+          } catch (err) {
+            self.postMessage({ ok: false, out: (err && err.message) || String(err) });
+          }
+        };`;
+      const blobUrl = URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' }));
+      const worker = new Worker(blobUrl);
+      const finish = (text: string) => {
+        worker.terminate();
+        URL.revokeObjectURL(blobUrl);
+        setExecutionOutput(text);
         setIsRunningCode(false);
-      }
+      };
+      const timeout = window.setTimeout(() => finish('Execution stopped: exceeded 5 second time limit.'), 5000);
+      worker.onmessage = (e: MessageEvent<{ ok: boolean; out: string }>) => {
+        clearTimeout(timeout);
+        finish(e.data.ok ? e.data.out || '✓ JavaScript ran with no output.' : `JavaScript Execution Error:\n${e.data.out}`);
+      };
+      worker.onerror = (e) => {
+        clearTimeout(timeout);
+        finish(`JavaScript Execution Error:\n${e.message}`);
+      };
+      worker.postMessage(scratchpadCode);
       return;
     }
 
@@ -639,6 +667,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         if (!win.loadPyodide) {
           const script = document.createElement('script');
           script.src = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+        script.integrity = 'sha384-i3R37b3tF+HWudsUf1VSEOY2YxwSNMqY8DQa9Z0O3xh+NkJ9o+yjcGyIi5huj+nB';
+        script.crossOrigin = 'anonymous';
           document.head.appendChild(script);
           await new Promise((resolve, reject) => {
             script.onload = resolve;
@@ -687,16 +717,17 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
-  // Guarantee countdown timer ticks down continuously every second while session is active
+  // Single owner of the countdown (the store no longer runs its own timer, which made it tick 2x).
+  const hasStarted = turns.length > 0;
   useEffect(() => {
-    if (sessionState === 'COMPLETED') return;
+    if (sessionState === 'COMPLETED' || !hasStarted) return;
     const interval = window.setInterval(() => {
       useInterviewStore.setState((s) => ({
         remainingSeconds: Math.max(0, s.remainingSeconds - 1),
       }));
     }, 1000);
     return () => clearInterval(interval);
-  }, [sessionState]);
+  }, [sessionState, hasStarted]);
 
   // Confine auto-scrolling to internal chat container on new turns or speech updates (without scrolling the page)
   useEffect(() => {
@@ -817,22 +848,37 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         activeSynthesizerCancelRef.current = null;
       }
 
-      useInterviewStore.setState({ isInterviewerSpeaking: true });
-
       const onTypingProgress = (current: string) => {
         setTypedText(current);
       };
 
+      // When the server streams the interviewer's real voice (Gemini Live / server TTS), the browser
+      // must not speak too: only animate the text, and let the audio player drive the mic hand-off.
+      const serverVoice = mode === 'VOICE' && useInterviewStore.getState().serverAudioActive;
+      const silent = isVoiceMuted || serverVoice;
+
       const onEnd = () => {
         setTypingTurnIndex(null);
-        useInterviewStore.setState({ isInterviewerSpeaking: false });
         activeSynthesizerCancelRef.current = null;
+        if (useInterviewStore.getState().serverAudioActive && mode === 'VOICE') {
+          return; // pcmPlayer.onAllEnded / interviewer_audio_done start the mic
+        }
+        useInterviewStore.setState({ isInterviewerSpeaking: false });
         // As soon as the question completes, automatically activate candidate microphone in voice mode
         if (mode === 'VOICE') {
           startVoiceRecording().catch(() => {});
         }
       };
 
+      if (silent) {
+        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.fallbackTypewriter(
+          latestTurn.transcript,
+          { onTypingProgress, onEnd }
+        );
+        return;
+      }
+
+      useInterviewStore.setState({ isInterviewerSpeaking: true });
       // Speak out interviewer question audibly while streaming the typewriter progress
       activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
         latestTurn.transcript,
@@ -858,16 +904,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     const latestTurn = turns[turns.length - 1];
     if (
       latestTurn.speaker === 'INTERVIEWER' &&
-      (latestTurn.code_sample ||
-        latestTurn.question_archetype === 'CODE_REVIEW' ||
-        latestTurn.transcript.toLowerCase().includes('code') ||
-        latestTurn.transcript.toLowerCase().includes('implement') ||
-        latestTurn.transcript.toLowerCase().includes('leetcode') ||
-        latestTurn.transcript.toLowerCase().includes('function') ||
-        latestTurn.transcript.toLowerCase().includes('algorithm'))
+      (latestTurn.code_sample || latestTurn.question_archetype === 'CODE_REVIEW')
     ) {
-      if (latestTurn.code_sample) {
-        setScratchpadCode(latestTurn.code_sample);
+      const sample = latestTurn.code_sample;
+      if (sample) {
+        // Only prefill an empty scratchpad; never overwrite what the candidate has written.
+        setScratchpadCode((current) => (current.trim() ? current : sample));
       }
       setShowScratchpad(true);
     }
@@ -958,7 +1000,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       } else if (e.key === 'Enter' && mode === 'VOICE' && !isRecording && !isInterviewerSpeaking && typingTurnIndex === null) {
         e.preventDefault();
         startVoiceRecording().catch(() => {});
-      } else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) {
+      } else if (e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
         e.preventDefault();
         setShowScratchpad((prev) => !prev);
       }
@@ -969,10 +1011,41 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   }, [mode, isRecording, isInterviewerSpeaking, typingTurnIndex, handleDoneSpeaking, handleBargeIn, startVoiceRecording]);
 
   const handleConclude = async () => {
+    setConfirmingConclude(false);
     setIsRoomCameraActive(false);
     cleanupHardwareMedia();
     await concludeSession();
     onConclude();
+  };
+
+  const requestConclude = () => {
+    if (confirmingConclude) {
+      void handleConclude();
+      return;
+    }
+    setConfirmingConclude(true);
+    window.setTimeout(() => setConfirmingConclude(false), 5000);
+  };
+
+  // Time budget exhausted: conclude and score automatically (once).
+  useEffect(() => {
+    if (remainingSeconds <= 0 && hasStarted && sessionState !== 'COMPLETED' && !autoConcludedRef.current) {
+      autoConcludedRef.current = true;
+      void handleConclude();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remainingSeconds, hasStarted, sessionState]);
+
+  const lastTurn = turns[turns.length - 1];
+  const awaitingCandidate = !!lastTurn && lastTurn.speaker === 'INTERVIEWER' && !isSubmitting && sessionState !== 'COMPLETED';
+  const showComposer = mode === 'TEXT' || showTypeFallback;
+
+  const handleSubmitTyped = async () => {
+    const text = typedAnswer.trim();
+    if (!text || isSubmitting) return;
+    const code = attachScratchpad && scratchpadCode.trim() ? scratchpadCode : undefined;
+    setTypedAnswer('');
+    await sendTypedAnswer(text, code);
   };
 
   const formatTimer = (seconds: number) => {
@@ -982,7 +1055,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-6xl flex-col px-4 py-4 sm:px-6">
+    <div className="mx-auto flex h-[calc(100vh-3.5rem)] supports-[height:100dvh]:h-[calc(100dvh-3.5rem)] max-w-6xl flex-col px-4 py-4 sm:px-6">
       {/* Session Top Status Bar */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-3 backdrop-blur-md shadow-sm">
         {/* Left: Active topic & state */}
@@ -1005,7 +1078,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               {currentTopic || 'Session Warmup'}
             </span>
             {blueprint?.topics?.find((t) => t.topic_name === currentTopic && t.mapped_claims_count > 0) && (
-              <span className="hidden lg:inline-flex items-center gap-1 rounded bg-emerald-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-emerald-800/40">
+              <span className="hidden lg:inline-flex items-center gap-1 rounded bg-emerald-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-800/40">
                 <CheckCircle className="h-3 w-3 text-emerald-400" />
                 Claim Grounded
               </span>
@@ -1046,7 +1119,29 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
           <button
             type="button"
-            onClick={handleConclude}
+            onClick={() => setShowScratchpad((v) => !v)}
+            aria-pressed={showScratchpad}
+            title="Toggle code & diagram scratchpad (Alt+S)"
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Scratchpad</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowCamera((v) => !v)}
+            aria-pressed={showCamera}
+            title={showCamera ? 'Turn off camera self-view' : 'Turn on camera self-view (stays on your device)'}
+            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+          >
+            {showCamera ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">Self-view</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={requestConclude}
             disabled={isSubmitting}
             className="flex items-center gap-1.5 rounded-lg bg-white px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-sm hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98]"
           >
@@ -1058,7 +1153,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             ) : (
               <>
                 <CheckCircle className="h-3.5 w-3.5" />
-                Conclude &amp; Score
+                {confirmingConclude ? 'Click again to end & score' : 'Conclude & Score'}
               </>
             )}
           </button>
@@ -1070,6 +1165,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-900/60 bg-red-950/40 p-3 text-xs text-red-300 font-mono">
           <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {notice && (
+        <div role="status" className="mb-3 flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/30 p-3 text-xs text-sky-200">
+          <Info className="h-4 w-4 shrink-0 text-sky-400" />
+          <span>{notice}</span>
         </div>
       )}
 
@@ -1087,7 +1189,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 muted
                 className="w-full h-full object-cover scale-x-[-1]"
               />
-              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-950/80 border border-zinc-800 text-[10px] font-mono text-emerald-400 backdrop-blur-sm">
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-950/80 border border-zinc-800 text-[11px] font-mono text-emerald-400 backdrop-blur-sm">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Live Self-View
               </div>
@@ -1150,13 +1252,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                           {isInterviewer ? (selectedGeminiVoice === 'Aoede' ? 'Maya (Interviewer)' : 'Alex (Interviewer)') : 'You'}
                         </span>
                         {turn.action_taken && (
-                          <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-800">
+                          <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] font-mono text-zinc-300 border border-zinc-800">
                             {turn.action_taken}
                           </span>
                         )}
                         {turn.question_archetype && ARCHETYPE_CONFIG[turn.question_archetype] && (
                           <span
-                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-mono border ${
                               ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
                             }`}
                           >
@@ -1165,7 +1267,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-zinc-500">Turn #{turn.turn_index}</span>
+                      <span className="text-[11px] text-zinc-500">Turn #{turn.turn_index}</span>
                     </div>
 
                     {(() => {
@@ -1183,11 +1285,11 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
                           {turn.code_sample && (!isCurrentlyTyping || typedText.length >= turn.transcript.length * 0.8) && (
                             <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 overflow-x-auto shadow-inner animate-in fade-in duration-200">
-                              <div className="flex items-center justify-between text-[10px] text-zinc-400 border-b border-zinc-800/80 pb-1.5 mb-2">
+                              <div className="flex items-center justify-between text-[11px] text-zinc-400 border-b border-zinc-800/80 pb-1.5 mb-2">
                                 <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
                                   <span>💻</span> Attached Code Sample for Review
                                 </span>
-                                <span className="text-zinc-500 font-mono text-[9px]">Inspect concurrency / memory leaks</span>
+                                <span className="text-zinc-500 font-mono text-[11px]">Inspect concurrency / memory leaks</span>
                               </div>
                               <pre className="whitespace-pre font-mono text-xs text-zinc-300 leading-relaxed">
                                 {turn.code_sample}
@@ -1217,7 +1319,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                       <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
                       <span>You (Speaking...)</span>
                     </div>
-                    <span className="text-[10px] text-zinc-400">
+                    <span className="text-[11px] text-zinc-400">
                       Turn #{(turns.length > 0 ? turns[turns.length - 1].turn_index : 0) + 1}
                     </span>
                   </div>
@@ -1265,7 +1367,50 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             <div ref={chatEndRef} />
           </div>
 
+          {showComposer && (
+            <form
+              className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3 sm:p-4 shadow-xl space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSubmitTyped();
+              }}
+            >
+              <label htmlFor="typed-answer" className="sr-only">Your answer</label>
+              <textarea
+                id="typed-answer"
+                value={typedAnswer}
+                onChange={(e) => setTypedAnswer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    void handleSubmitTyped();
+                  }
+                }}
+                rows={3}
+                placeholder={awaitingCandidate ? 'Type your answer…' : 'Waiting for the interviewer…'}
+                disabled={sessionState === 'COMPLETED'}
+                className="w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+                <span>
+                  {attachScratchpad && scratchpadCode.trim()
+                    ? 'Your scratchpad code will be attached.'
+                    : 'Ctrl+Enter to send'}
+                </span>
+                <button
+                  type="submit"
+                  disabled={!typedAnswer.trim() || isSubmitting || sessionState === 'COMPLETED'}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  Send answer
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* Gemini Live Voice Console Bar */}
+          {mode === 'VOICE' && (
           <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3 sm:p-4 backdrop-blur-md shadow-xl flex items-center justify-between gap-4">
             {/* Left: Active Voice Status */}
             <div className="flex items-center gap-2.5">
@@ -1277,9 +1422,15 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 <span className="text-xs font-semibold font-mono text-zinc-100">
                   {isInterviewerSpeaking
                     ? `${selectedGeminiVoice === 'Aoede' ? 'Maya' : 'Alex'} Speaking...`
-                    : 'Candidate Microphone Active'}
+                    : isRecording
+                      ? 'Listening to you'
+                      : wsStatus === 'connected'
+                        ? 'Microphone idle'
+                        : wsStatus === 'connecting'
+                          ? 'Connecting…'
+                          : 'Voice disconnected'}
                 </span>
-                <span className="text-[10px] text-zinc-400 font-mono">
+                <span className="text-[11px] text-zinc-400 font-mono">
                   {isInterviewerSpeaking ? 'Neural 24kHz Studio Speech' : 'Hands-Free Voice • Automatic Silence Detection'}
                 </span>
               </div>
@@ -1297,9 +1448,20 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                 >
                   <Hand className="h-3.5 w-3.5 text-amber-300" />
                   <span>Interrupt</span>
-                  <kbd className="hidden md:inline-block px-1 py-0.5 text-[9px] font-mono bg-zinc-900 text-amber-300 rounded border border-amber-500/30">Esc</kbd>
+                  <kbd className="hidden md:inline-block px-1 py-0.5 text-[11px] font-mono bg-zinc-900 text-amber-300 rounded border border-amber-500/30">Esc</kbd>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setShowTypeFallback((v) => !v)}
+                aria-pressed={showTypeFallback}
+                title="Type your answer instead of speaking"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-zinc-800 bg-zinc-950 text-xs text-zinc-300 hover:text-white"
+              >
+                <Keyboard className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Type instead</span>
+              </button>
 
               {/* 16-Bar Responsive Equalizer */}
               <div className="flex items-center px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
@@ -1311,6 +1473,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Scratchpad Panel */}
@@ -1344,7 +1507,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   </button>
                 </div>
                 {scratchpadTab === 'CODE' && (
-                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-zinc-700">
+                  <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] font-mono font-medium text-emerald-400 border border-zinc-700">
                     {preferredLanguage || 'Python'}
                   </span>
                 )}
@@ -1396,7 +1559,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             {scratchpadTab === 'CODE' ? (
               <>
                 {/* Quick Template Inserters */}
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                   <span className="text-zinc-500">Presets:</span>
                   {activeTemplates.map((tmpl) => (
                     <button
@@ -1431,7 +1594,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                       <button
                         type="button"
                         onClick={() => setExecutionOutput(null)}
-                        className="text-[10px] text-zinc-400 hover:text-white"
+                        className="text-[11px] text-zinc-400 hover:text-white"
                       >
                         Clear
                       </button>
@@ -1445,7 +1608,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             ) : (
               <>
                 {/* Diagram Presets */}
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                   <span className="text-zinc-500">Diagram Presets:</span>
                   {DIAGRAM_PRESETS.map((dp) => (
                     <button
@@ -1465,7 +1628,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
                 {/* Diagram Syntax Editor */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-zinc-500">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
                     <span>Mermaid Syntax Editor</span>
                     <span>Supports flowchart TD/LR &amp; sequenceDiagram</span>
                   </div>

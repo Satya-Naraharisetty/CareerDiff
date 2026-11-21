@@ -715,17 +715,18 @@ def _rewrite_bullet_for_jd(
     jd_keywords: list[str],
     company_context: str,
 ) -> tuple[str, str, list[str]]:
-    """Heuristic / Google X-Y-Z formula rewriter: elevates verb and weaves in relevant JD keywords."""
+    """Rephrase a bullet with a clearer action verb. Never adds facts, scope, metrics or technologies."""
     bullet_clean = bullet.strip()
     bullet_lower = bullet_clean.lower()
     incorporated: list[str] = []
 
-    # Map of weak verbs to strong action verbs
+    # Map of weak verbs to clearer verbs that keep the same scope of ownership
     verb_upgrades = [
-        (r"^(?:worked on|helped with|participated in|assisted with)\s+", "Architected and delivered "),
-        (r"^(?:built|made|created)\s+", "Engineered high-performance "),
-        (r"^(?:handled|maintained)\s+", "Scaled and operated resilient "),
-        (r"^(?:did|wrote)\s+", "Implemented mission-critical "),
+        (r"^(?:helped with|participated in|assisted with)\s+", "Contributed to "),
+        (r"^(?:worked on)\s+", "Developed "),
+        (r"^(?:made|created)\s+", "Built "),
+        (r"^(?:handled)\s+", "Managed "),
+        (r"^(?:did|wrote)\s+", "Implemented "),
     ]
     rewritten = bullet_clean
     for pat, strong_verb in verb_upgrades:
@@ -733,34 +734,32 @@ def _rewrite_bullet_for_jd(
             rewritten = re.sub(pat, strong_verb, rewritten, count=1, flags=re.IGNORECASE)
             break
 
-    # Weave in target JD concepts if naturally applicable without fabricating claims
-    if "kafka" in [k.lower() for k in jd_keywords] and ("event" in bullet_lower or "pipeline" in bullet_lower):
-        if "kafka" not in bullet_lower:
-            rewritten += " leveraging event-driven streaming patterns"
-            incorporated.append("Kafka")
+    # Never append technologies, metrics or guarantees the candidate did not write: a rewrite may
+    # only rephrase. JD keywords that the bullet already mentions are reported as incorporated;
+    # relevant JD keywords it does NOT mention are only suggested, for the candidate to add if true.
+    jd_lower = {k.lower(): k for k in jd_keywords}
+    incorporated = [orig for low, orig in jd_lower.items() if low in bullet_lower]
+    related_hints = {
+        "kafka": ("event", "pipeline", "stream"),
+        "idempotency": ("api", "payment", "retry", "duplicate"),
+        "latency": ("speed", "fast", "throughput", "performance"),
+        "distributed": ("microservice", "cluster", "replica"),
+    }
+    suggestions = [
+        jd_lower[k]
+        for k, hints in related_hints.items()
+        if k in jd_lower and k not in bullet_lower and any(h in bullet_lower for h in hints)
+    ]
 
-    if "distributed" in [k.lower() for k in jd_keywords] and "microservices" in bullet_lower:
-        if "distributed" not in bullet_lower:
-            rewritten = rewritten.replace("microservices", "distributed microservices")
-            incorporated.append("Distributed Systems")
-
-    if "idempotency" in [k.lower() for k in jd_keywords] and any(w in bullet_lower for w in ["api", "payment", "race"]):
-        if "idempotent" not in bullet_lower:
-            rewritten += ", enforcing strict idempotency and zero-duplicate transaction semantics"
-            incorporated.append("Idempotency")
-
-    if (
-        "latency" in [k.lower() for k in jd_keywords]
-        and "p99" not in bullet_lower
-        and any(w in bullet_lower for w in ["speed", "fast", "throughput", "sec"])
-    ):
-        rewritten += " with verified sub-50ms P99 latency bounds"
-        incorporated.append("P99 Latency Bounds")
-
-    rationale = (
-        f"Strengthened action verbs and highlighted JD competencies ({', '.join(incorporated) if incorporated else 'clarity & impact'}) "
-        f"while strictly preserving all verified metrics and responsibilities at {company_context}."
-    )
+    rationale = "Strengthened the action verb without changing facts or metrics"
+    if incorporated:
+        rationale += f"; already matches JD keywords: {', '.join(incorporated)}"
+    if suggestions:
+        rationale += (
+            f". If accurate, consider naming {', '.join(suggestions)} explicitly — "
+            "only add it if you actually used it"
+        )
+    rationale += f" ({company_context})."
     return rewritten, rationale, incorporated
 
 

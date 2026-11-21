@@ -12,7 +12,6 @@ Verifies:
 9. GDPR Article 17 physical storage file destruction upon account deletion.
 """
 
-import html
 import uuid
 
 import pytest
@@ -336,20 +335,12 @@ def test_production_environment_rejects_insecure_or_short_jwt_secret() -> None:
 
 
 @pytest.mark.asyncio
-async def test_chat_interface_escapes_xss_injection_in_token_query_parameter(
-    async_client: AsyncClient,
-) -> None:
-    """Verify chat template escapes reflected XSS payloads in query parameters."""
+async def test_token_in_url_html_pages_are_not_served(async_client: AsyncClient) -> None:
+    """Legacy HTML pages that reflected the token from the query string must not exist."""
     random_id = uuid.uuid4()
-    xss_payload = '";alert(document.cookie);//<script>alert(1)</script>'
-    res = await async_client.get(f"/api/v1/interviews/{random_id}/chat?token={xss_payload}")
-    assert res.status_code == 200
-
-    html_text = res.text
-    # Raw unescaped script tag must NOT be present
-    assert "<script>alert(1)</script>" not in html_text
-    # Escaped token must be present
-    assert html.escape(xss_payload) in html_text
+    for page in ("chat", "dossier"):
+        res = await async_client.get(f"/api/v1/interviews/{random_id}/{page}?token=x")
+        assert res.status_code in (404, 405)
 
 
 # ==============================================================================

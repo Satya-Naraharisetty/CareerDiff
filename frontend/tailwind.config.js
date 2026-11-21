@@ -1,3 +1,5 @@
+import animate from "tailwindcss-animate";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -7,6 +9,10 @@ export default {
   darkMode: "class",
   theme: {
     extend: {
+      fontSize: {
+        // Readability floor: "xs" is 13px (was 12px); arbitrary 8–10px sizes were raised to 11px.
+        xs: ["0.8125rem", { lineHeight: "1.25rem" }],
+      },
       colors: {
         brand: {
           50: "#eef2ff",
@@ -24,5 +30,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [animate],
 }

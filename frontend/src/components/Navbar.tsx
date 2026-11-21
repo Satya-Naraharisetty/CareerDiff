@@ -40,25 +40,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const isSessionActive = interviewState !== 'CREATED' && interviewState !== 'COMPLETED';
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+  const paletteShortcut = isMac ? '⌘K' : 'Ctrl+K';
+  const initialOf = (u: { full_name?: string; email?: string } | null | undefined) =>
+    ((u?.full_name || u?.email || 'U').trim()[0] || 'U').toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo - Crisp Developer Monospace Pill */}
-        <div
-          className="flex items-center gap-2.5 cursor-pointer shrink-0 group"
+        <button
+          type="button"
+          aria-label="CareerDiff home"
+          className="flex items-center gap-2.5 shrink-0 group rounded-lg"
           onClick={() => onNavigate('home')}
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-750 text-zinc-100 shadow-sm group-hover:border-zinc-600 group-hover:bg-zinc-850 transition-all">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 shadow-sm group-hover:border-zinc-600 group-hover:bg-zinc-800 transition-all">
             <CareerDiffLogo className="h-4 w-4" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white font-mono">
             CareerDiff
           </span>
-          <span className="hidden sm:inline-block rounded-md border border-zinc-800 bg-zinc-900/90 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+          <span className="hidden sm:inline-block rounded-md border border-zinc-800 bg-zinc-900/90 px-1.5 py-0.5 text-[11px] font-mono text-zinc-400">
             Engine v1.0
           </span>
-        </div>
+        </button>
 
         {/* Desktop Center Navigation - Segmented Dock Control */}
         <nav
@@ -134,7 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileText className="h-3.5 w-3.5 text-zinc-400" />
             <span>Resume Studio</span>
-            <span className="rounded bg-zinc-800/90 border border-zinc-700/60 px-1 py-0.2 text-[9px] font-mono text-zinc-400">
+            <span className="rounded bg-zinc-800/90 border border-zinc-700/60 px-1 py-px text-[11px] font-mono text-zinc-400">
               LaTeX
             </span>
           </button>
@@ -146,11 +152,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenCommandPalette}
-              title="Open Command Palette (Cmd+K / Ctrl+K)"
+              title={`Open Command Palette (${paletteShortcut})`}
               className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 transition-colors shadow-sm"
             >
               <Command className="h-3.5 w-3.5 text-zinc-500" />
-              <span className="font-mono text-[10px] text-zinc-400">⌘K</span>
+              <span className="font-mono text-[11px] text-zinc-400">{paletteShortcut}</span>
             </button>
           )}
 
@@ -163,13 +169,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center gap-2 pr-2 text-xs text-zinc-300 hover:text-white transition-colors group"
               >
                 <div className="h-6 w-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[11px] font-semibold text-emerald-400 shadow-inner group-hover:scale-105 transition-transform">
-                  {(user.full_name || user.email)[0].toUpperCase()}
+                  {initialOf(user)}
                 </div>
                 <span className="font-medium text-xs max-w-[110px] truncate text-zinc-200 group-hover:text-white">
                   {user.full_name?.split(' ')[0] || 'Account'}
                 </span>
                 {user.auth_provider === 'LOCAL_DEV' && (
-                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-mono text-amber-300 font-medium">
+                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[11px] font-mono text-amber-300 font-medium">
                     DEV
                   </span>
                 )}
@@ -220,8 +226,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onOpenProfile}
               className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-2 py-1 border border-zinc-800 text-xs text-zinc-200"
             >
-              <div className="h-5 w-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[10px] font-bold text-emerald-400">
-                {(user?.full_name || user?.email || 'U')[0].toUpperCase()}
+              <div className="h-5 w-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[11px] font-bold text-emerald-400">
+                {initialOf(user)}
               </div>
               <span className="max-w-[70px] truncate">{user?.full_name?.split(' ')[0] || 'User'}</span>
             </button>
@@ -323,7 +329,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <FileText className="h-4 w-4 text-emerald-400" />
                 <span>Resume Studio</span>
               </div>
-              <span className="rounded bg-zinc-800 border border-zinc-700/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400">
+              <span className="rounded bg-zinc-800 border border-zinc-700/80 px-1.5 py-0.5 text-[11px] font-mono text-zinc-400">
                 LaTeX
               </span>
             </button>
@@ -335,18 +341,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="flex items-center justify-between bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800">
                 <div className="flex items-center gap-2">
                   <div className="h-7 w-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-bold text-emerald-400">
-                    {(user.full_name || user.email || 'U')[0].toUpperCase()}
+                    {initialOf(user)}
                   </div>
                   <div className="text-left">
                     <div className="flex items-center gap-1.5">
                       <p className="text-xs font-medium text-white">{user.full_name || 'Candidate'}</p>
                       {user.auth_provider === 'LOCAL_DEV' && (
-                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.2 text-[9px] font-mono text-amber-300 font-medium">
+                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[11px] font-mono text-amber-300 font-medium">
                           DEV
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">{user.email}</p>
+                    <p className="text-[11px] text-zinc-400 truncate max-w-[150px]">{user.email}</p>
                   </div>
                 </div>
                 <button

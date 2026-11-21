@@ -567,7 +567,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                 Camera Self-Preview
               </span>
               <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-medium ${
                   cameraStatus === 'granted' && isCameraEnabled
                     ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
                     : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
@@ -616,7 +616,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                     <select
                       value={selectedCameraDeviceId}
                       onChange={(e) => handleSwitchCameraDevice(e.target.value)}
-                      className="bg-transparent border-0 text-[10px] font-mono text-zinc-300 focus:outline-none max-w-[140px] truncate cursor-pointer"
+                      className="bg-transparent border-0 text-[11px] font-mono text-zinc-300 focus:outline-none max-w-[140px] truncate cursor-pointer"
                       title="Switch Camera Device"
                     >
                       {cameraDevices.map((d) => (
@@ -626,14 +626,14 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                       ))}
                     </select>
                   ) : (
-                    <span className="truncate max-w-[140px] font-mono text-[10px] text-zinc-400">
+                    <span className="truncate max-w-[140px] font-mono text-[11px] text-zinc-400">
                       {cameraDeviceName || 'Connected Camera'}
                     </span>
                   )}
                   <button
                     type="button"
                     onClick={toggleCamera}
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors font-medium text-[10px] shrink-0"
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors font-medium text-[11px] shrink-0"
                   >
                     {isCameraEnabled ? (
                       <>
@@ -676,7 +676,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-xs font-semibold text-zinc-200">Microphone Input</h4>
-                    <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[150px]">
+                    <p className="text-[11px] text-zinc-400 font-mono truncate max-w-[150px]">
                       {micDeviceName || (micStatus === 'granted' ? 'Connected' : 'Not Connected')}
                     </p>
                   </div>
@@ -687,13 +687,13 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                     <button
                       type="button"
                       onClick={toggleMic}
-                      className="text-[10px] px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+                      className="text-[11px] px-2 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
                     >
                       {isMicMuted ? 'Unmute' : 'Mute'}
                     </button>
                   )}
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-medium ${
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-medium ${
                       micStatus === 'granted'
                         ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
                         : 'bg-rose-950/80 text-rose-300 border border-rose-800'
@@ -707,9 +707,9 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
               {/* Input Device Selector if multiple mics detected */}
               {micStatus === 'granted' && audioDevices.length > 1 && (
                 <div className="space-y-1">
-                  <label htmlFor="mic-select" className="text-[10px] text-zinc-400 font-medium flex items-center justify-between">
+                  <label htmlFor="mic-select" className="text-[11px] text-zinc-400 font-medium flex items-center justify-between">
                     <span>Select Microphone Device:</span>
-                    <span className="text-[9px] text-emerald-400/80 font-mono">Switch if using headset</span>
+                    <span className="text-[11px] text-emerald-400/80 font-mono">Switch if using headset</span>
                   </label>
                   <select
                     id="mic-select"
@@ -728,7 +728,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
 
               {/* Live VU Meter Audio Level Visualizer */}
               <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between text-[10px] font-mono text-zinc-400">
+                <div className="flex justify-between text-[11px] font-mono text-zinc-400">
                   <span>Input Volume Level</span>
                   <span className={audioLevel > 0.05 ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}>
                     {Math.round(audioLevel * 100)}%
@@ -754,7 +754,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                     );
                   })}
                 </div>
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[11px] text-zinc-500">
                   Speak into your microphone to verify volume detection.
                 </p>
               </div>
@@ -768,7 +768,7 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-zinc-200">Speaker / Headphones</h4>
-                  <p className="text-[10px] text-zinc-400">
+                  <p className="text-[11px] text-zinc-400">
                     Verify you can hear the interviewer.
                   </p>
                 </div>

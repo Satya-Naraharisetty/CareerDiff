@@ -302,7 +302,7 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                     <Award className="h-4 w-4 text-zinc-400" />
                     <span>{history.total_interviews}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 block">Dossiers Stored</span>
+                  <span className="text-[11px] text-zinc-500 block">Dossiers Stored</span>
                 </div>
 
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3.5 space-y-1 font-mono">
@@ -311,7 +311,7 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                     <Zap className="h-4 w-4 text-emerald-400" />
                     <span>{history.average_score !== null ? `${history.average_score} / 4.0` : '—'}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 block">Mean Across Sessions</span>
+                  <span className="text-[11px] text-zinc-500 block">Mean Across Sessions</span>
                 </div>
 
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3.5 space-y-1 font-mono">
@@ -320,7 +320,7 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                     <CheckCircle2 className="h-4 w-4 text-sky-400" />
                     <span>{history.latest_score !== null ? `${history.latest_score} / 4.0` : '—'}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 block">Most Recent Score</span>
+                  <span className="text-[11px] text-zinc-500 block">Most Recent Score</span>
                 </div>
 
                 <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3.5 space-y-1 font-mono">
@@ -339,7 +339,7 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                         : '—'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 block">First vs Latest Delta</span>
+                  <span className="text-[11px] text-zinc-500 block">First vs Latest Delta</span>
                 </div>
               </div>
 
@@ -386,14 +386,14 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                         >
                           <div className="space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-300">
+                              <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] font-mono font-bold text-zinc-300">
                                 {item.target_seniority}
                               </span>
                               <span className="font-semibold text-sm text-white font-sans">
                                 {item.role_title || 'General Engineering'}
                               </span>
                               {isCurrentlyActive && (
-                                <span className="rounded-full bg-emerald-950 border border-emerald-800 px-2 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold">
+                                <span className="rounded-full bg-emerald-950 border border-emerald-800 px-2 py-0.5 text-[11px] font-mono text-emerald-400 font-semibold">
                                   Currently Viewing
                                 </span>
                               )}
@@ -422,10 +422,10 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                                   <div className="text-xs font-bold text-emerald-400">
                                     {item.overall_score.toFixed(1)} / 4.0
                                   </div>
-                                  <div className="text-[9px] text-zinc-500">Rubric</div>
+                                  <div className="text-[11px] text-zinc-500">Rubric</div>
                                 </div>
                               ) : (
-                                <span className="rounded bg-zinc-900 border border-zinc-800 px-2 py-1 text-[10px] font-mono text-zinc-500">
+                                <span className="rounded bg-zinc-900 border border-zinc-800 px-2 py-1 text-[11px] font-mono text-zinc-500">
                                   In Progress
                                 </span>
                               )}
@@ -435,7 +435,7 @@ export const PerformanceHistoryModal: React.FC<PerformanceHistoryModalProps> = (
                                   <div className="text-xs font-bold text-indigo-400">
                                     {Math.round(item.ats_score)}%
                                   </div>
-                                  <div className="text-[9px] text-zinc-500">ATS</div>
+                                  <div className="text-[11px] text-zinc-500">ATS</div>
                                 </div>
                               )}
                             </div>

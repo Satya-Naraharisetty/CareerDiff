@@ -242,7 +242,7 @@ class GeminiLiveBridge:
                 if interim and getattr(interim, "text", None):
                     interim_text = interim.text
                     full_interim = "".join(self._input_transcript_buffer) + interim_text
-                    logger.info("[GEMINI LIVE] Candidate Interim Transcript: '%s'", full_interim)
+                    logger.debug("[GEMINI LIVE] Candidate interim transcript (%d chars)", len(full_interim))
                     yield GeminiLiveEvent(
                         event_type="input_transcript",
                         text=full_interim,
@@ -253,7 +253,7 @@ class GeminiLiveBridge:
                     input_text = final_in.text
                     self._input_transcript_buffer.append(input_text)
                     full_in = "".join(self._input_transcript_buffer)
-                    logger.info("[GEMINI LIVE] Candidate Finalized Transcript: '%s'", full_in)
+                    logger.info("[GEMINI LIVE] Candidate finalized transcript (%d chars)", len(full_in))
                     yield GeminiLiveEvent(
                         event_type="input_transcript",
                         text=full_in,
@@ -280,7 +280,7 @@ class GeminiLiveBridge:
                 # 4. Turn Completion
                 if getattr(server_content, "turn_complete", False):
                     full_output = "".join(self._output_transcript_buffer).strip()
-                    logger.info("Gemini Live: Turn completed. Response: '%s'", full_output)
+                    logger.info("Gemini Live: Turn completed (%d chars)", len(full_output))
                     self._input_transcript_buffer.clear()
                     self._output_transcript_buffer.clear()
                     yield GeminiLiveEvent(

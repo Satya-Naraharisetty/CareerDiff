@@ -92,7 +92,8 @@ async def test_full_interview_completion_outbox_and_evaluation_flow(
         f"/api/v1/interviews/{interview_id}/report",
         headers=headers,
     )
-    assert rep_pre_res.status_code == 404
+    assert rep_pre_res.status_code == 409
+    assert rep_pre_res.json()["detail"] == "REPORT_NOT_READY"
 
     # 4. Start Interview (Turn 0)
     start_res = await async_client.post(
@@ -203,8 +204,3 @@ async def test_full_interview_completion_outbox_and_evaluation_flow(
     assert kafka_claim is not None
     assert kafka_claim["status"] in ("VERIFIED", "VAGUE")
 
-    # 10. Verify Dossier HTML endpoint
-    dossier_res = await async_client.get(f"/api/v1/interviews/{interview_id}/dossier?token={token}")
-    assert dossier_res.status_code == 200
-    assert "CareerDiff Assessment Dossier" in dossier_res.text
-    assert "radar-chart" in dossier_res.text

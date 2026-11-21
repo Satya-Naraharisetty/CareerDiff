@@ -1,6 +1,7 @@
 """Storage service for persisting resume documents to managed local disk."""
 
 import hashlib
+import uuid
 from pathlib import Path
 
 # Local persistence storage directory for files
@@ -16,12 +17,15 @@ def compute_file_hash(content: bytes) -> str:
 def upload_resume_document(filename: str, content: bytes) -> tuple[str, str]:
     """Store resume document to disk and return (storage_key, file_hash)."""
     file_hash = compute_file_hash(content)
-    # Sanitize filename
-    safe_filename = "".join(c for c in filename if c.isalnum() or c in "._- ")
-    storage_key = f"resumes/{file_hash}_{safe_filename}"
+    # Sanitize filename (keep it short; never trust client-supplied names on disk)
+    safe_filename = "".join(c for c in filename if c.isalnum() or c in "._-")[-80:] or "resume"
+    # A unique id per upload: two users uploading identical bytes must never share one file,
+    # otherwise one user's account deletion (right to erasure) would delete the other's resume.
+    object_name = f"{uuid.uuid4().hex}_{safe_filename}"
+    storage_key = f"resumes/{object_name}"
 
     # Save to local storage
-    local_path = UPLOAD_DIR / f"{file_hash}_{safe_filename}"
+    local_path = UPLOAD_DIR / object_name
     local_path.write_bytes(content)
 
     return storage_key, file_hash

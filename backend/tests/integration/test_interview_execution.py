@@ -190,13 +190,11 @@ async def test_negative_paths_and_error_handling(async_client: AsyncClient) -> N
 
 
 @pytest.mark.asyncio
-async def test_chat_interface_endpoint(async_client: AsyncClient) -> None:
-    """Verify GET /api/v1/interviews/{id}/chat serves responsive HTML."""
+async def test_legacy_token_in_url_chat_page_removed(async_client: AsyncClient) -> None:
+    """The legacy HTML chat page accepted the bearer token in the URL; it must stay removed."""
     token, interview_id = await setup_interview_session(async_client)
     res = await async_client.get(f"/api/v1/interviews/{interview_id}/chat?token={token}")
-    assert res.status_code == 200
-    assert "text/html" in res.headers["content-type"]
-    assert "CareerDiff — Live Technical Interview" in res.text
+    assert res.status_code in (404, 405)
 
 
 @pytest.mark.asyncio

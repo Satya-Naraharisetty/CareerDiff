@@ -317,7 +317,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <>
                 <div className="grid grid-cols-2 gap-3 font-mono">
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3.5">
-                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                       Target Seniority
                     </span>
                     <span className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-1.5">
@@ -327,7 +327,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   </div>
 
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3.5">
-                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                       Primary Discipline
                     </span>
                     <span className="text-xs sm:text-sm font-bold text-zinc-100 flex items-center gap-1.5">
@@ -464,7 +464,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                           }`}
                       />
                     </div>
-                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
                       {strengthScore === 1 ? 'Weak' : strengthScore === 2 ? 'Fair' : 'Strong'}
                     </span>
                   </div>
@@ -554,7 +554,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                       key={idx}
                       className="font-mono text-xs font-bold text-zinc-200 bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-800 flex items-center justify-between"
                     >
-                      <span className="text-[10px] text-zinc-500 font-sans">{idx + 1}.</span>
+                      <span className="text-[11px] text-zinc-500 font-sans">{idx + 1}.</span>
                       <span>{code}</span>
                     </div>
                   ))}

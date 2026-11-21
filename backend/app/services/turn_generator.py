@@ -4,6 +4,7 @@ import logging
 import re
 
 from app.core.config import get_settings
+from app.core.llm import make_genai_client
 from app.schemas.adaptive import EngineAction, QuestionArchetype
 
 logger = logging.getLogger("CareerDiff.turn_generator")
@@ -336,9 +337,8 @@ class TurnGenerator:
         settings = get_settings()
         if settings.gemini_api_key:
             try:
-                from google import genai
 
-                client = genai.Client(api_key=settings.gemini_api_key)
+                client = make_genai_client()
                 interviewer = interviewer_name or "Alex"
                 first_name = candidate_name.split()[0] if candidate_name else "there"
                 clean_answer = sanitize_prompt_injection(candidate_warmup_answer)
@@ -425,9 +425,8 @@ class TurnGenerator:
         settings = get_settings()
         if settings.gemini_api_key:
             try:
-                from google import genai
 
-                client = genai.Client(api_key=settings.gemini_api_key)
+                client = make_genai_client()
 
                 persona_guidelines = {
                     "BIG_TECH": (
@@ -773,9 +772,8 @@ class TurnGenerator:
         settings = get_settings()
         if settings.gemini_api_key:
             try:
-                from google import genai
 
-                client = genai.Client(api_key=settings.gemini_api_key)
+                client = make_genai_client()
                 prompt = (
                     f"You are a Staff Software Engineer and interviewer at {company}.\n"
                     f"The candidate has just completed their {target_seniority.lower()} technical interview and asked you: "

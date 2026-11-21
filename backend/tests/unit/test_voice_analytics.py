@@ -9,11 +9,11 @@ from app.services.voice_analytics import analyze_voice_and_communication
 def test_voice_analytics_empty_turns() -> None:
     """Verify safe fallback metrics when no candidate turns are present."""
     result = analyze_voice_and_communication([])
-    assert result["communication_score"] == 80
-    assert result["speaking_rate_wpm"] == 135
-    assert result["pacing_grade"] == "OPTIMAL"
+    assert result["communication_score"] is None
+    assert result["pacing_grade"] == "NOT_ASSESSED"
+    assert result["speaking_rate_wpm"] is None
     assert result["filler_words_count"] == 0
-    assert result["monologue_risk"] == "LOW"
+    assert result["monologue_risk"] == "NOT_ASSESSED"
 
 
 def test_voice_analytics_optimal_pacing() -> None:

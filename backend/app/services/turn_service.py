@@ -155,10 +155,9 @@ class TurnService:
         await db.commit()
         await db.refresh(turn_0)
         logger.info(
-            "Committed Turn #0 greeting for interview %s (archetype: %s): '%s...'",
+            "Committed Turn #0 greeting for interview %s (archetype: %s)",
             interview_id,
             turn_0.question_archetype,
-            greeting_text[:70],
         )
         return turn_0
 
@@ -226,11 +225,10 @@ class TurnService:
         await db.commit()
         await db.refresh(candidate_turn)
         logger.info(
-            "TurnService: Committed Candidate Turn #%d (duration: %dms, words: %d): '%s...'",
+            "TurnService: Committed Candidate Turn #%d (duration: %sms, words: %d)",
             next_turn_index,
-            request.duration_ms,
+            request.duration_ms if request.duration_ms is not None else "n/a",
             len(request.transcript.split()),
-            request.transcript[:65],
         )
 
         # 3. Reconstruct session state and probe counts from historical turns
@@ -446,12 +444,11 @@ class TurnService:
         await db.commit()
         await db.refresh(interviewer_turn)
         logger.info(
-            "TurnService: Committed Interviewer Turn #%d (action: %s, archetype: %s, new state: %s): '%s...'",
+            "TurnService: Committed Interviewer Turn #%d (action: %s, archetype: %s, new state: %s)",
             interviewer_turn.turn_index,
             approved_action.value,
             question_archetype,
             interview.state,
-            interviewer_text[:70],
         )
 
         # Trigger immediate in-process outbox processing if interview completed

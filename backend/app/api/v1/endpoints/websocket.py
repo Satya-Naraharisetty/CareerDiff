@@ -283,9 +283,9 @@ async def interview_voice_gateway(
             nonlocal current_tts_task, active_interviewer_turn_index
             try:
                 logger.info(
-                    "[TURN FINALIZATION] Finalizing turn for interview %s (transcript: '%s...', duration: %dms)",
+                    "[TURN FINALIZATION] Finalizing turn for interview %s (%d chars, duration: %sms)",
                     interview_id,
-                    candidate_text[:60],
+                    len(candidate_text or ""),
                     duration_ms,
                 )
                 await cancel_active_tts()
@@ -301,10 +301,9 @@ async def interview_voice_gateway(
 
                 active_interviewer_turn_index = interviewer_reply.turn_index
                 logger.info(
-                    "[TURN SERVICE] Response ready: Turn #%d (%s): '%s...'",
+                    "[TURN SERVICE] Response ready: Turn #%d (%s)",
                     interviewer_reply.turn_index,
                     interviewer_reply.action_taken.value,
-                    interviewer_reply.transcript[:70],
                 )
 
                 # Notify UI interviewer is speaking
@@ -431,7 +430,7 @@ async def interview_voice_gateway(
                         if not transcript.strip():
                             continue
 
-                        logger.info("Candidate turn finalized via VAD: '%s' (%dms)", transcript, dur_ms)
+                        logger.info("Candidate turn finalized via VAD (%d chars, %dms)", len(transcript or ""), dur_ms)
                         await websocket.send_json(
                             {
                                 "type": "transcript_final",
@@ -463,7 +462,7 @@ async def interview_voice_gateway(
 
                 elif event_type == "speech_stopped":
                     client_transcript = payload.get("transcript")
-                    logger.info("Client event 'speech_stopped' received (client transcript: '%s')", client_transcript)
+                    logger.info("Client event 'speech_stopped' received (client transcript: %d chars)", len(str(client_transcript or "")))
                     if live_bridge and live_bridge.is_active:
                         await live_bridge.send_audio_stream_end()
                     else:
@@ -482,7 +481,7 @@ async def interview_voice_gateway(
                                     "focusing on low-latency microservices, Kafka event streaming, and resilient data architectures."
                                 )
 
-                            logger.info("Finalizing turn from speech_stopped event: '%s' (%dms)", transcript, dur_ms)
+                            logger.info("Finalizing turn from speech_stopped event (%d chars, %dms)", len(transcript or ""), dur_ms)
                             await websocket.send_json(
                                 {
                                     "type": "transcript_final",
@@ -497,7 +496,7 @@ async def interview_voice_gateway(
                 elif event_type == "text_input":
                     # Text fallback mode: process text input over WebSocket
                     candidate_text = payload.get("text", "").strip()
-                    logger.info("Client event 'text_input' received over voice gateway: '%s'", candidate_text)
+                    logger.info("Client event 'text_input' received over voice gateway (%d chars)", len(str(candidate_text or "")))
                     if candidate_text:
                         await cancel_active_tts()
                         if live_bridge and live_bridge.is_active:

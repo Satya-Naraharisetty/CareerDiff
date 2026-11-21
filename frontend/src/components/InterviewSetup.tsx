@@ -148,7 +148,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [mode, setMode] = useState<InterviewMode>('VOICE');
   const [userSelectedLanguage, setUserSelectedLanguage] = useState<string | null>(null);
   const [companyPersona, setCompanyPersona] = useState<CompanyPersona>('STANDARD');
-  const [targetCompany, setTargetCompany] = useState<string>('GlobalFinTech Corp');
+  const [targetCompany, setTargetCompany] = useState<string>('');
   const [isAnalyzingCompany, setIsAnalyzingCompany] = useState<boolean>(false);
   const [companyAnalysisResult, setCompanyAnalysisResult] = useState<CompanyAnalysisResponse | null>(null);
   const [isDeviceCheckOpen, setIsDeviceCheckOpen] = useState<boolean>(false);
@@ -157,14 +157,18 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [resumeTab, setResumeTab] = useState<'upload' | 'paste'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [resumeText, setResumeText] = useState(SAMPLE_RESUME_TEXT);
+  // Start empty: sample content is only loaded on request ("Load sample"), never submitted silently.
+  const [resumeText, setResumeText] = useState('');
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysisResponse | null>(null);
   const [resumeSuccessMsg, setResumeSuccessMsg] = useState<string | null>(null);
 
   // Step 2: Target Calibration State (DEFAULT OPTION IS PASTE JD)
   const [targetTab, setTargetTab] = useState<'jd' | 'discipline'>('jd');
-  const [jdText, setJdText] = useState(SAMPLE_JD_TEXT);
+  const [jdText, setJdText] = useState('');
+  // Snapshots of exactly what was analyzed, so later edits don't silently diverge from the analysis.
+  const [analyzedResumeText, setAnalyzedResumeText] = useState<string>('');
+  const [analyzedJdText, setAnalyzedJdText] = useState<string>('');
   const [isAnalyzingJd, setIsAnalyzingJd] = useState(false);
   const [jdAnalysis, setJdAnalysis] = useState<JdAnalysisResponse | null>(null);
   const [jdSuccessMsg, setJdSuccessMsg] = useState<string | null>(null);
@@ -189,36 +193,59 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const preferredLanguage = userSelectedLanguage ?? (detectedLanguages[0] || 'Python');
   const setPreferredLanguage = (lang: string) => setUserSelectedLanguage(lang);
 
-  // Comparative Intelligence: Compute Resume vs. JD fit matrix whenever context updates
+  // Comparative Intelligence: resume vs. JD fit, recomputed (debounced) only when the analyzed
+  // inputs change — not on every keystroke — and stale responses are discarded.
   useEffect(() => {
-    async function runComparativeMatch() {
-      if (!resumeAnalysis || (!jdAnalysis && !selectedRole)) {
-        setMatchAnalysis(null);
-        return;
-      }
+    if (!resumeAnalysis || (!jdAnalysis && !selectedRole)) {
+      setMatchAnalysis(null);
+      return;
+    }
+    const resumeBody =
+      analyzedResumeText ||
+      [resumeAnalysis.summary, ...resumeAnalysis.claims.map((c) => c.claim_text)].filter(Boolean).join('\n');
+    const jdBody = jdAnalysis && analyzedJdText
+      ? analyzedJdText
+      : `${selectedRole?.name || ''}\n${selectedRole?.description || ''}\n${(selectedRole?.competencies || []).map((c) => c.name).join(', ')}`;
+    if (resumeBody.trim().length < 10 || jdBody.trim().length < 10) {
+      setMatchAnalysis(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
       setIsMatching(true);
       try {
-        const jdBody = jdAnalysis
-          ? jdText
-          : `${selectedRole?.name || ''}\n${selectedRole?.description || ''}\n${(selectedRole?.competencies || []).map((c) => c.name).join(', ')}`;
-        const jdTechs = jdAnalysis?.matched_technologies || [];
         const res = await rolesApi.matchResumeJd({
-          resume_text: resumeText || SAMPLE_RESUME_TEXT,
+          resume_text: resumeBody,
           jd_text: jdBody,
           resume_skills: resumeAnalysis.verified_skills,
-          jd_technologies: jdTechs,
+          jd_technologies: jdAnalysis?.matched_technologies || [],
           candidate_seniority: seniority,
           required_seniority: jdAnalysis?.detected_seniority || seniority,
         });
-        setMatchAnalysis(res);
+        if (!cancelled) setMatchAnalysis(res);
       } catch (err) {
-        console.warn('Resume vs JD match calculation failed:', err);
+        if (!cancelled) console.warn('Resume vs JD match calculation failed:', err);
       } finally {
-        setIsMatching(false);
+        if (!cancelled) setIsMatching(false);
       }
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [resumeAnalysis, jdAnalysis, selectedRole, seniority, analyzedResumeText, analyzedJdText]);
+
+  // Any change to the session configuration after the plan was compiled invalidates that plan,
+  // so the candidate never enters an interview with settings different from what they see.
+  const configKey = `${selectedRole?.id}|${seniority}|${duration}|${mode}|${preferredLanguage}|${companyPersona}|${targetCompany.trim()}`;
+  const compiledConfigKeyRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (createdBlueprint && compiledConfigKeyRef.current && compiledConfigKeyRef.current !== configKey) {
+      setCreatedBlueprint(null);
+      compiledConfigKeyRef.current = null;
     }
-    runComparativeMatch();
-  }, [resumeAnalysis, jdAnalysis, selectedRole, seniority, jdText, resumeText]);
+  }, [configKey, createdBlueprint]);
 
   useEffect(() => {
     async function initData() {
@@ -303,6 +330,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           return;
         }
         analysis = await resumesApi.uploadFile(selectedFile);
+        setAnalyzedResumeText('');
       } else {
         if (!resumeText.trim()) {
           setError('Please paste resume text before analyzing.');
@@ -313,6 +341,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           raw_text: resumeText.trim(),
           filename: 'candidate_resume.txt',
         });
+        setAnalyzedResumeText(resumeText.trim());
       }
 
       setResumeAnalysis(analysis);
@@ -337,7 +366,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
     try {
       const res = await rolesApi.analyzeCompany({
         company_name: companyName.trim(),
-        jd_text: jdAnalysis ? jdText : undefined,
+        jd_text: jdAnalysis && analyzedJdText ? analyzedJdText : undefined,
       });
       setCompanyAnalysisResult(res);
       setCompanyPersona(res.detected_persona);
@@ -364,6 +393,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
     try {
       const res = await rolesApi.analyzeJd({ jd_text: jdText.trim() });
+      setAnalyzedJdText(jdText.trim());
       setJdAnalysis(res);
       setSelectedRole(res.role);
       setSeniority(res.detected_seniority);
@@ -402,12 +432,13 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         duration_minutes: duration,
         mode,
         preferred_language: preferredLanguage,
-        jd_text: jdAnalysis ? jdText : undefined,
+        jd_text: jdAnalysis && analyzedJdText ? analyzedJdText : undefined,
         company_persona: companyPersona,
         target_company: targetCompany.trim() || undefined,
       });
 
       setCreatedBlueprint(res.blueprint);
+      compiledConfigKeyRef.current = configKey;
       setInterview(
         res.interview_id,
         res.state,
@@ -502,7 +533,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               <div className="text-xs font-semibold text-zinc-200 truncate">
                 {resumeAnalysis ? 'Resume Ingested' : 'Ingest Resume'}
               </div>
-              <div className="text-[10px] text-zinc-500 truncate">
+              <div className="text-[11px] text-zinc-500 truncate">
                 {resumeAnalysis
                   ? `${resumeAnalysis.claims.length} claims extracted`
                   : 'Upload file or paste text'}
@@ -537,7 +568,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   ? 'Role Selected'
                   : 'Target Calibration'}
               </div>
-              <div className="text-[10px] text-zinc-500 truncate">
+              <div className="text-[11px] text-zinc-500 truncate">
                 {jdAnalysis
                   ? jdAnalysis.extracted_title
                   : selectedRole
@@ -570,7 +601,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               <div className="text-xs font-semibold text-zinc-200 truncate">
                 {createdBlueprint ? 'Blueprint Compiled' : 'Compile Blueprint'}
               </div>
-              <div className="text-[10px] text-zinc-500 truncate">
+              <div className="text-[11px] text-zinc-500 truncate">
                 {createdBlueprint
                   ? `${Math.round(createdBlueprint.total_allocated_seconds / 60)}m interview plan`
                   : 'Adaptive rubric ready'}
@@ -594,6 +625,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setResumeTab('upload')}
+                    aria-pressed={resumeTab === 'upload'}
                   className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     resumeTab === 'upload'
                       ? 'bg-zinc-800 text-white'
@@ -605,6 +637,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setResumeTab('paste')}
+                    aria-pressed={resumeTab === 'paste'}
                   className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     resumeTab === 'paste'
                       ? 'bg-zinc-800 text-white'
@@ -646,7 +679,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     {['PDF', 'DOCX', 'TXT'].map((ext) => (
                       <span
                         key={ext}
-                        className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-400 border border-zinc-800"
+                        className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] font-mono text-zinc-400 border border-zinc-800"
                       >
                         .{ext.toLowerCase()}
                       </span>
@@ -673,7 +706,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     <div className="mt-3.5 flex items-center gap-2 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs font-mono text-emerald-400 shadow-sm">
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate max-w-[200px] sm:max-w-xs">{selectedFile.name}</span>
-                      <span className="text-zinc-500 text-[10px]">
+                      <span className="text-zinc-500 text-[11px]">
                         ({(selectedFile.size / 1024).toFixed(1)} KB)
                       </span>
                       <button
@@ -765,7 +798,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 )}
 
                 <div>
-                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
                     Extracted Technical Keywords
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -794,6 +827,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setTargetTab('jd')}
+                    aria-pressed={targetTab === 'jd'}
                   className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     targetTab === 'jd'
                       ? 'bg-zinc-800 text-white'
@@ -805,6 +839,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setTargetTab('discipline')}
+                    aria-pressed={targetTab === 'discipline'}
                   className={`px-3 py-1 text-xs font-mono font-medium rounded-md transition-all ${
                     targetTab === 'discipline'
                       ? 'bg-zinc-800 text-white'
@@ -883,7 +918,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
                     {jdAnalysis.key_requirements.length > 0 && (
                       <div>
-                        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
+                        <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                           Key JD Requirements
                         </span>
                         <ul className="text-xs text-zinc-300 space-y-1 font-sans">
@@ -898,7 +933,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     )}
 
                     <div>
-                      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
+                      <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
                         Tailored Blueprint Competencies
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -952,7 +987,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                             {role.competencies.slice(0, 3).map((comp) => (
                               <span
                                 key={comp.id}
-                                className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] text-zinc-300 border border-zinc-800"
+                                className="rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] text-zinc-300 border border-zinc-800"
                               >
                                 {comp.name}
                               </span>
@@ -982,7 +1017,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     {matchAnalysis.match_score_pct}% Match
                   </span>
-                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-700">
+                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] font-mono text-zinc-300 border border-zinc-700">
                     {matchAnalysis.seniority_fit} Fit
                   </span>
                 </div>
@@ -1003,7 +1038,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Direct Matches */}
                   <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3" />
                       Direct Matched Skills ({matchAnalysis.matched_skills.length})
                     </span>
@@ -1025,7 +1060,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
                   {/* Identified Gaps */}
                   <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
                       Identified Gaps ({matchAnalysis.missing_skills.length})
                     </span>
@@ -1047,7 +1082,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
                   {/* Differentiating Strengths */}
                   <div className="rounded-lg bg-zinc-950/70 border border-zinc-800/90 p-3 space-y-2">
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1">
+                    <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1">
                       <Sparkles className="h-3 w-3" />
                       Candidate Strengths ({matchAnalysis.differentiating_skills.length})
                     </span>
@@ -1106,6 +1141,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     key={lvl.id}
                     type="button"
                     onClick={() => setSeniority(lvl.id)}
+                    aria-pressed={seniority === lvl.id}
                     className={`text-left rounded-lg p-3.5 border transition-all ${
                       isSelected
                         ? 'border-zinc-500 bg-zinc-800/90 text-white ring-1 ring-zinc-500/20'
@@ -1114,7 +1150,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-zinc-100 text-xs sm:text-sm">{lvl.title}</span>
-                      <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono font-medium text-zinc-300 border border-zinc-800">
+                      <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] font-mono font-medium text-zinc-300 border border-zinc-800">
                         {lvl.id}
                       </span>
                     </div>
@@ -1141,7 +1177,8 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                         key={lang}
                         type="button"
                         onClick={() => setPreferredLanguage(lang)}
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors ${
+                    aria-pressed={preferredLanguage === lang}
+                        className={`rounded px-1.5 py-0.5 text-[11px] font-medium border transition-colors ${
                           preferredLanguage === lang
                             ? 'border-emerald-500 bg-emerald-950/80 text-emerald-300'
                             : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-zinc-500'
@@ -1168,6 +1205,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     key={lang}
                     type="button"
                     onClick={() => setPreferredLanguage(lang)}
+                    aria-pressed={preferredLanguage === lang}
                     className={`relative rounded-lg py-2 px-2.5 text-xs font-mono font-semibold border transition-all text-center ${
                       isSelected
                         ? 'border-emerald-500 bg-emerald-950/50 text-emerald-300 ring-1 ring-emerald-500/30 shadow-sm'
@@ -1203,7 +1241,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   <Building2 className="h-3.5 w-3.5 text-indigo-400" />
                   <span>Target Company Archetype (Optional):</span>
                 </label>
-                <span className="text-[10px] text-zinc-500">Auto-deduces company scale &amp; culture</span>
+                <span className="text-[11px] text-zinc-500">Auto-deduces company scale &amp; culture</span>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -1240,7 +1278,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
               {/* Quick Company Presets */}
               <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] font-mono">
-                <span className="text-zinc-500 text-[10px]">Popular:</span>
+                <span className="text-zinc-500 text-[11px]">Popular:</span>
                 {[
                   { name: 'Stripe', persona: 'SCALE_UP' },
                   { name: 'Google', persona: 'BIG_TECH' },
@@ -1257,7 +1295,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                       setTargetCompany(item.name);
                       runCompanyAnalysis(item.name);
                     }}
-                    className={`rounded px-2 py-0.5 text-[10px] border transition-colors ${
+                    className={`rounded px-2 py-0.5 text-[11px] border transition-colors ${
                       targetCompany.toLowerCase() === item.name.toLowerCase()
                         ? 'border-indigo-500 bg-indigo-950/70 text-indigo-300 font-semibold'
                         : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
@@ -1276,17 +1314,17 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   <div className="flex items-center gap-2 text-indigo-300 font-semibold">
                     <Sparkles className="h-4 w-4 text-indigo-400" />
                     <span>Auto-Calibrated for "{companyAnalysisResult.company_name}"</span>
-                    <span className="rounded bg-indigo-900/60 px-2 py-0.5 text-[10px] text-indigo-200 border border-indigo-800">
+                    <span className="rounded bg-indigo-900/60 px-2 py-0.5 text-[11px] text-indigo-200 border border-indigo-800">
                       {companyAnalysisResult.scale_tier}
                     </span>
                   </div>
                   <div>
                     {companyPersona === companyAnalysisResult.detected_persona ? (
-                      <span className="rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2.5 py-0.5 text-[10px] font-bold">
+                      <span className="rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2.5 py-0.5 text-[11px] font-bold">
                         ✓ Active Persona Calibrated
                       </span>
                     ) : (
-                      <span className="rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/80 px-2.5 py-0.5 text-[10px] font-bold">
+                      <span className="rounded-full bg-amber-950/80 text-amber-400 border border-amber-800/80 px-2.5 py-0.5 text-[11px] font-bold">
                         Manual Override Active
                       </span>
                     )}
@@ -1297,11 +1335,11 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 </p>
                 {companyAnalysisResult.architectural_focus.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-zinc-500 font-mono">Key Architecture Focus:</span>
+                    <span className="text-[11px] text-zinc-500 font-mono">Key Architecture Focus:</span>
                     {companyAnalysisResult.architectural_focus.map((f, idx) => (
                       <span
                         key={idx}
-                        className="rounded bg-zinc-950 px-2 py-0.5 text-[10px] text-indigo-300 border border-zinc-800"
+                        className="rounded bg-zinc-950 px-2 py-0.5 text-[11px] text-indigo-300 border border-zinc-800"
                       >
                         {f}
                       </span>
@@ -1333,12 +1371,12 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                         <span className="text-base">{p.icon}</span>
                         <span className="font-semibold text-zinc-100 text-xs sm:text-sm">{p.title}</span>
                       </div>
-                      <span className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] font-mono font-medium text-indigo-400 border border-zinc-800">
+                      <span className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] font-mono font-medium text-indigo-400 border border-zinc-800">
                         {p.badge}
                       </span>
                     </div>
                     <p className="mt-1.5 text-xs text-zinc-300 leading-relaxed font-sans">{p.desc}</p>
-                    <div className="mt-2 text-[10px] font-mono text-zinc-400 flex items-center gap-1">
+                    <div className="mt-2 text-[11px] font-mono text-zinc-400 flex items-center gap-1">
                       <span className="text-indigo-400">Focus:</span>
                       <span>{p.focus}</span>
                     </div>
@@ -1360,6 +1398,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                     key={mins}
                     type="button"
                     onClick={() => setDuration(mins)}
+                    aria-pressed={duration === mins}
                     className={`rounded-lg py-2 text-xs font-mono font-semibold border transition-all ${
                       duration === mins
                         ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
@@ -1380,6 +1419,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setMode('VOICE')}
+                    aria-pressed={mode === 'VOICE'}
                   className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-mono font-semibold border transition-all ${
                     mode === 'VOICE'
                       ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
@@ -1392,6 +1432,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <button
                   type="button"
                   onClick={() => setMode('TEXT')}
+                    aria-pressed={mode === 'TEXT'}
                   className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-mono font-semibold border transition-all ${
                     mode === 'TEXT'
                       ? 'border-zinc-500 bg-white text-zinc-950 shadow-sm'
@@ -1422,7 +1463,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
+                  <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
                     Topic Timeline &amp; Mapped Resume Claims
                   </span>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">

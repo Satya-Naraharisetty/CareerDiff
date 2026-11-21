@@ -39,7 +39,7 @@ class STTService:
     ) -> str:
         """Transcribe finalized speech turn into verified text transcript."""
         if simulated_transcript is not None and simulated_transcript.strip():
-            logger.info("STT transcribe_final: using client-provided transcript '%s'", simulated_transcript.strip())
+            logger.info("STT transcribe_final: using client-provided transcript (%d chars)", len(simulated_transcript.strip()))
             return simulated_transcript.strip()
 
         duration_sec = len(audio_bytes) / (16000 * 2) if audio_bytes else 0.0
@@ -68,7 +68,7 @@ class STTService:
                         if channels and channels[0].get("alternatives"):
                             transcript = str(channels[0]["alternatives"][0].get("transcript", "")).strip()
                             if transcript:
-                                logger.info("STT transcribe_final: Deepgram recognized '%s'", transcript)
+                                logger.info("STT transcribe_final: Deepgram recognized %d chars", len(transcript))
                                 return transcript
             except Exception as exc:
                 logger.warning("Deepgram transcription call encountered exception: %s", exc)
@@ -78,7 +78,7 @@ class STTService:
                 "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
                 "and mitigated consumer group rebalance latency using cooperative sticky assignors."
             )
-            logger.info("STT transcribe_final: falling back to simulated development transcript: '%s'", fallback_text)
+            logger.info("STT transcribe_final: falling back to simulated development transcript")
             return fallback_text
 
         return ""
@@ -118,9 +118,9 @@ class TTSService:
 
         neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
         logger.info(
-            "[TTS] Synthesizing ElevenLabs-quality neural speech with voice '%s' for: '%s...'",
+            "[TTS] Synthesizing neural speech with voice '%s' (%d chars)",
             neural_voice,
-            clean_text[:60],
+            len(clean_text),
         )
 
         try:

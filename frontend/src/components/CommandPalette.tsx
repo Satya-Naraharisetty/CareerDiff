@@ -337,11 +337,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase">
+                    <span className="text-[11px] font-mono text-zinc-500 uppercase">
                       {cmd.category}
                     </span>
                     {cmd.shortcut && (
-                      <kbd className="hidden sm:inline-flex rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
+                      <kbd className="hidden sm:inline-flex rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-[11px] font-mono text-zinc-300">
                         {cmd.shortcut}
                       </kbd>
                     )}

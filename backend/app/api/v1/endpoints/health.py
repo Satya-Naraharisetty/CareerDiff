@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.core.database import async_session_factory, check_db_health
+from app.core.llm import make_genai_client
 from app.core.redis import check_redis_health
 from app.models.outbox import OutboxEvent
 from app.services.outbox_poller import OutboxPoller
@@ -99,10 +100,9 @@ async def check_gemini_health() -> tuple[bool, float, str, str | None]:
 
     start = time.perf_counter()
     try:
-        from google import genai
 
         def _probe_model() -> None:
-            client = genai.Client(api_key=settings.gemini_api_key)
+            client = make_genai_client(timeout_ms=8000)
             client.models.get(model=settings.gemini_turn_model)
 
         await asyncio.wait_for(asyncio.to_thread(_probe_model), timeout=5.0)

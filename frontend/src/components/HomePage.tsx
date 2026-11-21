@@ -94,11 +94,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
           {/* Trust Invariants */}
           <div className="pt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-mono text-zinc-400">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Zero Biometrics Invariant
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> No face, gaze or accent analysis
             </span>
             <span className="text-zinc-600">•</span>
             <span className="flex items-center gap-1.5">
-              <Lock className="h-3.5 w-3.5 text-zinc-400" /> GDPR Right to Erasure
+              <Lock className="h-3.5 w-3.5 text-zinc-400" /> Delete your data anytime
             </span>
             <span className="text-zinc-600">•</span>
             <span className="flex items-center gap-1.5">
@@ -129,7 +129,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
                   type="button"
                   onClick={() => setWrapPreviewText((prev) => !prev)}
                   title={wrapPreviewText ? 'Switch to horizontal scroll view' : 'Switch to wrapped text view'}
-                  className="sm:hidden shrink-0 ml-2 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-400 hover:text-white transition-colors"
+                  className="sm:hidden shrink-0 ml-2 rounded border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-[11px] font-mono text-zinc-400 hover:text-white transition-colors"
                 >
                   {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
                 </button>
@@ -193,10 +193,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
                     <span className="text-zinc-300">Topic: Kafka Concurrency</span>
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-zinc-300 border border-zinc-700/60 text-[10px]">
+                    <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-zinc-300 border border-zinc-700/60 text-[11px]">
                       Probe 2/3
                     </span>
-                    <span className="text-zinc-400 text-[10px]">Latency: 412ms</span>
+                    <span className="text-zinc-400 text-[11px]">Latency: 412ms</span>
                   </div>
                 </div>
 
@@ -245,7 +245,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
                   <button
                     type="button"
                     onClick={() => setWrapPreviewText((prev) => !prev)}
-                    className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
+                    className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
                   >
                     {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
                   </button>
@@ -285,7 +285,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
                   <button
                     type="button"
                     onClick={() => setWrapPreviewText((prev) => !prev)}
-                    className="hidden sm:inline-flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
+                    className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 font-mono transition-colors"
                   >
                     {wrapPreviewText ? 'Wrap: On' : 'Scroll: On'}
                   </button>
@@ -374,13 +374,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-3 hover:border-zinc-700 transition-colors">
               <div className="flex items-center gap-2.5 text-white font-semibold text-sm">
                 <ShieldCheck className="h-4 w-4 text-zinc-400" />
-                Strict Zero Biometrics Invariant
+                No Biometric Scoring
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                CareerDiff strictly rejects video capture, gaze tracking, micro-expressions, vocal pitch, tone, or accents as proxies for competence. Candidates are evaluated exclusively on architectural reasoning and code depth.
+                Competency scores come only from what you say and write. There is no face, gaze, pitch, tone or accent analysis. Camera self-view is optional and never leaves your device. Speaking pace and filler words are shown separately as delivery feedback and never change your competency scores. In voice mode, audio is streamed to Google Gemini to run the conversation.
               </p>
               <div className="text-[11px] font-mono text-zinc-500 border-t border-zinc-800/80 pt-2">
-                Audio RAM-Only • Right to Erasure Cascade
+                Audio not stored by CareerDiff • Full account deletion
               </div>
             </div>
           </div>
@@ -423,7 +423,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
                 <tr>
                   <td className="py-3 pr-4 font-mono text-zinc-400">Biometrics &amp; Bias</td>
                   <td className="py-3 pr-4 text-zinc-500">Facial tracking, gaze tracking, pitch/sentiment surveillance</td>
-                  <td className="py-3 text-emerald-400 font-medium">Strict Zero Biometrics standard — architectural competence only</td>
+                  <td className="py-3 text-emerald-400 font-medium">No biometric scoring — architectural competence only</td>
                 </tr>
               </tbody>
             </table>

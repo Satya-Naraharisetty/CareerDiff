@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.role import JobRole
+from app.models.user import User
 from app.schemas.role import (
     CompanyAnalysisRequest,
     CompanyAnalysisResponse,
@@ -59,6 +61,7 @@ async def list_job_roles(
 )
 async def analyze_jd(
     payload: JdAnalysisRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JdAnalysisResponse:
     """Extract role title, seniority, discipline, and competencies from a raw Job Description."""
@@ -89,6 +92,7 @@ async def analyze_jd(
 )
 async def match_resume_jd_endpoint(
     payload: ResumeJdMatchRequest,
+    current_user: User = Depends(get_current_user),
 ) -> ResumeJdMatchResponse:
     """Analyze candidate resume directly against target JD, identifying matched skills, gaps, and strategy."""
     result = match_resume_against_jd(
@@ -118,6 +122,7 @@ async def match_resume_jd_endpoint(
 )
 async def analyze_company_endpoint(
     payload: CompanyAnalysisRequest,
+    current_user: User = Depends(get_current_user),
 ) -> CompanyAnalysisResponse:
     """Classify any company name or JD context into an interview persona."""
     res = await classify_company_persona(payload.company_name, payload.jd_text)

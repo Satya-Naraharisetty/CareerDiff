@@ -127,12 +127,36 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("ELEVENLABS_API_KEY") or None
     )
 
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            o.strip().rstrip("/")
+            for o in os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+            ).split(",")
+            if o.strip()
+        ]
+    )
+    # Number of trusted reverse proxies in front of the API (Render = 1). Used to read the
+    # real client IP from the right-hand side of X-Forwarded-For, which clients cannot spoof.
+    trusted_proxy_hops: int = Field(
+        default_factory=lambda: int(os.getenv("TRUSTED_PROXY_HOPS", "1"))
+    )
+
+    @property
+    def is_local_dev(self) -> bool:
+        """True only for explicit local development/testing environments."""
+        return self.environment.lower() in ("development", "testing")
+
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         """Enforce strict cryptographic and configuration security standards in production."""
         if self.environment.lower() == "production":
-            insecure_secret = "insecure_dev_secret_change_in_production_key_32bytes"
-            if self.jwt_secret_key == insecure_secret or len(self.jwt_secret_key) < 32:
+            publicly_known_secrets = {
+                "insecure_dev_secret_change_in_production_key_32bytes",
+                "ProdSecretKeyMustBeSet32BytesLong",
+            }
+            if self.jwt_secret_key in publicly_known_secrets or len(self.jwt_secret_key) < 32:
                 raise ValueError(
                     "CRITICAL SECURITY CONFIGURATION ERROR: In 'production' environment, "
                     "JWT_SECRET_KEY must be explicitly set with a high-entropy secret "

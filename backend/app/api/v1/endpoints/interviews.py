@@ -1,21 +1,20 @@
 """Interview lifecycle, turn execution, and session planning endpoints."""
 
-import html
+
 import json
 import logging
 import re
 import uuid
-from pathlib import Path
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.llm import make_genai_client
 from app.core.redis import get_redis
 from app.core.security import assert_interview_owner, get_current_user
 from app.models.evaluation import (
@@ -327,9 +326,10 @@ async def _fetch_assessment_report(
     report = (await db.execute(stmt_rep)).scalars().first()
 
     if not report:
+        # 409 (not 404) so clients can tell "still being scored" apart from "does not exist".
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No assessment report has been generated yet for interview '{interview_id}'.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="REPORT_NOT_READY",
         )
 
     # Load claim verifications
@@ -556,7 +556,7 @@ async def submit_turn(
         )
     await assert_interview_owner(interview, current_user, db)
     logger.info(
-        "HTTP POST /turns for interview %s (duration_ms: %d, length: %d chars, user: %s)",
+        "HTTP POST /turns for interview %s (duration_ms: %s, length: %d chars, user: %s)",
         interview_id,
         payload.duration_ms,
         len(payload.transcript),
@@ -630,30 +630,6 @@ async def create_ws_ticket(
         websocket_url=ws_url,
         expires_in_seconds=60,
     )
-
-
-@router.get(
-    "/{interview_id}/chat",
-    response_class=HTMLResponse,
-    summary="Interactive Text Interview Web Client",
-)
-async def get_chat_interface(
-    interview_id: uuid.UUID,
-    token: str | None = Query(default=None),
-) -> HTMLResponse:
-    """Serve a lightweight, responsive text interview interface for direct browser execution."""
-    template_path = Path(__file__).resolve().parent.parent.parent.parent / "templates" / "chat.html"
-    if not template_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat interface template not found.",
-        )
-    html_content = template_path.read_text(encoding="utf-8")
-    safe_id = html.escape(str(interview_id))
-    safe_token = html.escape(token or "")
-    html_content = html_content.replace("{{interview_id}}", safe_id)
-    html_content = html_content.replace("{{token}}", safe_token)
-    return HTMLResponse(content=html_content)
 
 
 @router.post(
@@ -793,9 +769,8 @@ async def retake_interview_turn(
 
     if settings.gemini_api_key:
         try:
-            from google import genai
 
-            client = genai.Client(api_key=settings.gemini_api_key)
+            client = make_genai_client()
             eval_prompt = (
                 f"You are a Principal Software Engineer evaluating a candidate's re-attempt of an interview turn.\n\n"
                 f"Interview Question Asked:\n{question_text}\n\n"
@@ -840,29 +815,3 @@ async def retake_interview_turn(
         staff_model_answer=staff_model_answer,
         key_strengths_improved=key_strengths,
     )
-
-
-@router.get(
-    "/{interview_id}/dossier",
-    response_class=HTMLResponse,
-    summary="Interactive Candidate Assessment Dossier & Visual Dashboard",
-)
-async def get_assessment_dossier_interface(
-    interview_id: uuid.UUID,
-    token: str | None = Query(default=None),
-) -> HTMLResponse:
-    """Serve the interactive candidate assessment dossier dashboard."""
-    template_path = (
-        Path(__file__).resolve().parent.parent.parent.parent / "templates" / "dossier.html"
-    )
-    if not template_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assessment dossier template not found.",
-        )
-    html_content = template_path.read_text(encoding="utf-8")
-    safe_id = html.escape(str(interview_id))
-    safe_token = html.escape(token or "")
-    html_content = html_content.replace("{{interview_id}}", safe_id)
-    html_content = html_content.replace("{{token}}", safe_token)
-    return HTMLResponse(content=html_content)

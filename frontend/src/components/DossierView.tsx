@@ -20,7 +20,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { interviewsApi } from '../lib/api';
+import { ApiError, interviewsApi } from '../lib/api';
 import { getScoreTheme } from '../lib/scoring';
 import { useInterviewStore } from '../stores/interviewStore';
 import { PerformanceHistoryModal } from './PerformanceHistoryModal';
@@ -122,14 +122,14 @@ const ScoreRingGauge: React.FC<{ score: number; maxScore?: number; tier: string 
           <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
             {score.toFixed(1)}
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ {maxScore.toFixed(1)}</span>
+          <span className="text-[11px] text-zinc-500 font-mono mt-0.5">/ {maxScore.toFixed(1)}</span>
         </div>
       </div>
       <div className="mt-2 text-center">
         <span className="rounded bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-emerald-400 border border-zinc-800">
           {tier}
         </span>
-        <span className="block text-[10px] text-zinc-500 mt-1">Rubric Index</span>
+        <span className="block text-[11px] text-zinc-500 mt-1">Rubric Index</span>
       </div>
     </div>
   );
@@ -176,7 +176,7 @@ const AtsScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
           <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
             {Math.round(score)}
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ 100 ATS</span>
+          <span className="text-[11px] text-zinc-500 font-mono mt-0.5">/ 100 ATS</span>
         </div>
       </div>
 
@@ -184,7 +184,7 @@ const AtsScoreRingGauge: React.FC<{ score: number }> = ({ score }) => {
         <span className={`rounded px-2 py-0.5 text-xs font-semibold border ${badgeClass}`}>
           {tier}
         </span>
-        <span className="block text-[10px] text-zinc-500 mt-1">JD Alignment</span>
+        <span className="block text-[11px] text-zinc-500 mt-1">JD Alignment</span>
       </div>
     </div>
   );
@@ -239,7 +239,7 @@ const CommunicationScoreRingGauge: React.FC<{ score: number }> = ({ score }) => 
           <span className="text-2xl font-bold tracking-tight text-white font-mono leading-none">
             {Math.round(score)}
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono mt-0.5">/ 100 COMMS</span>
+          <span className="text-[11px] text-zinc-500 font-mono mt-0.5">/ 100 COMMS</span>
         </div>
       </div>
 
@@ -255,7 +255,7 @@ const CommunicationScoreRingGauge: React.FC<{ score: number }> = ({ score }) => 
         >
           {tier}
         </span>
-        <span className="block text-[10px] text-zinc-500 mt-1">Verbal Delivery</span>
+        <span className="block text-[11px] text-zinc-500 mt-1">Verbal Delivery</span>
       </div>
     </div>
   );
@@ -292,7 +292,7 @@ const CommunicationDeliveryCard: React.FC<{
             <span className="text-zinc-400 text-[11px]">Speech Rate</span>
             <span className="text-sky-400 font-bold">{breakdown.speaking_rate_wpm} WPM</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="flex items-center justify-between text-[11px] text-zinc-500">
             <span>Ideal: 120–165 WPM</span>
             <span className="text-emerald-400 font-medium">{breakdown.pacing_grade}</span>
           </div>
@@ -303,7 +303,7 @@ const CommunicationDeliveryCard: React.FC<{
             <span className="text-zinc-400 text-[11px]">Response Latency</span>
             <span className="text-sky-400 font-bold">{breakdown.avg_response_latency_sec}s avg</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="flex items-center justify-between text-[11px] text-zinc-500">
             <span>Ideal: 1.0–3.0s</span>
             <span className="text-emerald-400 font-medium">Deliberate</span>
           </div>
@@ -314,7 +314,7 @@ const CommunicationDeliveryCard: React.FC<{
             <span className="text-zinc-400 text-[11px]">Filler Word Density</span>
             <span className="text-sky-400 font-bold">{breakdown.filler_word_percentage}%</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="flex items-center justify-between text-[11px] text-zinc-500">
             <span>{breakdown.filler_words_count} fillers found</span>
             <span className="text-zinc-400">&lt; 3% optimal</span>
           </div>
@@ -325,7 +325,7 @@ const CommunicationDeliveryCard: React.FC<{
             <span className="text-zinc-400 text-[11px]">Monologue Risk</span>
             <span className="text-sky-400 font-bold">{breakdown.monologue_risk}</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <div className="flex items-center justify-between text-[11px] text-zinc-500">
             <span>Max turn: {breakdown.longest_turn_sec}s</span>
             <span>Total: {breakdown.total_speaking_time_sec}s</span>
           </div>
@@ -414,7 +414,7 @@ const TurnRetakeModal: React.FC<{
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2 font-mono text-xs">
           <div className="flex items-center justify-between text-zinc-400">
             <span className="font-semibold text-amber-400">Recorded Answer Excerpt:</span>
-            <span className="text-[10px] text-zinc-500">Historical Turn #{turnIndex}</span>
+            <span className="text-[11px] text-zinc-500">Historical Turn #{turnIndex}</span>
           </div>
           <p className="text-zinc-300 italic bg-zinc-950/80 p-2.5 rounded border border-zinc-800/80">
             "{originalExcerpt}"
@@ -492,7 +492,7 @@ const TurnRetakeModal: React.FC<{
 
               {result.key_strengths_improved.length > 0 && (
                 <div className="pt-2 border-t border-emerald-900/40">
-                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-400 block mb-1">
+                  <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-emerald-400 block mb-1">
                     Demonstrated Improvements:
                   </span>
                   <ul className="space-y-1 text-xs text-zinc-300 pl-4 list-disc">
@@ -688,7 +688,8 @@ const AtsAuditCard: React.FC<{ breakdown: AtsBreakdown; atsScore: number }> = ({
 };
 
 const CompetencyLevelMeter: React.FC<{ score: number | null }> = ({ score }) => {
-  const currentLevel = score ?? 1;
+  // Not assessed = no pips lit (never render a missing score as L1).
+  const currentLevel = score ?? 0;
   const levels = [
     { lvl: 1, label: 'L1' },
     { lvl: 2, label: 'L2' },
@@ -710,7 +711,7 @@ const CompetencyLevelMeter: React.FC<{ score: number | null }> = ({ score }) => 
               }`}
             />
             <span
-              className={`text-[8px] font-mono text-center ${
+              className={`text-[11px] font-mono text-center ${
                 isActive ? 'text-zinc-300 font-semibold' : 'text-zinc-600'
               }`}
             >
@@ -728,6 +729,9 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   const [report, setReport] = useState<AssessmentReportRead | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState<boolean>(false);
+  const [pendingSeconds, setPendingSeconds] = useState<number>(0);
+  const [reloadKey, setReloadKey] = useState<number>(0);
   const [expandedCompId, setExpandedCompId] = useState<string | null>(null);
   const [copiedExcerptId, setCopiedExcerptId] = useState<string | null>(null);
   const [retakeModalState, setRetakeModalState] = useState<{
@@ -754,50 +758,70 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
   useEffect(() => {
     let isMounted = true;
-    let pollCount = 0;
     let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    const startedAt = Date.now();
+    const POLL_INTERVAL_MS = 3000;
+    const MAX_WAIT_MS = 5 * 60 * 1000;
+    setIsLoading(true);
+    setError(null);
+    setIsEmpty(false);
+    setPendingSeconds(0);
+
+    let targetId = interviewId;
+    if (!targetId && typeof localStorage !== 'undefined') {
+      targetId = localStorage.getItem('careerdiff_active_interview_id');
+    }
 
     async function fetchOrPollReport() {
-      let targetId = interviewId;
-
-      if (!targetId && typeof localStorage !== 'undefined') {
-        targetId = localStorage.getItem('careerdiff_active_interview_id');
-      }
-
       try {
-        let data: AssessmentReportRead;
-        if (targetId) {
-          data = await interviewsApi.getReport(targetId);
-        } else {
-          // If no target ID in state or localStorage, fetch candidate's latest report directly
-          data = await interviewsApi.getLatestReport();
-        }
-
-        if (isMounted) {
-          setReport(data);
-          setIsLoading(false);
-          if (data?.interview_id) {
-            try {
-              if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('careerdiff_active_interview_id', data.interview_id);
-              }
-            } catch {}
+        const data = targetId
+          ? await interviewsApi.getReport(targetId)
+          : await interviewsApi.getLatestReport();
+        if (!isMounted) return;
+        setReport(data);
+        setIsLoading(false);
+        if (data?.interview_id) {
+          try {
+            localStorage.setItem('careerdiff_active_interview_id', data.interview_id);
+          } catch {}
+          if (data.interview_id !== interviewId) {
             useInterviewStore.setState({ interviewId: data.interview_id });
           }
         }
-      } catch {
-        // If report is still compiling in background, poll every 2.5s for up to 30s
-        if (pollCount < 12 && isMounted) {
-          pollCount++;
-          pollTimeoutId = setTimeout(fetchOrPollReport, 2500);
-        } else if (isMounted) {
-          if (!targetId) {
-            setIsLoading(false);
+      } catch (err) {
+        if (!isMounted) return;
+        const status = err instanceof ApiError ? err.status : 0;
+
+        // Report is still being scored: keep polling with visible progress.
+        if (status === 409) {
+          const elapsed = Date.now() - startedAt;
+          setPendingSeconds(Math.round(elapsed / 1000));
+          if (elapsed < MAX_WAIT_MS) {
+            pollTimeoutId = setTimeout(fetchOrPollReport, POLL_INTERVAL_MS);
           } else {
-            setError('Evaluation report compilation is still pending. Please refresh in a moment.');
+            setError('Scoring is taking longer than usual. Your interview is saved — check back in a few minutes.');
             setIsLoading(false);
           }
+          return;
         }
+
+        if (status === 404) {
+          if (targetId) {
+            // Saved interview id is stale (deleted / another account): fall back to the latest report.
+            try {
+              localStorage.removeItem('careerdiff_active_interview_id');
+            } catch {}
+            targetId = null;
+            pollTimeoutId = setTimeout(fetchOrPollReport, 0);
+            return;
+          }
+          setIsEmpty(true);
+          setIsLoading(false);
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : 'Could not load your report.');
+        setIsLoading(false);
       }
     }
 
@@ -808,10 +832,10 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
         clearTimeout(pollTimeoutId);
       }
     };
-  }, [interviewId]);
+  }, [interviewId, reloadKey]);
 
   const renderRadarChart = (scores: CompetencyScoreRead[]) => {
-    if (!scores || scores.length === 0) return null;
+    if (!scores || scores.length < 3) return null;
 
     const size = 260;
     const center = size / 2;
@@ -822,7 +846,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     // Calculate polygon points (normalized to 1.0 - 4.0 scale)
     const polygonPoints = scores
       .map((item, idx) => {
-        const value = item.score ? item.score / 4.0 : 0.25;
+        const value = item.score ? item.score / 4.0 : 0;
         const currentRadius = radius * value;
         const angle = idx * angleStep - Math.PI / 2;
         const x = center + currentRadius * Math.cos(angle);
@@ -834,6 +858,10 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     return (
       <div className="flex flex-col items-center justify-center p-4 w-full">
         <svg
+          role="img"
+          aria-label={`Competency scores: ${scores
+            .map((sc) => `${sc.competency_name} ${sc.score ? `level ${sc.score} of 4` : 'not assessed'}`)
+            .join('; ')}`}
           viewBox={`0 0 ${size} ${size}`}
           className="w-full max-w-[260px] h-auto overflow-visible"
         >
@@ -895,6 +923,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                 dominantBaseline="central"
                 className="font-mono"
               >
+                <title>{`${item.competency_name}: ${item.score ? `L${item.score}` : 'not assessed'}`}</title>
                 {item.competency_name.length > 14
                   ? `${item.competency_name.slice(0, 12)}…`
                   : item.competency_name}
@@ -902,7 +931,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             );
           })}
         </svg>
-        <span className="mt-3 text-[10px] text-zinc-500 font-mono">Competency Mastery Distribution (L1 - L4)</span>
+        <span className="mt-3 text-[11px] text-zinc-500 font-mono">Competency Mastery Distribution (L1 - L4)</span>
       </div>
     );
   };
@@ -910,26 +939,26 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
   const getEvidenceBadge = (type: EvidenceType) => {
     switch (type) {
       case 'POSITIVE_MASTERY':
-        return <span className="rounded bg-emerald-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-emerald-400 border border-emerald-800/40">Positive Mastery</span>;
+        return <span className="rounded bg-emerald-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-800/40">Positive Mastery</span>;
       case 'KNOWLEDGE_GAP':
-        return <span className="rounded bg-amber-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-amber-400 border border-amber-800/40">Knowledge Gap</span>;
+        return <span className="rounded bg-amber-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-amber-400 border border-amber-800/40">Knowledge Gap</span>;
       case 'CONTRADICTION':
-        return <span className="rounded bg-rose-950/60 px-2 py-0.5 text-[10px] font-mono font-medium text-rose-400 border border-rose-800/40">Contradiction</span>;
+        return <span className="rounded bg-rose-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-rose-400 border border-rose-800/40">Contradiction</span>;
       case 'SUPERFICIAL_EXPLANATION':
-        return <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-medium text-zinc-300 border border-zinc-700">Superficial</span>;
+        return <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] font-mono font-medium text-zinc-300 border border-zinc-700">Superficial</span>;
     }
   };
 
   const getClaimStatusBadge = (status: ClaimVerificationStatus) => {
     switch (status) {
       case 'VERIFIED':
-        return <span className="rounded-full bg-emerald-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-400 border border-emerald-800/40">VERIFIED</span>;
+        return <span className="rounded-full bg-emerald-950/60 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-400 border border-emerald-800/40">VERIFIED</span>;
       case 'CONTRADICTED':
-        return <span className="rounded-full bg-rose-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-rose-400 border border-rose-800/40">CONTRADICTED</span>;
+        return <span className="rounded-full bg-rose-950/60 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-rose-400 border border-rose-800/40">CONTRADICTED</span>;
       case 'VAGUE':
-        return <span className="rounded-full bg-amber-950/60 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-amber-400 border border-amber-800/40">VAGUE</span>;
+        return <span className="rounded-full bg-amber-950/60 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-amber-400 border border-amber-800/40">VAGUE</span>;
       case 'UNTESTED':
-        return <span className="rounded-full bg-zinc-900 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-zinc-400 border border-zinc-800">UNTESTED</span>;
+        return <span className="rounded-full bg-zinc-900 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-zinc-400 border border-zinc-800">UNTESTED</span>;
     }
   };
 
@@ -937,10 +966,31 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     return (
       <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center p-6 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-400 mb-4" />
-        <h2 className="text-lg font-bold text-white font-sans">Synthesizing Assessment Dossier</h2>
-        <p className="mt-1.5 text-xs text-zinc-400 max-w-md font-mono">
-          Grounding scores with character-offset transcript evidence citations and auditing resume claims...
+        <h2 className="text-lg font-bold text-white font-sans">
+          {pendingSeconds > 0 ? 'Scoring your interview…' : 'Loading your report…'}
+        </h2>
+        <p className="mt-1.5 text-sm text-zinc-400 max-w-md" role="status" aria-live="polite">
+          {pendingSeconds > 0
+            ? `This usually takes under a minute (${pendingSeconds}s so far). You can leave this page — your report will be here when it's ready.`
+            : 'Fetching your latest results.'}
         </p>
+      </div>
+    );
+  }
+
+  if (isEmpty && !report) {
+    return (
+      <div className="mx-auto max-w-xl py-16 px-4 text-center">
+        <h2 className="text-lg font-bold text-white">No interview reports yet</h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Finish a practice interview and your scores, evidence and study plan will appear here.
+        </p>
+        <button
+          onClick={onReset}
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-sm"
+        >
+          Start a practice interview
+        </button>
       </div>
     );
   }
@@ -950,6 +1000,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
       <div className="mx-auto max-w-xl py-16 px-4 text-center">
         <AlertTriangle className="mx-auto h-8 w-8 text-amber-400 mb-4" />
         <h2 className="text-base font-bold text-white">{error || 'No report found.'}</h2>
+        <button
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="mt-6 mr-2 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 transition-all"
+        >
+          Try again
+        </button>
         <button
           onClick={onReset}
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-sm"
@@ -1154,7 +1210,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                     <RationaleCoachingView rationale={cs.rationale} />
 
                     <div className="space-y-2">
-                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
+                      <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
                         Normalized Evidence Records (Turn &amp; Offset Anchors)
                       </span>
                       {cs.evidence_items.map((ev) => (
@@ -1165,7 +1221,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                               {getEvidenceBadge(ev.evidence_type)}
-                              <span className="rounded bg-zinc-900 px-2 py-0.5 text-[10px] text-zinc-300 border border-zinc-800">
+                              <span className="rounded bg-zinc-900 px-2 py-0.5 text-[11px] text-zinc-300 border border-zinc-800">
                                 Turn #{ev.turn_index} [Offset {ev.start_char_offset}:{ev.end_char_offset}]
                               </span>
                             </div>
@@ -1185,7 +1241,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                                 <RotateCcw className="h-3 w-3 text-amber-400" />
                                 <span>Re-take Turn #{ev.turn_index}</span>
                               </button>
-                              <span className="text-[10px] text-zinc-500">
+                              <span className="text-[11px] text-zinc-500">
                                 Confidence: {Math.round(ev.confidence * 100)}%
                               </span>
                             </div>
@@ -1237,7 +1293,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
             {report.claim_verifications.map((cl: ClaimVerificationRead) => (
               <div key={cl.claim_id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3.5 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] uppercase font-mono text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                  <span className="text-[11px] uppercase font-mono text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
                     {cl.category}
                   </span>
                   {getClaimStatusBadge(cl.status)}
@@ -1267,7 +1323,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
                 {report.claim_verifications.map((cl: ClaimVerificationRead) => (
                   <tr key={cl.claim_id}>
                     <td className="py-3 pr-4 font-medium text-zinc-200 max-w-xs">{cl.claim_text}</td>
-                    <td className="py-3 pr-4 text-zinc-400 uppercase font-mono text-[10px]">{cl.category}</td>
+                    <td className="py-3 pr-4 text-zinc-400 uppercase font-mono text-[11px]">{cl.category}</td>
                     <td className="py-3 pr-4">{getClaimStatusBadge(cl.status)}</td>
                     <td className="py-3 text-zinc-400 max-w-sm font-mono text-[11px]">{cl.auditor_notes || '—'}</td>
                   </tr>

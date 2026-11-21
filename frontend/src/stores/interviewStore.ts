@@ -33,6 +33,10 @@ interface InterviewStoreState {
   isMicMuted: boolean;
   isCameraOn: boolean;
   isVoiceMuted: boolean;
+  /** True once the server has streamed interviewer audio (Gemini Live / server TTS) this session. */
+  serverAudioActive: boolean;
+  /** Non-fatal notice, e.g. live captions unsupported in this browser. */
+  notice: string | null;
 
   setInterview: (
     id: string,
@@ -49,6 +53,8 @@ interface InterviewStoreState {
   loadTurns: (interviewId: string) => Promise<void>;
   startInterview: () => Promise<void>;
   submitTextTurn: (text: string, codeSnippet?: string) => Promise<void>;
+  /** Typed answer: over the live voice socket when connected, otherwise via REST. */
+  sendTypedAnswer: (text: string, codeSnippet?: string) => Promise<void>;
   initVoiceSession: () => Promise<void>;
   startVoiceRecording: () => Promise<void>;
   stopVoiceRecording: () => void;
@@ -64,7 +70,10 @@ let activeWs: WebSocket | null = null;
 let pcmPlayer: PcmPlayer | null = null;
 let pcmRecorder: PcmRecorder | null = null;
 let speechRecognizer: BrowserSpeechRecognizer | null = null;
-let countdownTimer: number | null = null;
+let intentionalClose = false;
+let reconnectAttempts = 0;
+let reconnectTimer: number | null = null;
+const MAX_RECONNECT_ATTEMPTS = 3;
 
 export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   interviewId: typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_INTERVIEW_ID_KEY) : null,
@@ -84,8 +93,10 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   preferredLanguage: 'Python',
   error: null,
   isMicMuted: false,
-  isCameraOn: true,
+  isCameraOn: false,
   isVoiceMuted: false,
+  serverAudioActive: false,
+  notice: null,
 
   toggleMic: () => {
     const next = !get().isMicMuted;
@@ -119,6 +130,8 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       preferredLanguage: preferredLanguage || 'Python',
       turns: [],
       partialTranscript: '',
+      serverAudioActive: false,
+      notice: null,
       remainingSeconds: (blueprint.total_allocated_seconds || 1800),
       currentTopic: blueprint.topics?.[0]?.topic_name || null,
       error: null,
@@ -151,14 +164,6 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         state: 'WARMUP',
         isSubmitting: false,
       });
-
-      // Start countdown timer
-      if (countdownTimer) clearInterval(countdownTimer);
-      countdownTimer = window.setInterval(() => {
-        set((s) => ({
-          remainingSeconds: Math.max(0, s.remainingSeconds - 1),
-        }));
-      }, 1000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to start interview';
       set({ error: message, isSubmitting: false });
@@ -214,6 +219,19 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     }
   },
 
+  sendTypedAnswer: async (text: string, codeSnippet?: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (get().mode === 'VOICE' && activeWs && activeWs.readyState === WebSocket.OPEN) {
+      const combined = codeSnippet && codeSnippet.trim()
+        ? `${trimmed}\n\n[Attached Scratchpad Snippet]:\n\`\`\`\n${codeSnippet.trim()}\n\`\`\``
+        : trimmed;
+      activeWs.send(JSON.stringify({ type: 'text_input', text: combined, client_timestamp_ms: Date.now() }));
+      return;
+    }
+    await get().submitTextTurn(trimmed, codeSnippet);
+  },
+
   initVoiceSession: async () => {
     const { interviewId } = get();
     if (!interviewId) return;
@@ -245,9 +263,15 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       const wsUrl = `${wsBase}${ticketRes.websocket_url}${separator}voice=${encodeURIComponent(selectedVoice)}`;
 
       if (activeWs) {
+        intentionalClose = true;
         activeWs.close();
       }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
 
+      if (pcmPlayer) pcmPlayer.close();
       pcmPlayer = new PcmPlayer();
       pcmPlayer.onAllEnded = () => {
         set({ isInterviewerSpeaking: false });
@@ -258,8 +282,10 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
       activeWs = ws;
+      intentionalClose = false;
 
       ws.onopen = () => {
+        reconnectAttempts = 0;
         set({ wsStatus: 'connected', error: null });
         // Race-condition prevention: If interviewer is already done speaking and candidate mic is not active, auto-start
         const { isInterviewerSpeaking, isRecording, turns, mode } = get();
@@ -278,7 +304,14 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         if (event.data instanceof ArrayBuffer) {
           // Play server binary PCM audio (from Gemini Live 24kHz or server TTS)
           if (pcmPlayer && !get().isVoiceMuted) {
-            set({ isInterviewerSpeaking: true });
+            if (!get().serverAudioActive) {
+              // Server voice is available: silence the browser TTS fallback so the
+              // interviewer is never heard twice. Flag first so its onEnd won't start the mic.
+              set({ serverAudioActive: true, isInterviewerSpeaking: true });
+              BrowserSpeechSynthesizer.stop();
+            } else {
+              set({ isInterviewerSpeaking: true });
+            }
             pcmPlayer.feed(event.data);
           }
         } else if (typeof event.data === 'string') {
@@ -286,16 +319,11 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
             const msg: WsServerMessage = JSON.parse(event.data);
             switch (msg.type) {
               case 'session_ready':
+                // Server is authoritative for the remaining time budget (also after a reconnect).
                 set({
                   state: msg.state as InterviewState,
                   remainingSeconds: msg.remaining_seconds,
                 });
-                if (countdownTimer) clearInterval(countdownTimer);
-                countdownTimer = window.setInterval(() => {
-                  set((s) => ({
-                    remainingSeconds: Math.max(0, s.remainingSeconds - 1),
-                  }));
-                }, 1000);
                 break;
               case 'interviewer_audio_done':
                 setTimeout(() => {
@@ -380,11 +408,31 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       };
 
       ws.onerror = () => {
-        set({ wsStatus: 'error', error: 'WebSocket connection encountered an error' });
+        // onclose follows and decides whether to reconnect
+        set({ wsStatus: 'error' });
       };
 
       ws.onclose = () => {
-        set({ wsStatus: 'disconnected' });
+        if (activeWs !== ws) return; // superseded by a newer connection
+        activeWs = null;
+        const { state, mode } = get();
+        const sessionLive = state !== 'COMPLETED' && mode === 'VOICE';
+        if (!intentionalClose && sessionLive && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts += 1;
+          const delay = 1000 * 2 ** (reconnectAttempts - 1);
+          set({ wsStatus: 'connecting', error: `Connection lost — reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})…` });
+          reconnectTimer = window.setTimeout(() => {
+            reconnectTimer = null;
+            get().initVoiceSession().catch(() => {});
+          }, delay);
+          return;
+        }
+        set({
+          wsStatus: 'disconnected',
+          ...(sessionLive && !intentionalClose
+            ? { error: 'Voice connection lost. You can keep answering by typing, or reload to reconnect.' }
+            : {}),
+        });
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to establish voice connection';
@@ -413,6 +461,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     }
 
     try {
+      let micCaptureOk = true;
       // 1. Initialize PCM Recorder for raw audio streaming & volume metering (if mic permission is granted)
       try {
         if (!pcmRecorder) {
@@ -431,6 +480,22 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         );
       } catch (audioErr) {
         console.warn('PcmRecorder capture notice:', audioErr);
+        micCaptureOk = false;
+      }
+
+      if (!micCaptureOk) {
+        set({
+          isRecording: false,
+          audioLevel: 0,
+          error:
+            'Microphone unavailable. Allow microphone access in your browser settings, or type your answer instead.',
+        });
+        return;
+      }
+
+      if (!BrowserSpeechRecognizer.isSupported()) {
+        // Audio still streams to the server; only the in-browser live caption is unavailable.
+        set({ notice: 'Live captions are not supported in this browser (use Chrome or Edge). Your voice is still sent to the interviewer.' });
       }
 
       // 2. Start browser-native speech recognition to capture actual words candidate speaks in real time
@@ -524,6 +589,12 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   },
 
   disconnectVoiceSession: () => {
+    intentionalClose = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    reconnectAttempts = 0;
     BrowserSpeechSynthesizer.stop();
     if (speechRecognizer) {
       speechRecognizer.abort();
@@ -540,10 +611,6 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     if (activeWs) {
       activeWs.close();
       activeWs = null;
-    }
-    if (countdownTimer) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
     }
     set({
       wsStatus: 'disconnected',
@@ -595,6 +662,16 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       currentTopic: null,
       remainingSeconds: 1800,
       error: null,
+      notice: null,
+      serverAudioActive: false,
+      isCameraOn: false,
     });
   },
 }));
+
+if (typeof window !== 'undefined') {
+  // Never leak one user's interview into the next session on a shared browser.
+  window.addEventListener('careerdiff:logout', () => {
+    useInterviewStore.getState().reset();
+  });
+}

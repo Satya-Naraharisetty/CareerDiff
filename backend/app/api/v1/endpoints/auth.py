@@ -1,6 +1,8 @@
 """Authentication endpoints for candidate registration, login, and backup code recovery."""
 
 import html
+import json
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -42,6 +44,21 @@ from app.services.storage import delete_resume_document
 
 router = APIRouter()
 settings = get_settings()
+
+
+def _resolve_allowed_origin(redirect_url: str | None) -> str | None:
+    """Return the scheme://host[:port] origin of redirect_url only if it is an allowed frontend origin."""
+    if not redirect_url:
+        return None
+    try:
+        parts = urlsplit(redirect_url)
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return None
+    origin = f"{parts.scheme}://{parts.netloc}".lower()
+    allowed = {o.lower() for o in settings.cors_origins}
+    return origin if origin in allowed else None
 
 
 @router.post(
@@ -273,10 +290,16 @@ async def github_login(
         samesite="lax",
         max_age=300,
     )
-    if redirect_url:
+    allowed_origin = _resolve_allowed_origin(redirect_url)
+    if redirect_url and not allowed_origin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="INVALID_REDIRECT_URL",
+        )
+    if allowed_origin:
         redirect_res.set_cookie(
             key="cd_github_redirect_target",
-            value=redirect_url,
+            value=allowed_origin,
             httponly=True,
             secure=is_prod,
             samesite="lax",
@@ -405,31 +428,36 @@ async def github_callback(
         claims={"email": user.email, "role": user.role},
     )
 
-    target_redirect = request.cookies.get("cd_github_redirect_target") or "/"
+    # Only ever deliver the token to an allow-listed frontend origin (never to "*" or an arbitrary URL).
+    target_origin = _resolve_allowed_origin(request.cookies.get("cd_github_redirect_target"))
+    if not target_origin:
+        target_origin = settings.cors_origins[0] if settings.cors_origins else None
+    if not target_origin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="INVALID_REDIRECT_URL",
+        )
+    payload_js = json.dumps({"token": token, "origin": target_origin}).replace("<", "\u003c")
     res = HTMLResponse(
         content=f"""<!DOCTYPE html>
 <html>
-<head><title>CareerDiff Auth</title></head>
+<head><title>CareerDiff Auth</title><meta name="referrer" content="no-referrer"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #09090b; color: #fafafa; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
-  <div style="text-align: center;">
-    <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid #27272a; border-top-color: #fafafa; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-    <p style="color: #a1a1aa; font-size: 13px; margin-top: 12px; font-family: monospace;">Authenticating session...</p>
-  </div>
-  <style>@keyframes spin {{ to {{ transform: rotate(360deg); }} }}</style>
+  <p style="color: #a1a1aa; font-size: 14px;">Signing you in…</p>
   <script>
-    const token = "{token}";
-    const target = "{html.escape(target_redirect)}";
+    const data = {payload_js};
     if (window.opener && !window.opener.closed) {{
-      window.opener.postMessage({{ type: "CAREERDIFF_OAUTH_SUCCESS", token: token }}, "*");
+      window.opener.postMessage({{ type: "CAREERDIFF_OAUTH_SUCCESS", token: data.token }}, data.origin);
       window.close();
     }} else {{
-      const separator = target.includes("?") ? "&" : "?";
-      window.location.href = target + separator + "auth_token=" + encodeURIComponent(token);
+      // URL fragment is never sent to servers or included in Referer headers.
+      window.location.replace(data.origin + "/#auth_token=" + encodeURIComponent(data.token));
     }}
   </script>
 </body>
 </html>""",
         status_code=status.HTTP_200_OK,
+        headers={"Cache-Control": "no-store"},
     )
     res.delete_cookie(key="cd_github_oauth_state")
     res.delete_cookie(key="cd_github_redirect_target")
@@ -563,7 +591,7 @@ async def change_password(
 
     if not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="INVALID_CURRENT_PASSWORD",
         )
 
@@ -603,7 +631,7 @@ async def delete_current_user_account(
             payload.current_password, current_user.hashed_password
         ):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="INVALID_CURRENT_PASSWORD",
             )
 

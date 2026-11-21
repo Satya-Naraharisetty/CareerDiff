@@ -21,19 +21,20 @@ def analyze_voice_and_communication(
 ) -> dict[str, Any]:
     """Calculate objective speech pacing (WPM), filler density, response latency, and communication score."""
     if not candidate_turns:
+        # Nothing was said: report "not assessed" rather than inventing a score.
         return {
-            "communication_score": 80,
-            "speaking_rate_wpm": 135,
-            "pacing_grade": "OPTIMAL",
+            "communication_score": None,
+            "speaking_rate_wpm": None,
+            "pacing_grade": "NOT_ASSESSED",
             "total_words": 0,
             "total_speaking_time_sec": 0.0,
-            "avg_response_latency_sec": 1.5,
+            "avg_response_latency_sec": None,
             "filler_words_count": 0,
             "filler_word_percentage": 0.0,
             "longest_turn_sec": 0.0,
-            "monologue_risk": "LOW",
+            "monologue_risk": "NOT_ASSESSED",
             "delivery_feedback": [
-                "No spoken candidate turns recorded in this session.",
+                "No spoken candidate turns were recorded, so delivery was not assessed.",
             ],
         }
 

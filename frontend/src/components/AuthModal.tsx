@@ -114,8 +114,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   useEffect(() => {
     if (!isOpen) return;
 
+    // Only accept the token from our own API origin's callback page.
+    const apiOrigin = (() => {
+      try {
+        return new URL(import.meta.env.VITE_API_URL || window.location.origin).origin;
+      } catch {
+        return window.location.origin;
+      }
+    })();
+
     const handleOAuthMessage = async (event: MessageEvent) => {
-      if (event.data?.type === 'CAREERDIFF_OAUTH_SUCCESS' && event.data?.token) {
+      if (event.origin !== apiOrigin && event.origin !== window.location.origin) return;
+      if (event.data?.type === 'CAREERDIFF_OAUTH_SUCCESS' && typeof event.data?.token === 'string') {
         setGithubLoading(true);
         try {
           await loginWithToken(event.data.token);
@@ -153,7 +163,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     // Fallback to full-page redirect if popup is blocked
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
       window.location.href = loginUrl;
+      return;
     }
+
+    // If the user closes the popup without finishing, re-enable the sign-in buttons.
+    const watcher = window.setInterval(() => {
+      if (popup.closed) {
+        window.clearInterval(watcher);
+        setGithubLoading(false);
+      }
+    }, 500);
   };
 
   // Focus first input on open or tab change
@@ -166,13 +185,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      // The one-time backup codes screen must not be dismissed by accident.
+      if (e.key === 'Escape' && isOpen && tab !== 'backup_codes_reveal') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, tab]);
 
   if (!isOpen) return null;
 
@@ -299,7 +319,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             <span className="font-semibold text-white text-sm font-mono tracking-tight">
               CareerDiff
             </span>
-            <span className="rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+            <span className="rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[11px] font-mono text-zinc-400">
               Engine v1.0
             </span>
           </div>
@@ -337,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                   key={idx}
                   className="font-mono text-xs font-bold text-zinc-200 bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-800 flex items-center justify-between"
                 >
-                  <span className="text-[10px] text-zinc-500 font-sans">{idx + 1}.</span>
+                  <span className="text-[11px] text-zinc-500 font-sans">{idx + 1}.</span>
                   <span>{code}</span>
                 </div>
               ))}
@@ -452,9 +472,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     if (window.google?.accounts?.id) {
                       window.google.accounts.id.prompt();
                     } else if (!GOOGLE_CLIENT_ID) {
-                      alert(
-                        'Google OAuth is configured and verified in the backend! To enable browser Google One-Tap, set VITE_GOOGLE_CLIENT_ID in frontend/.env.'
-                      );
+                      setSuccessMsg(null);
+                      useAuthStore.setState({
+                        error: 'Google sign-in is not available right now. Please use email or GitHub.',
+                      });
                     }
                   }}
                   disabled={isLoading || googleLoading || githubLoading}
@@ -523,7 +544,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-zinc-800" />
                 </div>
-                <span className="relative bg-zinc-900 px-2.5 text-[10px] uppercase font-mono tracking-wider text-zinc-500">
+                <span className="relative bg-zinc-900 px-2.5 text-[11px] uppercase font-mono tracking-wider text-zinc-500">
                   Or continue with email
                 </span>
               </div>
@@ -673,7 +694,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                             }`}
                         />
                       </div>
-                      <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                      <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
                         {strengthScore === 1 ? 'Weak' : strengthScore === 2 ? 'Fair' : 'Strong'}
                       </span>
                     </div>

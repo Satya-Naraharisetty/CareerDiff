@@ -106,8 +106,8 @@ const TEMPLATE_DESCRIPTIONS: Record<TemplateStyle, { name: string; tag: string; 
 };
 
 export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToInterview }) => {
-  const [resumeText, setResumeText] = useState(SAMPLE_RESUME);
-  const [jdText, setJdText] = useState(SAMPLE_JD);
+  const [resumeText, setResumeText] = useState("");
+  const [jdText, setJdText] = useState("");
   const [seniority, setSeniority] = useState<SeniorityLevel>('SENIOR');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateStyle>('jakes_resume');
   const [isLoading, setIsLoading] = useState(false);
@@ -305,14 +305,14 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   <span>1. Candidate Resume Text</span>
-                  <span className="text-[10px] text-zinc-500 font-normal">Original Experience & Skills</span>
+                  <span className="text-[11px] text-zinc-500 font-normal">Original Experience & Skills</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setResumeText(SAMPLE_RESUME)}
                   className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
-                  Reset to Sample
+                  Load sample
                 </button>
               </div>
               <textarea
@@ -329,14 +329,14 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   <span>2. Target Job Description (JD)</span>
-                  <span className="text-[10px] text-zinc-500 font-normal">Target Keywords & Scope</span>
+                  <span className="text-[11px] text-zinc-500 font-normal">Target Keywords & Scope</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setJdText(SAMPLE_JD)}
                   className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
-                  Reset to Sample
+                  Load sample
                 </button>
               </div>
               <textarea
@@ -355,7 +355,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                 <Layers className="h-4 w-4 text-emerald-400" />
                 <span>3. Choose LaTeX Template Style</span>
-                <span className="text-[10px] text-zinc-500 font-normal">Free Overleaf pdflatex compatible</span>
+                <span className="text-[11px] text-zinc-500 font-normal">Free Overleaf pdflatex compatible</span>
               </label>
             </div>
 
@@ -377,7 +377,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-white">{info.name}</span>
                       <span
-                        className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                        className={`text-[11px] px-1.5 py-0.5 rounded font-mono ${
                           isSelected
                             ? 'bg-emerald-900 text-emerald-300'
                             : 'bg-zinc-800 text-zinc-400'
@@ -386,7 +386,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                         {info.ats}
                       </span>
                     </div>
-                    <div className="text-[10px] font-mono text-zinc-400 mb-1">{info.font}</div>
+                    <div className="text-[11px] font-mono text-zinc-400 mb-1">{info.font}</div>
                     <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
                       {info.desc}
                     </p>
@@ -456,7 +456,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                     return (
                       <div className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 ${atsTheme.ringBorder} ${atsTheme.ringBg} ${atsTheme.text} font-extrabold text-2xl shadow-inner`}>
                         {rewriteData.ats_score}
-                        <span className={`text-[10px] font-normal ${atsTheme.text} opacity-70 absolute -bottom-1`}>
+                        <span className={`text-[11px] font-normal ${atsTheme.text} opacity-70 absolute -bottom-1`}>
                           /100
                         </span>
                       </div>
@@ -465,7 +465,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-lg font-bold text-white">ATS Compatibility Score</h2>
-                      <span className="rounded bg-emerald-950 border border-emerald-800/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                      <span className="rounded bg-emerald-950 border border-emerald-800/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
                         Evaluated First
                       </span>
                     </div>
@@ -477,25 +477,25 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
-                    <div className="text-[10px] uppercase text-zinc-500 font-semibold">Keywords</div>
+                    <div className="text-[11px] uppercase text-zinc-500 font-semibold">Keywords</div>
                     <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.keyword_score ?? 85).text}`}>
                       {rewriteData.ats_breakdown?.keyword_score ?? 85}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
-                    <div className="text-[10px] uppercase text-zinc-500 font-semibold">Experience</div>
+                    <div className="text-[11px] uppercase text-zinc-500 font-semibold">Experience</div>
                     <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.experience_score ?? 80).text}`}>
                       {rewriteData.ats_breakdown?.experience_score ?? 80}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
-                    <div className="text-[10px] uppercase text-zinc-500 font-semibold">Quantified</div>
+                    <div className="text-[11px] uppercase text-zinc-500 font-semibold">Quantified</div>
                     <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.quantified_impact_score ?? 90).text}`}>
                       {rewriteData.ats_breakdown?.quantified_impact_score ?? 90}%
                     </div>
                   </div>
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-center">
-                    <div className="text-[10px] uppercase text-zinc-500 font-semibold">Structure</div>
+                    <div className="text-[11px] uppercase text-zinc-500 font-semibold">Structure</div>
                     <div className={`text-sm font-bold ${getScoreTheme(rewriteData.ats_breakdown?.section_structure_score ?? 100).text}`}>
                       {rewriteData.ats_breakdown?.section_structure_score ?? 100}%
                     </div>
@@ -512,7 +512,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-zinc-200">Page Length & Density:</span>
-                      <span className="rounded bg-emerald-950 border border-emerald-800/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                      <span className="rounded bg-emerald-950 border border-emerald-800/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
                         {rewriteData.page_fit.estimated_pages} Page{rewriteData.page_fit.estimated_pages > 1 ? 's' : ''} ({rewriteData.page_fit.density_status})
                       </span>
                     </div>
@@ -685,7 +685,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                       <strong>Strict Fact-Preservation Invariant:</strong> No fake companies, non-existent projects, or fabricated metrics are generated. Action verbs and JD competencies are elevated around verified candidate achievements.
                     </span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 flex-shrink-0">
+                  <span className="text-[11px] text-zinc-400 flex-shrink-0">
                     {Object.values(acceptedSuggestions).filter(Boolean).length} / {rewriteData.suggestions.length} Accepted
                   </span>
                 </div>
@@ -704,7 +704,7 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                       >
                         <div className="flex items-center justify-between gap-4 mb-2.5">
                           <div className="flex items-center gap-2">
-                            <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-mono uppercase font-bold text-zinc-300">
+                            <span className="rounded bg-zinc-800 px-2 py-0.5 text-[11px] font-mono uppercase font-bold text-zinc-300">
                               {item.section}
                             </span>
                             <span className="text-xs font-semibold text-zinc-200">
@@ -734,14 +734,14 @@ export const ResumeRewriter: React.FC<ResumeRewriterProps> = ({ onBackToIntervie
                         {/* Diff Comparison */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
                           <div className="rounded-lg bg-zinc-950 border border-red-500/20 p-3 text-zinc-400">
-                            <div className="text-[10px] uppercase font-bold text-red-400 mb-1">Original</div>
+                            <div className="text-[11px] uppercase font-bold text-red-400 mb-1">Original</div>
                             <p className="line-through opacity-80">{item.original_text}</p>
                           </div>
                           <div className="rounded-lg bg-emerald-950/20 border border-emerald-500/30 p-3 text-emerald-200">
-                            <div className="text-[10px] uppercase font-bold text-emerald-400 mb-1 flex items-center justify-between">
+                            <div className="text-[11px] uppercase font-bold text-emerald-400 mb-1 flex items-center justify-between">
                               <span>Rewritten for JD</span>
                               {item.matched_keywords.length > 0 && (
-                                <span className="text-[9px] text-emerald-400/80 font-normal">
+                                <span className="text-[11px] text-emerald-400/80 font-normal">
                                   +{item.matched_keywords.join(', ')}
                                 </span>
                               )}

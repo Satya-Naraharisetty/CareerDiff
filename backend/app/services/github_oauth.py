@@ -118,38 +118,21 @@ class GitHubOAuthService:
                 ) from e
 
             github_id = str(user_data.get("id"))
-            email = user_data.get("email")
             full_name = user_data.get("name") or user_data.get("login") or "Candidate"
             avatar_url = user_data.get("avatar_url")
 
-            # 3. If primary email is private in profile, fetch from emails endpoint
-            if not email:
-                try:
-                    emails_resp = await client.get(_GITHUB_EMAILS_URL, headers=auth_headers)
-                    if emails_resp.status_code == 200:
-                        emails_data = emails_resp.json()
-                        # Prefer primary and verified email
-                        for item in emails_data:
-                            if item.get("primary") and item.get("verified"):
-                                email = item.get("email")
-                                break
-                        # Fallback to primary
-                        if not email:
-                            for item in emails_data:
-                                if item.get("primary"):
-                                    email = item.get("email")
-                                    break
-                        # Fallback to any verified
-                        if not email:
-                            for item in emails_data:
-                                if item.get("verified"):
-                                    email = item.get("email")
-                                    break
-                        # Fallback to first
-                        if not email and emails_data:
-                            email = emails_data[0].get("email")
-                except Exception as e:
-                    logger.warning("Could not fetch GitHub private emails: %s", e)
+            # 3. Only accept the account's PRIMARY + VERIFIED email. Unverified emails must never be
+            #    used, because they are used to link to existing CareerDiff accounts.
+            email: str | None = None
+            try:
+                emails_resp = await client.get(_GITHUB_EMAILS_URL, headers=auth_headers)
+                if emails_resp.status_code == 200:
+                    for item in emails_resp.json():
+                        if item.get("primary") and item.get("verified") and item.get("email"):
+                            email = item["email"]
+                            break
+            except Exception as e:
+                logger.warning("Could not fetch GitHub emails: %s", e)
 
             if not email:
                 raise HTTPException(
