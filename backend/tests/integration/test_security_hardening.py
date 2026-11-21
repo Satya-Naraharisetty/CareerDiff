@@ -14,7 +14,6 @@ Verifies:
 
 import html
 import uuid
-from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
@@ -23,13 +22,12 @@ from sqlalchemy import select
 from app.core.config import Settings
 from app.core.database import async_session_factory
 from app.models.role import JobRole
-from app.models.user import CandidateProfile
 from app.scripts.seed_roles import seed_job_roles
 from app.services.resume_rewriter import escape_latex
 from app.services.storage import UPLOAD_DIR
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 async def ensure_roles_seeded() -> None:
     """Ensure catalog roles are seeded for tests."""
     async with async_session_factory() as session:
@@ -62,6 +60,7 @@ async def create_test_candidate(
 @pytest.mark.asyncio
 async def test_bola_idor_interview_endpoints_cross_user_isolation(
     async_client: AsyncClient,
+    ensure_roles_seeded: None,
 ) -> None:
     """Verify User B cannot access, read, or mutate User A's interview session."""
     token_a, _ = await create_test_candidate(async_client, "user_a")
@@ -235,7 +234,7 @@ async def test_resume_upload_rejects_disguised_executable_and_invalid_magic_byte
 
 
 def test_escape_latex_neutralizes_commands_and_escapes_special_characters() -> None:
-    """Verify LaTeX command injection vectors (\write18, \input) are neutralized."""
+    r"""Verify LaTeX command injection vectors (\write18, \input) are neutralized."""
     malicious_input = (
         r"Built high-throughput service; \write18{rm -rf /} and \input{/etc/passwd} "
         r"with 99.9% uptime & $10M revenue in C# and C++."

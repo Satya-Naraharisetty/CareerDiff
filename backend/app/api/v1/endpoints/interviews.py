@@ -115,7 +115,7 @@ async def list_interviews(
         if ov_score is not None:
             scores_list.append(ov_score)
 
-        role_name = inv.role.title if inv.role else "General Engineering"
+        role_name = inv.role.name if inv.role else "General Engineering"
 
         items.append(
             InterviewHistoryItemRead(
@@ -139,7 +139,7 @@ async def list_interviews(
     latest_score = scores_list[0] if scores_list else None
 
     score_delta = None
-    if len(scores_list) >= 2:
+    if len(scores_list) >= 2 and latest_score is not None:
         oldest_score = scores_list[-1]
         score_delta = round(latest_score - oldest_score, 2)
 

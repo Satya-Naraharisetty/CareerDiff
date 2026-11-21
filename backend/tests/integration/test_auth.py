@@ -5,8 +5,11 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from app.core.config import get_settings
+from app.core.database import async_session_factory
+from app.models.user import User
 
 settings = get_settings()
 
@@ -481,3 +484,103 @@ async def test_oauth_user_can_delete_account_without_password(async_client: Asyn
         # Token is now invalid
         me_res = await async_client.get("/api/v1/auth/me", headers=headers)
         assert me_res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_github_oauth_login_redirect_and_state_cookie(async_client: AsyncClient) -> None:
+    """Verify /github/login sets secure CSRF state cookie and redirects to GitHub authorization."""
+    with patch.object(settings, "github_client_id", "mock-gh-client-id"), patch(
+        "app.services.github_oauth.get_settings", return_value=settings
+    ):
+        res = await async_client.get("/api/v1/auth/github/login?redirect_url=http://localhost:5173", follow_redirects=False)
+        assert res.status_code == 302
+        assert "https://github.com/login/oauth/authorize" in res.headers["location"]
+        assert "client_id=mock-gh-client-id" in res.headers["location"]
+        assert "cd_github_oauth_state" in res.cookies
+
+
+@pytest.mark.asyncio
+async def test_github_oauth_callback_new_user_provisioning(async_client: AsyncClient) -> None:
+    """Verify GitHub OAuth callback provisions new user and dispatches token in opener response."""
+    unique_gh_id = f"gh-{uuid.uuid4().hex[:10]}"
+    unique_email = f"gh_cand_{uuid.uuid4().hex[:8]}@github.com"
+    mock_gh_profile = {
+        "github_id": unique_gh_id,
+        "email": unique_email,
+        "full_name": "Octocat Candidate",
+        "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4",
+    }
+    test_state = "valid-csrf-state-token-12345"
+
+    with patch(
+        "app.api.v1.endpoints.auth.GitHubOAuthService.exchange_code_for_profile",
+        return_value=mock_gh_profile,
+    ):
+        async_client.cookies.set("cd_github_oauth_state", test_state)
+        res = await async_client.get(
+            f"/api/v1/auth/github/callback?code=mock_github_code&state={test_state}"
+        )
+        assert res.status_code == 200
+        assert "CAREERDIFF_OAUTH_SUCCESS" in res.text
+
+        # Verify user was created in database
+        async with async_session_factory() as db:
+            stmt = select(User).where(User.github_id == unique_gh_id)
+            user = (await db.execute(stmt)).scalar_one_or_none()
+            assert user is not None
+            assert user.email == unique_email
+            assert user.auth_provider == "GITHUB"
+            assert user.full_name == "Octocat Candidate"
+
+
+@pytest.mark.asyncio
+async def test_github_oauth_callback_account_linking(async_client: AsyncClient) -> None:
+    """Verify GitHub OAuth links to existing user matching verified email."""
+    unique_email = f"link_gh_{uuid.uuid4().hex[:8]}@example.com"
+    password = "ExistingPassword123!"
+
+    # 1. Register existing local user
+    reg = await async_client.post(
+        "/api/v1/auth/register",
+        json={"email": unique_email, "password": password, "full_name": "Local Candidate"},
+    )
+    assert reg.status_code == 201
+
+    # 2. Callback with GitHub account having the same email
+    unique_gh_id = f"gh-{uuid.uuid4().hex[:10]}"
+    mock_gh_profile = {
+        "github_id": unique_gh_id,
+        "email": unique_email,
+        "full_name": "Local Candidate",
+        "avatar_url": "https://avatars.githubusercontent.com/u/2?v=4",
+    }
+    test_state = "valid-csrf-state-token-linking"
+
+    with patch(
+        "app.api.v1.endpoints.auth.GitHubOAuthService.exchange_code_for_profile",
+        return_value=mock_gh_profile,
+    ):
+        async_client.cookies.set("cd_github_oauth_state", test_state)
+        res = await async_client.get(
+            f"/api/v1/auth/github/callback?code=mock_link_code&state={test_state}"
+        )
+        assert res.status_code == 200
+
+        # Verify account was linked
+        async with async_session_factory() as db:
+            stmt = select(User).where(User.email == unique_email)
+            user = (await db.execute(stmt)).scalar_one_or_none()
+            assert user is not None
+            assert user.github_id == unique_gh_id
+
+
+@pytest.mark.asyncio
+async def test_github_oauth_callback_state_mismatch_fails(async_client: AsyncClient) -> None:
+    """Verify callback rejects invalid CSRF state tokens."""
+    async_client.cookies.set("cd_github_oauth_state", "real-state")
+    res = await async_client.get(
+        "/api/v1/auth/github/callback?code=mock_code&state=attacker-forged-state"
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "INVALID_OAUTH_STATE"
+

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.evaluation import AssessmentReport
     from app.models.role import Competency, JobRole
     from app.models.user import CandidateProfile
 
@@ -101,6 +102,11 @@ class Interview(Base):
         back_populates="interview",
         cascade="all, delete-orphan",
         order_by="InterviewTurn.turn_index",
+    )
+    assessment_reports: Mapped[list["AssessmentReport"]] = relationship(
+        cascade="all, delete-orphan",
+        order_by="AssessmentReport.version.desc()",
+        overlaps="interview",
     )
 
 

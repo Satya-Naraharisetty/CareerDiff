@@ -49,6 +49,19 @@ export const AppContent: React.FC = () => {
 
   // Rehydrate profile on mount if token is present
   useEffect(() => {
+    // Check for OAuth redirect token in URL query params on mount
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('auth_token') || params.get('token');
+    if (token) {
+      useAuthStore.getState().loginWithToken(token).then(() => {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }).catch((err) => {
+        console.error('Failed to authenticate via URL token:', err);
+      });
+      return;
+    }
+
     if (isAuthenticated) {
       rehydrateProfile();
     }

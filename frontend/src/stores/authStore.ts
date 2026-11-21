@@ -17,6 +17,7 @@ interface AuthState {
   error: string | null;
   login: (credentials: UserLoginRequest) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithToken: (accessToken: string) => Promise<void>;
   register: (payload: UserRegisterRequest) => Promise<UserRegisterResponse>;
   recoverPassword: (payload: PasswordRecoveryRequest) => Promise<PasswordRecoveryResponse>;
   rehydrateProfile: () => Promise<void>;
@@ -186,6 +187,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Google authentication failed';
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  loginWithToken: async (accessToken: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      let user: UserProfile = {
+        id: 'oauth-user',
+        email: 'candidate@oauth.com',
+        full_name: 'Candidate',
+      };
+      savePersistedAuth(accessToken, user);
+
+      try {
+        const profile = await authApi.getProfile();
+        user = {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name,
+          role: profile.role,
+          target_seniority: profile.target_seniority,
+          primary_discipline: profile.primary_discipline,
+          auth_provider: profile.auth_provider,
+          avatar_url: profile.avatar_url,
+        };
+        savePersistedAuth(accessToken, user);
+      } catch {
+        // Fallback
+      }
+
+      set({
+        token: accessToken,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Authentication failed';
       set({ error: message, isLoading: false });
       throw err;
     }

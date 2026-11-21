@@ -62,3 +62,46 @@ def test_get_settings_cache() -> None:
     s1 = get_settings()
     s2 = get_settings()
     assert s1 is s2
+
+
+def test_production_jwt_secret_validation() -> None:
+    """Verify that production environment strictly enforces high-entropy JWT_SECRET_KEY."""
+    import pytest
+
+    # Fails if default dev secret is used in production
+    with patch.dict(
+        os.environ,
+        {
+            "ENVIRONMENT": "production",
+            "JWT_SECRET_KEY": "insecure_dev_secret_change_in_production_key_32bytes",
+            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/db",
+        },
+    ):
+        with pytest.raises(ValueError, match="CRITICAL SECURITY CONFIGURATION ERROR"):
+            Settings()
+
+    # Fails if secret is shorter than 32 characters
+    with patch.dict(
+        os.environ,
+        {
+            "ENVIRONMENT": "production",
+            "JWT_SECRET_KEY": "short_secret_under_32_chars",
+            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/db",
+        },
+    ):
+        with pytest.raises(ValueError, match="CRITICAL SECURITY CONFIGURATION ERROR"):
+            Settings()
+
+    # Succeeds with a valid 32+ character high-entropy key
+    with patch.dict(
+        os.environ,
+        {
+            "ENVIRONMENT": "production",
+            "JWT_SECRET_KEY": "0" * 32,
+            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/db",
+        },
+    ):
+        cfg = Settings()
+        assert cfg.environment == "production"
+        assert cfg.jwt_secret_key == "0" * 32
+

@@ -93,6 +93,12 @@ class Settings(BaseModel):
     google_client_secret: str | None = Field(
         default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET") or None
     )
+    github_client_id: str | None = Field(
+        default_factory=lambda: os.getenv("GITHUB_CLIENT_ID") or None
+    )
+    github_client_secret: str | None = Field(
+        default_factory=lambda: os.getenv("GITHUB_CLIENT_SECRET") or None
+    )
 
     gemini_api_key: str | None = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY") or None)
     gemini_turn_model: str = Field(
