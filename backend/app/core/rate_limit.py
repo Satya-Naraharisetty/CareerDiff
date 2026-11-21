@@ -70,9 +70,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "/docs",
             "/redoc",
             "/openapi.json",
+            "/health",
             "/api/v1/health",
             "/api/v1/health/db",
             "/api/v1/health/redis",
+            "/api/v1/health/storage",
+            "/api/v1/health/gemini",
+            "/api/v1/health/outbox",
         }
 
     async def dispatch(
@@ -84,6 +88,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if (
             path in self.whitelist_paths
+            or path.startswith("/health")
+            or path.startswith("/api/v1/health")
             or path.startswith("/docs")
             or path.startswith("/redoc")
             or request.headers.get("X-Bypass-Rate-Limit") == "1"

@@ -5,6 +5,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -109,6 +110,14 @@ async def root() -> dict[str, str]:
         "status": "online",
         "docs": "/docs",
     }
+
+
+@app.get("/health", summary="Top-level system health probe", tags=["Root"])
+async def root_health(response: Response) -> Any:
+    """Convenience endpoint routing root /health to system integration health probe."""
+    from app.api.v1.endpoints.health import get_system_health
+
+    return await get_system_health(response)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
