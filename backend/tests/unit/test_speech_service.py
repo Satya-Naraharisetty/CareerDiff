@@ -30,19 +30,21 @@ async def test_stt_final_transcription() -> None:
 
 @pytest.mark.asyncio
 async def test_tts_pcm_stream_generation() -> None:
-    """Verify TTS streaming yields 100ms (3,200 bytes) 16kHz PCM chunks."""
+    """Verify TTS streaming yields 100ms (4,800 bytes) 24kHz studio PCM chunks."""
     text = "Could you explain how Kafka partitions guarantee total ordering per key?"
     chunks: list[bytes] = []
 
     async for chunk in TTSService.synthesize_pcm_stream(text, chunk_duration_ms=100):
         chunks.append(chunk)
-        assert len(chunk) == 3200  # 1600 samples * 2 bytes = 3200 bytes
+        assert len(chunk) <= TTSService.CHUNK_SIZE_BYTES
+        assert len(chunk) > 0
 
     assert len(chunks) > 0
+    assert len(chunks[0]) == TTSService.CHUNK_SIZE_BYTES
 
 
 def test_tts_generate_silence() -> None:
-    """Verify silence chunk length."""
+    """Verify silence chunk length at 24kHz."""
     silence = TTSService.generate_silence(duration_ms=100)
-    assert len(silence) == 3200
+    assert len(silence) == TTSService.CHUNK_SIZE_BYTES  # 4800 bytes @ 24kHz
     assert all(b == 0 for b in silence)

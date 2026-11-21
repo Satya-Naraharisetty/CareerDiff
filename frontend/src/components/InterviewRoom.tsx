@@ -9,17 +9,11 @@ import {
   Hand,
   Layers,
   Loader2,
-  Mic,
   Network,
   Play,
-  Send,
   Trash2,
   User,
-  Video,
-  VideoOff,
   Volume2,
-  VolumeX,
-  X,
 } from 'lucide-react';
 import { useInterviewStore } from '../stores/interviewStore';
 import { BrowserSpeechSynthesizer } from '../lib/speechSynthesis';
@@ -548,8 +542,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     remainingSeconds,
     preferredLanguage,
     error,
+    isVoiceMuted,
     startInterview,
-    submitTextTurn,
     initVoiceSession,
     startVoiceRecording,
     stopVoiceRecording,
@@ -558,7 +552,6 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     concludeSession,
   } = useInterviewStore();
 
-  const [textInput, setTextInput] = useState('');
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [scratchpadCode, setScratchpadCode] = useState('');
   const [scratchpadTab, setScratchpadTab] = useState<'CODE' | 'DIAGRAM'>('CODE');
@@ -569,11 +562,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [isRunningCode, setIsRunningCode] = useState(false);
   const [showCamera, setShowCamera] = useState<boolean>(true);
   const [isRoomCameraActive, setIsRoomCameraActive] = useState<boolean>(false);
-  const [showTextFallbackInVoice, setShowTextFallbackInVoice] = useState<boolean>(false);
   // Real-time typewriter and synchronized interviewer speech state
   const [typingTurnIndex, setTypingTurnIndex] = useState<number | null>(null);
   const [typedText, setTypedText] = useState<string>('');
-  const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(false);
   const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<string>(() => {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('careerdiff_gemini_voice');
@@ -696,6 +687,17 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
+  // Guarantee countdown timer ticks down continuously every second while session is active
+  useEffect(() => {
+    if (sessionState === 'COMPLETED') return;
+    const interval = window.setInterval(() => {
+      useInterviewStore.setState((s) => ({
+        remainingSeconds: Math.max(0, s.remainingSeconds - 1),
+      }));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionState]);
+
   // Confine auto-scrolling to internal chat container on new turns or speech updates (without scrolling the page)
   useEffect(() => {
     if (isInitialMountRef.current) {
@@ -727,7 +729,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
   // Initialize session on mount
   useEffect(() => {
-    if (sessionState === 'CREATED' && !hasStartedRef.current) {
+    // Only trigger HTTP start if in TEXT mode; in VOICE mode, initVoiceSession starts and synchronizes the session cleanly over WebSocket
+    if (sessionState === 'CREATED' && !hasStartedRef.current && mode === 'TEXT') {
       hasStartedRef.current = true;
       startInterview();
     }
@@ -830,25 +833,45 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         }
       };
 
-      if (isVoiceMuted) {
-        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.fallbackTypewriter(
-          latestTurn.transcript,
-          { onTypingProgress, onEnd }
-        );
-      } else {
-        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
-          latestTurn.transcript,
-          {
-            rate: 0.96,
-            pitch: 1.0,
-            onTypingProgress,
-            onEnd,
-            onError: onEnd,
-          }
-        );
-      }
+      // Speak out interviewer question audibly while streaming the typewriter progress
+      activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
+        latestTurn.transcript,
+        {
+          rate: 0.98,
+          pitch: 1.0,
+          onTypingProgress,
+          onEnd,
+          onError: () => {
+            activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.fallbackTypewriter(
+              latestTurn.transcript,
+              { onTypingProgress, onEnd }
+            );
+          },
+        }
+      );
     }
   }, [turns, isVoiceMuted, mode, wsStatus, startVoiceRecording]);
+
+  // Automatically open browser IDE pre-populated when interviewer presents a coding or LeetCode challenge
+  useEffect(() => {
+    if (turns.length === 0) return;
+    const latestTurn = turns[turns.length - 1];
+    if (
+      latestTurn.speaker === 'INTERVIEWER' &&
+      (latestTurn.code_sample ||
+        latestTurn.question_archetype === 'CODE_REVIEW' ||
+        latestTurn.transcript.toLowerCase().includes('code') ||
+        latestTurn.transcript.toLowerCase().includes('implement') ||
+        latestTurn.transcript.toLowerCase().includes('leetcode') ||
+        latestTurn.transcript.toLowerCase().includes('function') ||
+        latestTurn.transcript.toLowerCase().includes('algorithm'))
+    ) {
+      if (latestTurn.code_sample) {
+        setScratchpadCode(latestTurn.code_sample);
+      }
+      setShowScratchpad(true);
+    }
+  }, [turns]);
 
   // Cleanup speech synthesis on unmount
   useEffect(() => {
@@ -929,10 +952,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         handleBargeIn();
-      } else if (e.key === 'Enter' && mode === 'VOICE' && isRecording && !showTextFallbackInVoice) {
+      } else if (e.key === 'Enter' && mode === 'VOICE' && isRecording) {
         e.preventDefault();
         handleDoneSpeaking();
-      } else if (e.key === 'Enter' && mode === 'VOICE' && !isRecording && !isInterviewerSpeaking && typingTurnIndex === null && !showTextFallbackInVoice) {
+      } else if (e.key === 'Enter' && mode === 'VOICE' && !isRecording && !isInterviewerSpeaking && typingTurnIndex === null) {
         e.preventDefault();
         startVoiceRecording().catch(() => {});
       } else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) {
@@ -943,34 +966,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
     window.addEventListener('keydown', handleRoomKeyDown);
     return () => window.removeEventListener('keydown', handleRoomKeyDown);
-  }, [mode, isRecording, isInterviewerSpeaking, typingTurnIndex, showTextFallbackInVoice, handleDoneSpeaking, handleBargeIn, startVoiceRecording]);
-
-  const handleSendText = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!textInput.trim() || isSubmitting) return;
-
-    BrowserSpeechSynthesizer.stop();
-    if (activeSynthesizerCancelRef.current) {
-      activeSynthesizerCancelRef.current();
-      activeSynthesizerCancelRef.current = null;
-    }
-    setTypingTurnIndex(null);
-
-    const msg = textInput;
-    let snippet: string | undefined = undefined;
-    if (attachScratchpad) {
-      if (scratchpadTab === 'DIAGRAM' && diagramCode.trim()) {
-        snippet = `\`\`\`mermaid\n${diagramCode.trim()}\n\`\`\``;
-      } else if (scratchpadCode.trim()) {
-        snippet = scratchpadCode.trim();
-        if (executionOutput) {
-          snippet = `${snippet}\n\n[Console Output]:\n${executionOutput}`;
-        }
-      }
-    }
-    setTextInput('');
-    await submitTextTurn(msg, snippet);
-  };
+  }, [mode, isRecording, isInterviewerSpeaking, typingTurnIndex, handleDoneSpeaking, handleBargeIn, startVoiceRecording]);
 
   const handleConclude = async () => {
     setIsRoomCameraActive(false);
@@ -1022,121 +1018,50 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         </div>
 
         {/* Right Section: Countdown Timer & Conclude Action */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
           {/* Countdown timer */}
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-950 px-3 py-1.5 border border-zinc-800">
-            <Clock className={`h-3.5 w-3.5 ${remainingSeconds < 300 ? 'text-amber-400 animate-pulse' : 'text-zinc-400'}`} />
+          <div className="flex items-center gap-2 rounded-lg bg-zinc-950 px-3 py-1.5 border border-zinc-800 shadow-sm">
+            <Clock className={`h-3.5 w-3.5 ${remainingSeconds < 300 ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`} />
             <span className="font-mono text-xs sm:text-sm font-semibold tracking-wider text-zinc-100">
               {formatTimer(remainingSeconds)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Scratchpad Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setShowScratchpad((prev) => !prev)}
-              title="Toggle Architecture & Code Scratchpad (Key: S)"
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${showScratchpad
-                  ? 'border-zinc-500 bg-zinc-800 text-white shadow-sm'
-                  : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-                }`}
+          {/* Voice Persona Selector */}
+          <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs font-mono">
+            <span className="text-[11px] text-zinc-500 hidden sm:inline">Voice:</span>
+            <select
+              value={selectedGeminiVoice}
+              onChange={(e) => handleVoiceChange(e.target.value)}
+              title="Interviewer Voice Persona"
+              className="bg-transparent text-[11px] font-mono text-zinc-200 focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[150px] truncate"
             >
-              <Code2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Scratchpad</span>
-              <kbd className="hidden md:inline-block px-1 py-0.5 text-[9px] font-mono bg-zinc-900 text-zinc-400 rounded border border-zinc-800">S</kbd>
-              {scratchpadCode.trim() && (
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              )}
-            </button>
-
-            {/* Camera Preview Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setShowCamera((prev) => !prev)}
-              title="Toggle Candidate Video Self-Preview"
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
-                showCamera
-                  ? 'border-emerald-700/80 bg-emerald-950/40 text-emerald-300 shadow-sm'
-                  : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-              }`}
-            >
-              {showCamera ? (
-                <Video className="h-3.5 w-3.5 text-emerald-400" />
-              ) : (
-                <VideoOff className="h-3.5 w-3.5 text-zinc-500" />
-              )}
-              <span className="hidden sm:inline">Camera</span>
-            </button>
-
-            {/* Interviewer Audio Output Voice Toggle Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsVoiceMuted((prev) => {
-                  if (!prev) {
-                    BrowserSpeechSynthesizer.stop();
-                    if (activeSynthesizerCancelRef.current) {
-                      activeSynthesizerCancelRef.current();
-                      activeSynthesizerCancelRef.current = null;
-                    }
-                  }
-                  return !prev;
-                });
-              }}
-              title={isVoiceMuted ? 'Unmute Interviewer Speech Voice' : 'Mute Interviewer Speech Voice'}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-mono font-medium border transition-colors ${
-                !isVoiceMuted
-                  ? 'border-emerald-700/80 bg-emerald-950/40 text-emerald-300 shadow-sm'
-                  : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-              }`}
-            >
-              {!isVoiceMuted ? (
-                <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
-              ) : (
-                <VolumeX className="h-3.5 w-3.5 text-zinc-500" />
-              )}
-              <span className="hidden sm:inline">{!isVoiceMuted ? 'Voice' : 'Muted'}</span>
-            </button>
-
-            {/* High-Fidelity Gemini Live Natural Voice Persona Selector */}
-            {!isVoiceMuted && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs font-mono">
-                <span className="text-[11px] text-zinc-500 hidden sm:inline">Voice:</span>
-                <select
-                  value={selectedGeminiVoice}
-                  onChange={(e) => handleVoiceChange(e.target.value)}
-                  title="Interviewer Voice Persona & Human Tone (Gemini Multimodal Live)"
-                  className="bg-transparent text-[11px] font-mono text-zinc-200 focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate"
-                >
-                  {GEMINI_LIVE_VOICES.map((v) => (
-                    <option key={v.id} value={v.id} title={v.description} className="bg-zinc-900 text-zinc-200">
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleConclude}
-              disabled={isSubmitting}
-              className="flex items-center gap-1.5 rounded-lg bg-white px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-sm hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98]"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Compiling...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Conclude &amp; Score
-                </>
-              )}
-            </button>
+              {GEMINI_LIVE_VOICES.map((v) => (
+                <option key={v.id} value={v.id} title={v.description} className="bg-zinc-900 text-zinc-200">
+                  {v.label}
+                </option>
+              ))}
+            </select>
           </div>
+
+          <button
+            type="button"
+            onClick={handleConclude}
+            disabled={isSubmitting}
+            className="flex items-center gap-1.5 rounded-lg bg-white px-3 sm:px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-sm hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98]"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Compiling...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-3.5 w-3.5" />
+                Conclude &amp; Score
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -1148,40 +1073,47 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         </div>
       )}
 
-      {/* Middle Work Area: Split Screen when Scratchpad is open */}
+      {/* Middle Work Area: Unified Gemini Live Conversation Stream */}
       <div className={`flex-1 min-h-0 ${showScratchpad ? 'grid grid-cols-1 lg:grid-cols-12 gap-4' : 'flex flex-col'}`}>
-        {/* Main Conversation Stream & Input Column */}
+        {/* Main Conversation Stream Column */}
         <div className={`relative flex flex-col min-h-0 ${showScratchpad ? 'lg:col-span-7' : 'flex-1'}`}>
-          {/* Floating Candidate Camera Self-Preview */}
+          {/* Centered Camera Self-View with Live Subtitles Overlay */}
           {showCamera && isRoomCameraActive && (
-            <div className="absolute top-3 right-3 z-20 w-36 sm:w-44 rounded-xl border border-zinc-700 bg-zinc-950/90 shadow-2xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-              <div className="relative aspect-video w-full bg-zinc-900">
-                <video
-                  ref={setRoomVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-                <div className="absolute top-1 left-1 flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-950/70 border border-zinc-800/80 text-[9px] font-mono text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Self-View
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCamera(false)}
-                  className="absolute top-1 right-1 p-0.5 rounded bg-zinc-950/70 text-zinc-400 hover:text-white transition-colors"
-                  title="Hide camera preview"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+            <div className="mx-auto mb-3 w-64 sm:w-80 aspect-video rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden relative shrink-0 animate-in fade-in zoom-in-95 duration-150">
+              <video
+                ref={setRoomVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover scale-x-[-1]"
+              />
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-950/80 border border-zinc-800 text-[10px] font-mono text-emerald-400 backdrop-blur-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Self-View
               </div>
+
+              {/* Subtitles Overlay right on the video content */}
+              {isInterviewerSpeaking && (
+                <div className="absolute bottom-2 inset-x-2 rounded-xl bg-black/85 backdrop-blur-md px-3 py-1.5 text-xs text-zinc-100 border border-zinc-800 shadow-md flex items-center gap-2 animate-in fade-in">
+                  <span className="text-emerald-400 font-semibold shrink-0">
+                    {selectedGeminiVoice === 'Aoede' ? 'Maya' : 'Alex'}:
+                  </span>
+                  <span className="truncate">{typedText || (turns.length > 0 ? turns[turns.length - 1].transcript : '')}</span>
+                </div>
+              )}
+              {!isInterviewerSpeaking && (isRecording || partialTranscript) && (
+                <div className="absolute bottom-2 inset-x-2 rounded-xl bg-black/85 backdrop-blur-md px-3 py-1.5 text-xs text-white border border-emerald-500/50 shadow-md flex items-center gap-2 animate-in fade-in">
+                  <span className="text-cyan-400 font-semibold shrink-0">You:</span>
+                  <span className="truncate font-sans">{partialTranscript || 'Listening... speak naturally'}</span>
+                </div>
+              )}
             </div>
           )}
 
+          {/* Conversation Stream: Left Side Interviewer, Right Side Candidate */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6 space-y-4 backdrop-blur-sm shadow-inner"
+            className="flex-1 overflow-y-auto rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-4 sm:p-6 space-y-4 backdrop-blur-md shadow-inner"
           >
             {turns.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center text-center text-zinc-500 py-12">
@@ -1191,6 +1123,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               </div>
             )}
 
+            {/* Historical Turns: Left = Interviewer, Right = Candidate */}
             {turns.map((turn, idx) => {
               const isInterviewer = turn.speaker === 'INTERVIEWER';
               return (
@@ -1199,21 +1132,22 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   className={`flex gap-3 sm:gap-4 ${isInterviewer ? 'justify-start' : 'justify-end'}`}
                 >
                   {isInterviewer && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300">
-                      <Bot className="h-4 w-4 text-zinc-300" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-300 shadow-sm">
+                      <Bot className="h-4 w-4 text-emerald-400" />
                     </div>
                   )}
 
                   <div
-                    className={`max-w-[90%] sm:max-w-[75%] rounded-xl p-4 shadow-sm ${isInterviewer
+                    className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
+                      isInterviewer
                         ? 'rounded-tl-none border border-zinc-800 bg-zinc-950 text-zinc-200'
-                        : 'rounded-tr-none border border-zinc-700 bg-zinc-800 text-white'
-                      }`}
+                        : 'rounded-tr-none border border-emerald-800/50 bg-emerald-950/30 text-white'
+                    }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 font-mono">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-semibold tracking-tight">
-                          {isInterviewer ? 'CareerDiff Evaluator' : 'Candidate'}
+                        <span className={`text-xs font-semibold ${isInterviewer ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                          {isInterviewer ? (selectedGeminiVoice === 'Aoede' ? 'Maya (Interviewer)' : 'Alex (Interviewer)') : 'You'}
                         </span>
                         {turn.action_taken && (
                           <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-800">
@@ -1222,8 +1156,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                         )}
                         {turn.question_archetype && ARCHETYPE_CONFIG[turn.question_archetype] && (
                           <span
-                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
-                              }`}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono border ${
+                              ARCHETYPE_CONFIG[turn.question_archetype].badgeClass
+                            }`}
                           >
                             <span>{ARCHETYPE_CONFIG[turn.question_archetype].icon}</span>
                             <span>{ARCHETYPE_CONFIG[turn.question_archetype].label}</span>
@@ -1265,22 +1200,22 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   </div>
 
                   {!isInterviewer && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300">
-                      <User className="h-4 w-4 text-zinc-300" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-300 shadow-sm">
+                      <User className="h-4 w-4 text-cyan-400" />
                     </div>
                   )}
                 </div>
               );
             })}
 
-            {/* Live Candidate Speaking Turn with Real-Time Transcription */}
+            {/* Real-Time Live Candidate Speaking Bubble on the Right */}
             {(isRecording || partialTranscript) && (
               <div className="flex justify-end gap-3 sm:gap-4 animate-in fade-in duration-150">
-                <div className="max-w-[85%] sm:max-w-[75%] rounded-xl rounded-tr-none bg-zinc-900 border border-emerald-500/40 p-4 text-white shadow-lg shadow-emerald-950/20 font-mono">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
-                      <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span>Candidate Speaking (Live)</span>
+                <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-none border border-emerald-500/50 bg-emerald-950/40 p-4 text-white shadow-lg shadow-emerald-950/20 font-sans">
+                  <div className="flex items-center justify-between gap-3 mb-1.5 font-mono">
+                    <div className="flex items-center gap-2 text-cyan-400 text-xs font-semibold">
+                      <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+                      <span>You (Speaking...)</span>
                     </div>
                     <span className="text-[10px] text-zinc-400">
                       Turn #{(turns.length > 0 ? turns[turns.length - 1].turn_index : 0) + 1}
@@ -1290,29 +1225,23 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                     {partialTranscript ? (
                       <>
                         {partialTranscript}
-                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
+                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
                       </>
                     ) : (
-                      <span className="text-zinc-500 italic font-mono text-xs">
-                        Microphone active... speak your answer naturally.
+                      <span className="text-zinc-400 italic text-xs font-mono">
+                        {audioLevel > 0.04 ? (
+                          <span className="text-emerald-400 not-italic flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                            Listening to you speak... transcribing
+                          </span>
+                        ) : (
+                          'Listening... speak your answer naturally (auto-continues when you pause)'
+                        )}
                       </span>
                     )}
                   </p>
-                  <div className="flex items-center justify-between text-[11px] text-zinc-400 border-t border-zinc-800/80 pt-2.5 mt-2.5">
-                    <span className="text-zinc-400 font-mono text-[10px]">
-                      Pause for 2s or click below when finished to get the followup.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleDoneSpeaking}
-                      className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs shadow-sm transition-all flex items-center gap-1 active:scale-[0.98]"
-                    >
-                      <CheckCircle className="h-3 w-3" />
-                      <span>Submit Answer →</span>
-                    </button>
-                  </div>
                 </div>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-950 border border-emerald-600/50 text-emerald-300">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-950 border border-cyan-600/50 text-cyan-300 shadow-sm ring-2 ring-emerald-500/40">
                   <User className="h-4 w-4" />
                 </div>
               </div>
@@ -1320,9 +1249,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
             {/* Interviewer Speaking Notification Indicator */}
             {isInterviewerSpeaking && (
-              <div className="flex items-center gap-2.5 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 w-fit font-mono">
-                <Volume2 className="h-3.5 w-3.5 animate-pulse text-zinc-300" />
-                <span>Interviewer audio streaming in progress...</span>
+              <div className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 w-fit font-mono animate-pulse">
+                <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Interviewer speaking...</span>
               </div>
             )}
 
@@ -1336,130 +1265,51 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Bottom Interaction Console */}
-          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 backdrop-blur-md shadow-sm">
-            {mode === 'VOICE' ? (
-              /* Voice Mode Controls */
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Dynamic Voice Controls: Barge-In when interviewer speaks; Auto-Mic & Done Speaking when candidate speaks */}
-                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                    {/* While interviewer is speaking: only the Barge-In preemption button is presented */}
-                    {(isInterviewerSpeaking || typingTurnIndex !== null) && (
-                      <button
-                        type="button"
-                        onClick={handleBargeIn}
-                        title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
-                        className="flex items-center justify-center gap-2 rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/40 px-4 py-2.5 text-xs sm:text-sm font-semibold hover:bg-amber-500/30 transition-all active:scale-[0.98] shadow-sm animate-pulse"
-                      >
-                        <Hand className="h-4 w-4 text-amber-300" />
-                        <span>Barge-In / Interrupt</span>
-                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-900 text-amber-300 rounded border border-amber-500/30">Esc</kbd>
-                      </button>
-                    )}
-
-                    {/* When question has finished and candidate mic is live */}
-                    {isRecording && !isInterviewerSpeaking && typingTurnIndex === null && (
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <div className="flex items-center gap-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 px-3 py-2 text-xs font-mono text-emerald-300">
-                          <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                          <span>Mic Active • Listening to you</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleDoneSpeaking}
-                          title="Finish speaking and submit answer for interviewer followup (Key: Enter or 2s pause)"
-                          className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] shadow-sm animate-pulse"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Submit Answer & Get Followup</span>
-                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-emerald-700 text-emerald-100 rounded border border-emerald-500/50">Enter</kbd>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Ready to speak state: clear action button so candidate can click/tap to talk anytime */}
-                    {!isRecording && !isInterviewerSpeaking && typingTurnIndex === null && (
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => startVoiceRecording().catch(() => {})}
-                          title="Activate microphone and speak your answer (Key: Enter)"
-                          className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] shadow-sm shadow-emerald-950/40"
-                        >
-                          <Mic className="h-4 w-4" />
-                          <span>Start Speaking</span>
-                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-emerald-700 text-emerald-100 rounded border border-emerald-500/50">Enter</kbd>
-                        </button>
-                        <span className="text-xs font-mono text-zinc-400 hidden md:inline">
-                          Click to speak or press Enter
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                    {/* 16-Bar Responsive Equalizer */}
-                    <AudioEqualizer
-                      audioLevel={audioLevel}
-                      isRecording={isRecording}
-                      isInterviewerSpeaking={isInterviewerSpeaking}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowTextFallbackInVoice((prev) => !prev)}
-                      className="text-[11px] font-mono text-zinc-400 hover:text-zinc-200 underline decoration-zinc-700 underline-offset-2 shrink-0 transition-colors"
-                    >
-                      {showTextFallbackInVoice ? 'Hide Text' : 'Type / Edit'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Optional Text Fallback Input in Voice Mode */}
-                {showTextFallbackInVoice && (
-                  <form onSubmit={handleSendText} className="flex gap-2 pt-2 border-t border-zinc-800 animate-in fade-in duration-150">
-                    <input
-                      type="text"
-                      value={textInput}
-                      onChange={(e) => setTextInput(e.target.value)}
-                      placeholder="Type or paste technical answer if preferred..."
-                      disabled={isSubmitting || sessionState === 'COMPLETED'}
-                      className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 sm:px-4 py-2 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-50 font-sans"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !textInput.trim() || sessionState === 'COMPLETED'}
-                      className="shrink-0 flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      <span>Send</span>
-                    </button>
-                  </form>
-                )}
+          {/* Gemini Live Voice Console Bar */}
+          <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3 sm:p-4 backdrop-blur-md shadow-xl flex items-center justify-between gap-4">
+            {/* Left: Active Voice Status */}
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+              </span>
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold font-mono text-zinc-100">
+                  {isInterviewerSpeaking
+                    ? `${selectedGeminiVoice === 'Aoede' ? 'Maya' : 'Alex'} Speaking...`
+                    : 'Candidate Microphone Active'}
+                </span>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  {isInterviewerSpeaking ? 'Neural 24kHz Studio Speech' : 'Hands-Free Voice • Automatic Silence Detection'}
+                </span>
               </div>
-            ) : (
-              /* Text Mode Controls */
-              <form onSubmit={handleSendText} className="flex gap-2">
-                <input
-                  type="text"
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Type your technical response here (e.g. architecture tradeoffs, failure modes)..."
-                  disabled={isSubmitting || sessionState === 'COMPLETED'}
-                  className="min-w-0 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 disabled:opacity-50 transition-all font-sans"
-                />
+            </div>
+
+            {/* Right: Audio Waveform Equalizer & Optional Interrupt */}
+            <div className="flex items-center gap-3">
+              {/* Barge-In Interrupt (Visible when interviewer speaks) */}
+              {(isInterviewerSpeaking || typingTurnIndex !== null) && (
                 <button
-                  type="submit"
-                  disabled={isSubmitting || !textInput.trim() || sessionState === 'COMPLETED'}
-                  className="shrink-0 flex items-center justify-center gap-2 rounded-lg bg-white px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
+                  type="button"
+                  onClick={handleBargeIn}
+                  title="Interrupt Interviewer Speech (<150ms preemption, Key: Esc)"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-200 border border-amber-500/40 hover:bg-amber-500/30 text-xs font-semibold transition-all active:scale-95 animate-pulse shadow-sm"
                 >
-                  <Send className="h-3.5 w-3.5" />
-                  <span className="hidden xs:inline">Submit Turn</span>
-                  <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-800 rounded border border-zinc-300">↵</kbd>
+                  <Hand className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Interrupt</span>
+                  <kbd className="hidden md:inline-block px-1 py-0.5 text-[9px] font-mono bg-zinc-900 text-amber-300 rounded border border-amber-500/30">Esc</kbd>
                 </button>
-              </form>
-            )}
+              )}
+
+              {/* 16-Bar Responsive Equalizer */}
+              <div className="flex items-center px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 shrink-0">
+                <AudioEqualizer
+                  audioLevel={audioLevel}
+                  isRecording={isRecording}
+                  isInterviewerSpeaking={isInterviewerSpeaking}
+                />
+              </div>
+            </div>
           </div>
         </div>
 

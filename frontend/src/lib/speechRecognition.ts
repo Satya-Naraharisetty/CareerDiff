@@ -22,17 +22,135 @@ export class BrowserSpeechRecognizer {
   private onFinalCallback: ((text: string) => void) | null = null;
   private onSilenceCallback: (() => void) | null = null;
   private onErrorCallback: ((errorMsg: string) => void) | null = null;
+  private isMutedFn: (() => boolean) | null = null;
 
   static isSupported(): boolean {
     const win = window as unknown as IWindowWithSpeech;
     return !!(win.SpeechRecognition || win.webkitSpeechRecognition);
   }
 
+  private initFreshInstance(): any {
+    const win = window as unknown as IWindowWithSpeech;
+    const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) return null;
+
+    const rec = new SpeechRecognitionClass();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+    rec.maxAlternatives = 1;
+
+    rec.onstart = () => {
+      console.info('[SpeechRecognition] Active listening started.');
+    };
+
+    rec.onspeechstart = () => {
+      console.info('[SpeechRecognition] Speech onset detected.');
+    };
+
+    rec.onresult = (event: any) => {
+      if (this.isMutedFn && this.isMutedFn()) {
+        return;
+      }
+
+      let finalChunk = '';
+      let interimChunk = '';
+
+      for (let i = 0; i < event.results.length; i++) {
+        const item = event.results[i];
+        const text = item[0]?.transcript || '';
+        if (item.isFinal) {
+          finalChunk += (finalChunk ? ' ' : '') + text.trim();
+        } else {
+          interimChunk += (interimChunk ? ' ' : '') + text.trim();
+        }
+      }
+
+      this.currentSessionFinal = finalChunk;
+      this.currentInterimTranscript = interimChunk;
+
+      const fullCombined = this.getFullTranscript();
+      if (this.onPartialCallback && fullCombined) {
+        this.onPartialCallback(fullCombined);
+      }
+
+      // Reset and re-arm hands-free silence auto-finalization
+      this.clearSilenceTimer();
+
+      // If candidate has spoken at least 2 words (~6 chars) and goes silent for 2.2 seconds
+      if (fullCombined.trim().length >= 6 && this.onSilenceCallback) {
+        this.silenceTimer = window.setTimeout(() => {
+          if (this.isListening && this.getFullTranscript().trim().length >= 6) {
+            this.onSilenceCallback?.();
+          }
+        }, 2200);
+      }
+    };
+
+    rec.onerror = (event: any) => {
+      const error = event.error;
+      if (error === 'no-speech' || error === 'aborted') {
+        return;
+      }
+      console.warn('[SpeechRecognition] Status:', error);
+      if (error === 'not-allowed') {
+        this.onErrorCallback?.('Microphone access blocked. Please allow microphone permissions in your browser address bar.');
+      } else if (error === 'network') {
+        console.warn('[SpeechRecognition] Web Speech API network notice: WebSocket voice streaming active');
+      } else if (error === 'audio-capture') {
+        this.onErrorCallback?.('No microphone input detected. Please verify your microphone is plugged in.');
+      }
+    };
+
+    rec.onend = () => {
+      if (!this.isListening) return;
+      const currentTotal = this.getFullTranscript();
+      if (currentTotal) {
+        this.confirmedPriorText = currentTotal;
+      }
+      this.currentSessionFinal = '';
+      this.currentInterimTranscript = '';
+      this.scheduleRestart(100);
+    };
+
+    return rec;
+  }
+
+  private scheduleRestart(delayMs: number): void {
+    this.clearRestartTimer();
+    this.restartTimer = window.setTimeout(() => {
+      if (!this.isListening) return;
+      this.teardownCurrentInstance();
+      try {
+        const rec = this.initFreshInstance();
+        if (rec) {
+          rec.start();
+          this.recognition = rec;
+        }
+      } catch (err) {
+        console.warn('[SpeechRecognition] Restart attempt notice:', err);
+      }
+    }, delayMs);
+  }
+
+  private teardownCurrentInstance(): void {
+    if (this.recognition) {
+      try {
+        this.recognition.onresult = null;
+        this.recognition.onerror = null;
+        this.recognition.onend = null;
+        this.recognition.abort();
+      } catch {}
+      this.recognition = null;
+    }
+  }
+
   start(
     onPartial?: (text: string) => void,
     onFinal?: (text: string) => void,
     onSilence?: () => void,
-    onError?: (errorMsg: string) => void
+    onError?: (errorMsg: string) => void,
+    isMuted?: () => boolean
   ): boolean {
     const win = window as unknown as IWindowWithSpeech;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
@@ -42,7 +160,6 @@ export class BrowserSpeechRecognizer {
       return false;
     }
 
-    // Stop and clean up any existing recognition instance to avoid InvalidStateError in Chromium
     this.abort();
 
     this.clearSilenceTimer();
@@ -51,111 +168,15 @@ export class BrowserSpeechRecognizer {
     this.onFinalCallback = onFinal || null;
     this.onSilenceCallback = onSilence || null;
     this.onErrorCallback = onError || null;
+    this.isMutedFn = isMuted || null;
     this.confirmedPriorText = '';
     this.currentSessionFinal = '';
     this.currentInterimTranscript = '';
     this.isListening = true;
 
     try {
-      const rec = new SpeechRecognitionClass();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-      rec.maxAlternatives = 1;
-
-      rec.onresult = (event: any) => {
-        let finalChunk = '';
-        let interimChunk = '';
-
-        for (let i = 0; i < event.results.length; i++) {
-          const item = event.results[i];
-          const text = item[0]?.transcript || '';
-          if (item.isFinal) {
-            finalChunk += (finalChunk ? ' ' : '') + text.trim();
-          } else {
-            interimChunk += (interimChunk ? ' ' : '') + text.trim();
-          }
-        }
-
-        this.currentSessionFinal = finalChunk;
-        this.currentInterimTranscript = interimChunk;
-
-        const fullCombined = this.getFullTranscript();
-        if (this.onPartialCallback && fullCombined) {
-          this.onPartialCallback(fullCombined);
-        }
-
-        // Reset and re-arm hands-free silence auto-finalization
-        if (this.silenceTimer !== null) {
-          window.clearTimeout(this.silenceTimer);
-          this.silenceTimer = null;
-        }
-
-        // If candidate has spoken at least 2 words (~8 chars) and then goes silent for 2.2 seconds
-        if (fullCombined.length >= 8 && this.onSilenceCallback) {
-          this.silenceTimer = window.setTimeout(() => {
-            if (this.isListening && this.getFullTranscript().length >= 8) {
-              this.onSilenceCallback?.();
-            }
-          }, 2200);
-        }
-      };
-
-      rec.onerror = (event: any) => {
-        const error = event.error;
-        // Ignore normal non-fatal events like 'no-speech' or 'aborted'
-        if (error === 'no-speech' || error === 'aborted') {
-          return;
-        }
-        console.warn('Speech recognition status:', error);
-        if (error === 'not-allowed') {
-          this.onErrorCallback?.('Microphone access blocked. Please allow microphone permissions in your browser address bar to speak.');
-        } else if (error === 'network') {
-          this.onErrorCallback?.('Speech recognition network service unreachable (common if blocked by Brave Shields or ad blockers). Use "Type / Edit" or allow speech services.');
-        } else if (error === 'audio-capture') {
-          this.onErrorCallback?.('No microphone input detected. Please verify your microphone is plugged in.');
-        } else if (error === 'service-not-allowed') {
-          this.onErrorCallback?.('Speech recognition service is disallowed by browser policy.');
-        }
-      };
-
-      rec.onend = () => {
-        // Preserve confirmed text across browser silence auto-restarts
-        if (this.isListening) {
-          const currentTotal = this.getFullTranscript();
-          if (currentTotal) {
-            this.confirmedPriorText = currentTotal;
-          }
-          this.currentSessionFinal = '';
-          this.currentInterimTranscript = '';
-
-          this.clearRestartTimer();
-          // Safe asynchronous restart with 120ms backoff to prevent Chromium InvalidStateError
-          this.restartTimer = window.setTimeout(() => {
-            if (!this.isListening) return;
-            try {
-              rec.start();
-            } catch {
-              // If current instance cannot be reused, create a fresh instance
-              try {
-                const freshRec = new SpeechRecognitionClass();
-                freshRec.continuous = true;
-                freshRec.interimResults = true;
-                freshRec.lang = 'en-US';
-                freshRec.maxAlternatives = 1;
-                freshRec.onresult = rec.onresult;
-                freshRec.onerror = rec.onerror;
-                freshRec.onend = rec.onend;
-                freshRec.start();
-                this.recognition = freshRec;
-              } catch {
-                // Restarting
-              }
-            }
-          }, 120);
-        }
-      };
-
+      const rec = this.initFreshInstance();
+      if (!rec) return false;
       rec.start();
       this.recognition = rec;
       return true;

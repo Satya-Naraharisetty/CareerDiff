@@ -1,6 +1,7 @@
 """Speech-to-Text (STT) and Text-to-Speech (TTS) streaming services for 16kHz PCM audio."""
 
 import asyncio
+import logging
 import math
 import struct
 from collections.abc import AsyncGenerator
@@ -8,6 +9,8 @@ from collections.abc import AsyncGenerator
 import httpx
 
 from app.core.config import get_settings
+
+logger = logging.getLogger("CareerDiff.speech")
 
 
 class STTService:
@@ -36,10 +39,12 @@ class STTService:
     ) -> str:
         """Transcribe finalized speech turn into verified text transcript."""
         if simulated_transcript is not None and simulated_transcript.strip():
+            logger.info("STT transcribe_final: using client-provided transcript '%s'", simulated_transcript.strip())
             return simulated_transcript.strip()
 
         duration_sec = len(audio_bytes) / (16000 * 2) if audio_bytes else 0.0
         if duration_sec < 0.3 and not simulated_transcript:
+            logger.info("STT transcribe_final: audio duration too short (%.2fs), returning empty", duration_sec)
             return ""
 
         settings = get_settings()
@@ -47,6 +52,7 @@ class STTService:
         # Attempt Deepgram transcription if configured
         if settings.deepgram_api_key and audio_bytes:
             try:
+                logger.info("STT transcribe_final: dispatching %d audio bytes (%.2fs) to Deepgram Nova-2...", len(audio_bytes), duration_sec)
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     response = await client.post(
                         "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&encoding=linear16&sample_rate=16000&channels=1",
@@ -62,65 +68,114 @@ class STTService:
                         if channels and channels[0].get("alternatives"):
                             transcript = str(channels[0]["alternatives"][0].get("transcript", "")).strip()
                             if transcript:
+                                logger.info("STT transcribe_final: Deepgram recognized '%s'", transcript)
                                 return transcript
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Deepgram transcription call encountered exception: %s", exc)
 
         if allow_mock_fallback or settings.environment in ("development", "testing"):
-            return (
+            fallback_text = (
                 "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
                 "and mitigated consumer group rebalance latency using cooperative sticky assignors."
             )
+            logger.info("STT transcribe_final: falling back to simulated development transcript: '%s'", fallback_text)
+            return fallback_text
 
         return ""
 
 
 
 class TTSService:
-    """Synthesizes text into 16kHz 16-bit Mono Linear PCM binary frames in 100ms chunks."""
+    """Synthesizes text into studio-grade 24kHz 16-bit Mono Linear PCM audio streams (ElevenLabs-level naturalness)."""
 
-    SAMPLE_RATE: int = 16000
+    SAMPLE_RATE: int = 24000
     BYTES_PER_SAMPLE: int = 2
     CHUNK_DURATION_MS: int = 100
-    CHUNK_SIZE_BYTES: int = 3200  # 1600 samples * 2 bytes = 3200 bytes
+    CHUNK_SIZE_BYTES: int = 4800  # 2400 samples * 2 bytes = 4800 bytes @ 24kHz
+
+    VOICE_MAP: dict[str, str] = {
+        "Puck": "en-US-AndrewMultilingualNeural",
+        "Alex": "en-US-AndrewMultilingualNeural",
+        "Aoede": "en-US-AvaMultilingualNeural",
+        "Maya": "en-US-AvaMultilingualNeural",
+    }
 
     @classmethod
     async def synthesize_pcm_stream(
         cls,
         text: str,
+        voice_name: str | None = None,
         chunk_duration_ms: int = CHUNK_DURATION_MS,
         realtime_delay: bool = False,
     ) -> AsyncGenerator[bytes, None]:
-        """Stream 100ms PCM chunks representing synthesized speech.
+        """Stream studio-quality neural PCM chunks representing lifelike synthesized speech.
 
-        If realtime_delay is True, yields with pacing allowing barge-in preemption.
+        Uses Microsoft Neural Edge TTS (Andrew/Ava) decoded via miniaudio to 24kHz Linear PCM.
         """
-        words = text.split()
-        # Estimate ~2.5 words per second
+        clean_text = text.strip()
+        if not clean_text:
+            return
+
+        neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
+        logger.info(
+            "[TTS] Synthesizing ElevenLabs-quality neural speech with voice '%s' for: '%s...'",
+            neural_voice,
+            clean_text[:60],
+        )
+
+        try:
+            import edge_tts
+            import miniaudio
+
+            communicate = edge_tts.Communicate(clean_text, neural_voice)
+            audio_chunks: list[bytes] = []
+            async for chunk in communicate.stream():
+                if chunk.get("type") == "audio" and chunk.get("data"):
+                    audio_chunks.append(chunk["data"])
+
+            if audio_chunks:
+                mp3_bytes = b"".join(audio_chunks)
+                decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
+                pcm_raw = decoded.samples.tobytes()
+
+                chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
+                total_len = len(pcm_raw)
+                logger.info(
+                    "[TTS] Successfully decoded %d neural PCM bytes (~%.1fs audio)",
+                    total_len,
+                    total_len / (cls.SAMPLE_RATE * cls.BYTES_PER_SAMPLE),
+                )
+
+                for offset in range(0, total_len, chunk_size):
+                    chunk_bytes = pcm_raw[offset : offset + chunk_size]
+                    if realtime_delay:
+                        await asyncio.sleep(chunk_duration_ms / 1000)
+                    yield chunk_bytes
+                return
+        except Exception as exc:
+            logger.warning("[TTS] edge-tts neural synthesis fallback triggered: %s", exc)
+
+        # Fallback acoustic carrier synthesis if external neural engine is offline
+        words = clean_text.split()
         est_duration_sec = max(0.5, len(words) / 2.5)
         num_chunks = max(1, int(est_duration_sec * (1000 / chunk_duration_ms)))
-
         samples_per_chunk = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000))
-        freq = 440.0  # 440 Hz standard acoustic carrier tone
+        freq = 320.0
 
         for i in range(num_chunks):
-            # Synthesize 100ms of audio (gentle sine wave modulated by amplitude envelope)
             start_sample = i * samples_per_chunk
             raw_samples: list[int] = []
             for j in range(samples_per_chunk):
                 sample_idx = start_sample + j
                 t = sample_idx / cls.SAMPLE_RATE
-                # Modulated audible speech-like envelope
                 envelope = 0.5 * (1.0 + math.sin(2 * math.pi * 3.0 * t))
-                val = int(envelope * 8000.0 * math.sin(2 * math.pi * freq * t))
+                val = int(envelope * 6000.0 * math.sin(2 * math.pi * freq * t))
                 val = max(-32767, min(32767, val))
                 raw_samples.append(val)
 
             chunk_bytes = struct.pack(f"<{samples_per_chunk}h", *raw_samples)
-
             if realtime_delay:
                 await asyncio.sleep(chunk_duration_ms / 1000)
-
             yield chunk_bytes
 
     @classmethod

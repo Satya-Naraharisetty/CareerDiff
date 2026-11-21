@@ -61,38 +61,54 @@ def build_live_system_instruction(interview: Interview, voice_name: str = "Puck"
     company = "GlobalFinTech Corp"
     if isinstance(policy, dict) and policy.get("target_company"):
         company = policy["target_company"]
-    elif getattr(interview, "role", None) and getattr(interview.role, "name", None):
-        company = interview.role.name
+    else:
+        try:
+            role = getattr(interview, "role", None)
+            if role and getattr(role, "name", None):
+                company = role.name
+        except Exception:
+            pass
 
     candidate_name = "Candidate"
-    if getattr(interview, "candidate_profile", None) and interview.candidate_profile.user:
-        candidate_name = interview.candidate_profile.user.full_name or "Candidate"
+    try:
+        profile = getattr(interview, "candidate_profile", None)
+        if profile and getattr(profile, "user", None):
+            candidate_name = profile.user.full_name or "Candidate"
+    except Exception:
+        pass
 
     persona = VOICE_PERSONAS.get(voice_name, VOICE_PERSONAS["Puck"])
     interviewer_name = persona["interviewer_name"]
     interviewer_style = persona["style"]
 
     topics_summary = ""
-    blueprint = getattr(interview, "blueprint", None)
-    if blueprint is not None and getattr(blueprint, "topics", None):
-        topic_lines = [
-            f"- {t.topic_name} (Allocated: {getattr(t, 'allocated_seconds', 0) // 60} min)"
-            for t in blueprint.topics
-        ]
-        topics_summary = "\n".join(topic_lines)
+    try:
+        blueprint = getattr(interview, "blueprint", None)
+        if blueprint is not None and getattr(blueprint, "topics", None):
+            topic_lines = [
+                f"- {t.topic_name} (Allocated: {getattr(t, 'allocated_seconds', 0) // 60} min)"
+                for t in blueprint.topics
+            ]
+            topics_summary = "\n".join(topic_lines)
+    except Exception:
+        pass
 
     claims_summary = ""
-    if getattr(interview, "candidate_profile", None) and getattr(interview.candidate_profile, "resumes", None):
-        all_claims = []
-        for r in interview.candidate_profile.resumes:
-            if getattr(r, "claims", None):
-                all_claims.extend(r.claims)
-        if all_claims:
-            claim_lines = [
-                f"- Claimed: {c.claim_text} ({', '.join(c.technologies) if getattr(c, 'technologies', None) else ''})"
-                for c in all_claims[:5]
-            ]
-            claims_summary = "\n".join(claim_lines)
+    try:
+        profile = getattr(interview, "candidate_profile", None)
+        if profile and getattr(profile, "resumes", None):
+            all_claims = []
+            for r in profile.resumes:
+                if getattr(r, "claims", None):
+                    all_claims.extend(r.claims)
+            if all_claims:
+                claim_lines = [
+                    f"- Claimed: {c.claim_text} ({', '.join(c.technologies) if getattr(c, 'technologies', None) else ''})"
+                    for c in all_claims[:5]
+                ]
+                claims_summary = "\n".join(claim_lines)
+    except Exception:
+        pass
 
     return (
         f"You are {interviewer_name}, Lead Technical Interviewer at {company}, conducting an interactive, live {seniority} engineering interview "
@@ -138,6 +154,16 @@ class GeminiLiveBridge:
         cand_voice = voice_name or policy_voice or self.settings.gemini_live_voice or "Puck"
         resolved_voice = VOICE_FALLBACK_MAP.get(cand_voice, cand_voice if cand_voice in SUPPORTED_VOICES else "Puck")
         self.voice_name = resolved_voice
+        logger.info(
+            "Created GeminiLiveBridge for interview %s (persona voice: %s)",
+            getattr(interview, "id", "unknown"),
+            self.voice_name,
+        )
+
+    @property
+    def is_active(self) -> bool:
+        """Return True if Gemini Live WebSocket session is active and healthy."""
+        return self._active and self._session is not None
 
     async def connect(self) -> AsyncGenerator[GeminiLiveEvent, None]:
         """Establish Gemini Live WebSocket connection and yield live events continuously."""
@@ -206,23 +232,38 @@ class GeminiLiveBridge:
 
                 # 1. Native Interruption / Barge-In
                 if getattr(server_content, "interrupted", False):
+                    logger.info("Gemini Live: Native barge-in detected (interviewer interrupted)")
                     self._output_transcript_buffer.clear()
                     yield GeminiLiveEvent(event_type="interrupted")
                     continue
 
                 # 2. Live Candidate Speech Transcription (Input Audio Transcription)
-                if server_content.input_transcription and server_content.input_transcription.text:
-                    input_text = server_content.input_transcription.text
-                    self._input_transcript_buffer.append(input_text)
+                interim = getattr(server_content, "interim_input_transcription", None)
+                if interim and getattr(interim, "text", None):
+                    interim_text = interim.text
+                    full_interim = "".join(self._input_transcript_buffer) + interim_text
+                    logger.info("[GEMINI LIVE] Candidate Interim Transcript: '%s'", full_interim)
                     yield GeminiLiveEvent(
                         event_type="input_transcript",
-                        text="".join(self._input_transcript_buffer),
+                        text=full_interim,
+                    )
+
+                final_in = getattr(server_content, "input_transcription", None)
+                if final_in and getattr(final_in, "text", None):
+                    input_text = final_in.text
+                    self._input_transcript_buffer.append(input_text)
+                    full_in = "".join(self._input_transcript_buffer)
+                    logger.info("[GEMINI LIVE] Candidate Finalized Transcript: '%s'", full_in)
+                    yield GeminiLiveEvent(
+                        event_type="input_transcript",
+                        text=full_in,
                     )
 
                 # 3. Live Interviewer Audio & Transcription Output
                 if server_content.output_transcription and server_content.output_transcription.text:
                     out_text = server_content.output_transcription.text
                     self._output_transcript_buffer.append(out_text)
+                    logger.info("Gemini Live [Interviewer Speaking]: %s", out_text)
                     yield GeminiLiveEvent(
                         event_type="output_transcript",
                         text="".join(self._output_transcript_buffer),
@@ -239,6 +280,7 @@ class GeminiLiveBridge:
                 # 4. Turn Completion
                 if getattr(server_content, "turn_complete", False):
                     full_output = "".join(self._output_transcript_buffer).strip()
+                    logger.info("Gemini Live: Turn completed. Response: '%s'", full_output)
                     self._input_transcript_buffer.clear()
                     self._output_transcript_buffer.clear()
                     yield GeminiLiveEvent(

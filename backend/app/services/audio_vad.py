@@ -27,7 +27,7 @@ class AudioVadProcessor:
     # Silence threshold: 1,200 ms of trailing silence = 24 consecutive 50ms frames
     TRAILING_SILENCE_FRAMES_REQUIRED: int = 24
     MIN_SPEECH_FRAMES_REQUIRED: int = 4  # At least 200ms of speech before finalization
-    DEFAULT_ENERGY_THRESHOLD_RMS: float = 350.0
+    DEFAULT_ENERGY_THRESHOLD_RMS: float = 180.0
 
     def __init__(self, energy_threshold_rms: float = DEFAULT_ENERGY_THRESHOLD_RMS) -> None:
         self.energy_threshold_rms = energy_threshold_rms

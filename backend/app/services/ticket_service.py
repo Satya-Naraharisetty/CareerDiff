@@ -1,10 +1,13 @@
 """Ephemeral single-use ticket management for WebSocket authentication via Redis GETDEL."""
 
 import json
+import logging
 import uuid
 from typing import Any
 
 import redis.asyncio as aioredis
+
+logger = logging.getLogger("CareerDiff.ticket")
 
 
 class TicketService:
@@ -29,6 +32,7 @@ class TicketService:
             "user_id": str(user_id),
         }
         await redis.set(key, json.dumps(payload), ex=ttl_seconds)
+        logger.info("Stored single-use ticket in Redis for interview %s (user %s, TTL %ds)", interview_id, user_id, ttl_seconds)
         return ticket_id
 
     @classmethod
@@ -43,12 +47,19 @@ class TicketService:
         # Atomically retrieve and delete in a single operation
         raw_val = await redis.getdel(key)
         if not raw_val:
+            logger.warning("Ticket validation failed: ticket key %s not found in Redis (expired or already consumed)", key)
             return None
 
         try:
             data: dict[str, Any] = json.loads(raw_val)
             if data.get("interview_id") != str(expected_interview_id):
+                logger.warning(
+                    "Ticket validation failed: interview mismatch (expected: %s, actual: %s)",
+                    expected_interview_id,
+                    data.get("interview_id"),
+                )
                 return None
+            logger.info("Successfully validated and atomically consumed ticket for interview %s", expected_interview_id)
             return data
         except (json.JSONDecodeError, TypeError):
             return None

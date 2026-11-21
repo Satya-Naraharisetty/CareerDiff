@@ -173,6 +173,15 @@ async def create_interview(
             detail="Job role not found or inactive",
         )
 
+    logger.info(
+        "Creating interview: role='%s' (%s), seniority=%s, duration=%dmin, mode=%s, user=%s",
+        role.name,
+        role.id,
+        payload.target_seniority,
+        payload.duration_minutes,
+        payload.mode,
+        current_user.id,
+    )
     # 2. Retrieve or create candidate profile for current user
     stmt_profile = select(CandidateProfile).where(CandidateProfile.user_id == current_user.id)
     profile = (await db.execute(stmt_profile)).scalar_one_or_none()
@@ -235,6 +244,11 @@ async def create_interview(
         topics=topic_reads,
     )
 
+    logger.info(
+        "Successfully created interview %s with %d scheduled blueprint topics",
+        interview.id,
+        len(loaded_bp.topics),
+    )
     return InterviewCreateResponse(
         interview_id=interview.id,
         state=interview.state,
@@ -512,7 +526,7 @@ async def start_interview(
             detail=f"Interview '{interview_id}' not found.",
         )
     await assert_interview_owner(interview, current_user, db)
-
+    logger.info("HTTP POST /start for interview %s (user: %s)", interview_id, current_user.id)
     turn = await TurnService.start_interview(db, interview_id)
     return InterviewTurnRead.model_validate(turn)
 
@@ -541,7 +555,13 @@ async def submit_turn(
             detail=f"Interview '{interview_id}' not found.",
         )
     await assert_interview_owner(interview, current_user, db)
-
+    logger.info(
+        "HTTP POST /turns for interview %s (duration_ms: %d, length: %d chars, user: %s)",
+        interview_id,
+        payload.duration_ms,
+        len(payload.transcript),
+        current_user.id,
+    )
     return await TurnService.process_candidate_turn(db, interview_id, payload)
 
 
@@ -603,6 +623,7 @@ async def create_ws_ticket(
         interview_id=interview_id,
         user_id=current_user.id,
     )
+    logger.info("Issued WebSocket ticket token for interview %s to user %s (60s TTL)", interview_id, current_user.id)
     ws_url = f"/ws/v1/interviews/{interview_id}?ticket={ticket}"
     return WsTicketResponse(
         ticket=ticket,

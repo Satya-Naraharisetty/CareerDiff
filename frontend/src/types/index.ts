@@ -412,6 +412,10 @@ export type WsServerMessage =
     cutoff_timestamp_ms: number;
   }
   | {
+    type: 'interviewer_audio_done';
+    turn_index: number;
+  }
+  | {
     type: 'state_change';
     previous_state: string;
     new_state: string;

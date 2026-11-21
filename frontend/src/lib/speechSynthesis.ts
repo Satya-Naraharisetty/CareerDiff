@@ -75,23 +75,24 @@ export class BrowserSpeechSynthesizer {
       if (matchedSaved) return matchedSaved;
     }
 
-    // 2. High-Fidelity Neural / Natural voices (Edge Natural & Chrome Google Neural)
+    // 2. High-Fidelity Neural / Natural voices (ElevenLabs / Edge Natural & Chrome Google Neural)
     const neuralPriorityNames = [
       'natural',
       'neural',
       'online (natural)',
+      'andrew online',
+      'brian online',
+      'ava online',
+      'emma online',
       'google us english',
       'google uk english female',
       'microsoft jenny',
       'microsoft guy',
       'microsoft aria',
       'microsoft christopher',
-      'microsoft michelle',
-      'microsoft eric',
       'samantha (enhanced)',
       'ava (premium)',
       'serena',
-      'zira',
     ];
 
     for (const needle of neuralPriorityNames) {
@@ -99,7 +100,9 @@ export class BrowserSpeechSynthesizer {
         (v) =>
           v.lang.toLowerCase().startsWith('en') &&
           v.name.toLowerCase().includes(needle) &&
-          !v.name.toLowerCase().includes('desktop')
+          !v.name.toLowerCase().includes('desktop') &&
+          !v.name.toLowerCase().includes('zira') &&
+          !v.name.toLowerCase().includes('david')
       );
       if (match) return match;
     }
@@ -109,8 +112,10 @@ export class BrowserSpeechSynthesizer {
       (v) =>
         v.lang.toLowerCase().startsWith('en') &&
         !v.name.toLowerCase().includes('desktop') &&
+        !v.name.toLowerCase().includes('zira') &&
         !v.name.toLowerCase().includes('david') &&
-        !v.name.toLowerCase().includes('mark')
+        !v.name.toLowerCase().includes('mark') &&
+        !v.name.toLowerCase().includes('espeak')
     );
     if (nonRoboticEn) return nonRoboticEn;
 

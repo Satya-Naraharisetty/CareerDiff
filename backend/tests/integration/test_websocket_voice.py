@@ -79,11 +79,14 @@ def generate_pcm_frame(amplitude: int = 0, num_samples: int = 800) -> bytes:
     return struct.pack(f"<{num_samples}h", *samples)
 
 
-def receive_json_message(ws: Any) -> dict[str, Any]:
-    """Helper receiving WebSocket messages while ignoring interleaved binary audio chunks."""
+def receive_json_message(ws: Any, bytes_collector: list[bytes] | None = None) -> dict[str, Any]:
+    """Helper receiving WebSocket messages while collecting interleaved binary audio chunks."""
     while True:
         raw = ws.receive()
-        if "text" in raw and raw["text"]:
+        if "bytes" in raw and raw["bytes"]:
+            if bytes_collector is not None:
+                bytes_collector.append(raw["bytes"])
+        elif "text" in raw and raw["text"]:
             result: dict[str, Any] = json.loads(raw["text"])
             return result
 
@@ -115,24 +118,27 @@ async def test_websocket_successful_handshake_and_warmup(async_client: AsyncClie
 
     client = TestClient(app)
     with client.websocket_connect(f"/ws/v1/interviews/{interview_id}?ticket={ticket}") as ws:
+        collected_chunks: list[bytes] = []
         # 1. Server emits session_ready
-        ready_msg = receive_json_message(ws)
+        ready_msg = receive_json_message(ws, collected_chunks)
         assert ready_msg["type"] == "session_ready"
         assert ready_msg["interview_id"] == str(interview_id)
 
         # 2. Server transitions CREATED -> WARMUP and emits Turn 0
-        state_msg = receive_json_message(ws)
+        state_msg = receive_json_message(ws, collected_chunks)
         assert state_msg["type"] == "state_change"
         assert state_msg["new_state"] == "WARMUP"
 
-        speaking_msg = receive_json_message(ws)
+        speaking_msg = receive_json_message(ws, collected_chunks)
         assert speaking_msg["type"] == "interviewer_speaking"
         assert speaking_msg["turn_index"] == 0
         assert speaking_msg["action"] == "WARMUP"
 
         # 3. Server streams binary PCM audio frames for Turn 0
-        binary_chunk = ws.receive_bytes()
-        assert len(binary_chunk) > 0
+        if not collected_chunks:
+            collected_chunks.append(ws.receive_bytes())
+        assert len(collected_chunks) > 0
+        assert len(collected_chunks[0]) > 0
 
 
 @pytest.mark.asyncio

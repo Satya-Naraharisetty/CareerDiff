@@ -62,9 +62,28 @@ export class PcmPlayer {
   private activeSources: AudioBufferSourceNode[] = [];
   private sampleRate: number;
   private inputNode: AudioNode | null = null;
+  public onAllEnded: (() => void) | null = null;
 
   constructor(sampleRate: number = 24000) {
     this.sampleRate = sampleRate;
+
+    // Autoplay Policy Unlock: Chrome requires user interaction to resume AudioContext
+    if (typeof window !== 'undefined') {
+      const unlock = () => {
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(() => {});
+        }
+      };
+      ['click', 'keydown', 'touchstart', 'pointerdown'].forEach((evt) => {
+        window.addEventListener(evt, unlock, { once: false, passive: true });
+      });
+    }
+  }
+
+  public async resume(): Promise<void> {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      await this.audioCtx.resume().catch(() => {});
+    }
   }
 
   setSampleRate(rate: number): void {
@@ -165,7 +184,14 @@ export class PcmPlayer {
       if (idx !== -1) {
         this.activeSources.splice(idx, 1);
       }
+      if (this.activeSources.length === 0 && this.onAllEnded) {
+        this.onAllEnded();
+      }
     };
+  }
+
+  activeSourcesCount(): number {
+    return this.activeSources.length;
   }
 
   /**

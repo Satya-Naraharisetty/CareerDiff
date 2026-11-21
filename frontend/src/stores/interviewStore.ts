@@ -30,6 +30,9 @@ interface InterviewStoreState {
   remainingSeconds: number;
   preferredLanguage: string;
   error: string | null;
+  isMicMuted: boolean;
+  isCameraOn: boolean;
+  isVoiceMuted: boolean;
 
   setInterview: (
     id: string,
@@ -40,6 +43,9 @@ interface InterviewStoreState {
     preferredLanguage?: string
   ) => void;
   setMode: (mode: InterviewMode) => void;
+  toggleMic: () => void;
+  toggleCamera: () => void;
+  toggleVoiceMute: () => void;
   loadTurns: (interviewId: string) => Promise<void>;
   startInterview: () => Promise<void>;
   submitTextTurn: (text: string, codeSnippet?: string) => Promise<void>;
@@ -77,6 +83,26 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   remainingSeconds: 1800,
   preferredLanguage: 'Python',
   error: null,
+  isMicMuted: false,
+  isCameraOn: true,
+  isVoiceMuted: false,
+
+  toggleMic: () => {
+    const next = !get().isMicMuted;
+    set({ isMicMuted: next, audioLevel: next ? 0 : get().audioLevel });
+  },
+
+  toggleCamera: () => {
+    set((s) => ({ isCameraOn: !s.isCameraOn }));
+  },
+
+  toggleVoiceMute: () => {
+    const next = !get().isVoiceMuted;
+    if (next && pcmPlayer) {
+      pcmPlayer.stopAll();
+    }
+    set({ isVoiceMuted: next });
+  },
 
   setInterview: (id, state, mode, seniority, blueprint, preferredLanguage) => {
     try {
@@ -223,12 +249,18 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       }
 
       pcmPlayer = new PcmPlayer();
+      pcmPlayer.onAllEnded = () => {
+        set({ isInterviewerSpeaking: false });
+        if (get().mode === 'VOICE' && !get().isRecording) {
+          get().startVoiceRecording().catch(() => {});
+        }
+      };
       const ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
       activeWs = ws;
 
       ws.onopen = () => {
-        set({ wsStatus: 'connected' });
+        set({ wsStatus: 'connected', error: null });
         // Race-condition prevention: If interviewer is already done speaking and candidate mic is not active, auto-start
         const { isInterviewerSpeaking, isRecording, turns, mode } = get();
         if (
@@ -245,7 +277,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       ws.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
           // Play server binary PCM audio (from Gemini Live 24kHz or server TTS)
-          if (pcmPlayer) {
+          if (pcmPlayer && !get().isVoiceMuted) {
             set({ isInterviewerSpeaking: true });
             pcmPlayer.feed(event.data);
           }
@@ -258,9 +290,27 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                   state: msg.state as InterviewState,
                   remainingSeconds: msg.remaining_seconds,
                 });
+                if (countdownTimer) clearInterval(countdownTimer);
+                countdownTimer = window.setInterval(() => {
+                  set((s) => ({
+                    remainingSeconds: Math.max(0, s.remainingSeconds - 1),
+                  }));
+                }, 1000);
+                break;
+              case 'interviewer_audio_done':
+                setTimeout(() => {
+                  if (pcmPlayer && pcmPlayer.activeSourcesCount() === 0) {
+                    set({ isInterviewerSpeaking: false });
+                    if (get().mode === 'VOICE' && !get().isRecording) {
+                      get().startVoiceRecording().catch(() => {});
+                    }
+                  }
+                }, 350);
                 break;
               case 'transcript_partial':
-                set({ partialTranscript: msg.text });
+                if (!get().partialTranscript || msg.text.length > get().partialTranscript.length) {
+                  set({ partialTranscript: msg.text });
+                }
                 break;
               case 'transcript_final':
                 set((s) => ({
@@ -343,8 +393,24 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   },
 
   startVoiceRecording: async () => {
-    // Candidate begins speaking -> trigger instant barge-in if interviewer is speaking
-    get().bargeIn();
+    if (get().isRecording) return;
+
+    // If interviewer is speaking, cut off playback immediately
+    if (get().isInterviewerSpeaking) {
+      BrowserSpeechSynthesizer.stop();
+      if (pcmPlayer) {
+        pcmPlayer.stopAll();
+      }
+      set({ isInterviewerSpeaking: false });
+      if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+        activeWs.send(
+          JSON.stringify({
+            type: 'speech_started',
+            client_timestamp_ms: Date.now(),
+          })
+        );
+      }
+    }
 
     try {
       // 1. Initialize PCM Recorder for raw audio streaming & volume metering (if mic permission is granted)
@@ -355,12 +421,12 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
         await pcmRecorder.start(
           (chunk) => {
-            if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            if (activeWs && activeWs.readyState === WebSocket.OPEN && !get().isMicMuted) {
               activeWs.send(chunk);
             }
           },
           (level) => {
-            set({ audioLevel: level });
+            set({ audioLevel: get().isMicMuted ? 0 : level });
           }
         );
       } catch (audioErr) {
@@ -374,16 +440,24 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
       speechRecognizer.start(
         (liveTranscript) => {
-          set({ partialTranscript: liveTranscript });
+          if (!get().isMicMuted) {
+            set({ partialTranscript: liveTranscript });
+          }
         },
         undefined,
         () => {
-          // Automatic 2.2s silence detection -> hands-free auto-commit candidate turn
-          get().stopVoiceRecording();
+          // Automatic 2.2s silence detection -> hands-free auto-commit candidate turn (only if not muted)
+          if (!get().isMicMuted) {
+            get().stopVoiceRecording();
+          }
         },
         (errorMsg) => {
-          set({ error: errorMsg });
-        }
+          // Only show fatal permission errors in banner, not transient background status
+          if (!errorMsg.includes('no-speech') && !errorMsg.includes('aborted')) {
+            set({ error: errorMsg });
+          }
+        },
+        () => get().isMicMuted
       );
 
       set({ isRecording: true, error: null });
@@ -422,7 +496,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         console.warn('Fallback turn submission failed:', err);
       });
     }
-    set({ isRecording: false, audioLevel: 0, partialTranscript: '' });
+    set({ isRecording: false, audioLevel: 0 });
   },
 
   bargeIn: () => {

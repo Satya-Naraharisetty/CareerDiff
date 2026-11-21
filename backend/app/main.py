@@ -15,14 +15,15 @@ from app.api.v1.endpoints.websocket import router as ws_router
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
 from app.core.database import async_session_factory, engine
+from app.core.logging_config import setup_logging
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.security import SecurityHeadersMiddleware
 from app.core.tracing import CorrelationIdMiddleware
 from app.services.outbox_poller import OutboxPoller
 
 settings = get_settings()
-logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
-logger = logging.getLogger("CareerDiff")
+setup_logging()
+logger = logging.getLogger("CareerDiff.main")
 
 
 async def run_outbox_loop(poll_interval_seconds: int = 15) -> None:
