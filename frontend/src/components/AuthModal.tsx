@@ -80,11 +80,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         googleBtnContainerRef.current.innerHTML = '';
         window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
           type: 'standard',
-          theme: 'filled_black',
+          theme: 'outline',
           size: 'large',
-          text: tab === 'register' ? 'signup_with' : 'signin_with',
+          text: tab === 'register' ? 'signup_with' : 'continue_with',
           shape: 'rectangular',
-          logo_alignment: 'left',
+          logo_alignment: 'center',
           width: buttonWidth,
         });
       } catch (err) {
@@ -445,21 +445,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
             {/* OAuth Quick Sign-In (Google & GitHub) */}
             <div className="space-y-2.5 mb-4">
-              <div
-                ref={googleBtnContainerRef}
-                className="w-full flex items-center justify-center min-h-[44px] overflow-hidden rounded-lg [&>div]:!bg-transparent [&>div]:!border-none [&>div]:!shadow-none [&>div]:w-full [&>div]:flex [&>div]:justify-center [&_iframe]:!bg-transparent [&_iframe]:!rounded-lg"
-              >
+              <div className="group relative w-full overflow-hidden rounded-lg">
                 <button
                   type="button"
                   onClick={() => {
-                    if (!GOOGLE_CLIENT_ID) {
+                    if (window.google?.accounts?.id) {
+                      window.google.accounts.id.prompt();
+                    } else if (!GOOGLE_CLIENT_ID) {
                       alert(
                         'Google OAuth is configured and verified in the backend! To enable browser Google One-Tap, set VITE_GOOGLE_CLIENT_ID in frontend/.env.'
                       );
                     }
                   }}
                   disabled={isLoading || googleLoading || githubLoading}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950 hover:bg-zinc-800/80 hover:border-zinc-700 py-2.5 px-4 text-xs font-semibold text-zinc-200 hover:text-white transition-all shadow-sm active:scale-[0.99] disabled:opacity-50 font-sans"
+                  className="w-full flex items-center justify-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950 group-hover:bg-zinc-800/80 group-hover:border-zinc-700 py-2.5 px-4 text-xs font-semibold text-zinc-200 group-hover:text-white transition-all shadow-sm group-active:scale-[0.99] disabled:opacity-50 font-sans"
                 >
                   {googleLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
@@ -487,6 +486,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                     {tab === 'register' ? 'Sign up with Google' : 'Continue with Google'}
                   </span>
                 </button>
+
+                {/* Google GSI hidden overlay: receives user clicks and triggers Google authentication */}
+                <div
+                  ref={googleBtnContainerRef}
+                  className={`absolute inset-0 opacity-[0.0001] z-10 cursor-pointer overflow-hidden flex items-center justify-center [&>div]:!w-full [&>div]:!h-full [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:!scale-[1.25] [&_iframe]:!cursor-pointer ${
+                    isLoading || googleLoading || githubLoading ? 'pointer-events-none' : ''
+                  }`}
+                />
               </div>
 
               {/* GitHub OAuth Quick Sign-In */}
