@@ -4,7 +4,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def _load_env_file(env_path: Path) -> None:
@@ -80,7 +80,12 @@ class Settings(BaseModel):
     )
     jwt_algorithm: str = Field(default_factory=lambda: os.getenv("JWT_ALGORITHM", "HS256"))
     jwt_access_token_expire_minutes: int = Field(
-        default_factory=lambda: int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
+        default_factory=lambda: int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    )
+    enable_docs: bool = Field(
+        default_factory=lambda: os.getenv("ENABLE_DOCS", "false").lower() in ("1", "true", "yes")
+        if os.getenv("ENVIRONMENT") == "production"
+        else True
     )
     google_client_id: str | None = Field(
         default_factory=lambda: os.getenv("GOOGLE_CLIENT_ID") or None
@@ -105,6 +110,19 @@ class Settings(BaseModel):
     elevenlabs_api_key: str | None = Field(
         default_factory=lambda: os.getenv("ELEVENLABS_API_KEY") or None
     )
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        """Enforce strict cryptographic and configuration security standards in production."""
+        if self.environment.lower() == "production":
+            insecure_secret = "insecure_dev_secret_change_in_production_key_32bytes"
+            if self.jwt_secret_key == insecure_secret or len(self.jwt_secret_key) < 32:
+                raise ValueError(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: In 'production' environment, "
+                    "JWT_SECRET_KEY must be explicitly set with a high-entropy secret "
+                    "of at least 32 characters (256-bit entropy)."
+                )
+        return self
 
 
 @lru_cache(maxsize=1)

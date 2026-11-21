@@ -17,7 +17,9 @@ from app.core.security import (
     verify_google_id_token,
     verify_password,
 )
+from app.models.resume import Resume
 from app.models.user import CandidateProfile, User
+from app.services.storage import delete_resume_document
 from app.schemas.auth import (
     AccountDeletionRequest,
     AccountDeletionResponse,
@@ -410,6 +412,18 @@ async def delete_current_user_account(
                 detail="INVALID_CURRENT_PASSWORD",
             )
 
+    # 1. Permanently delete all associated physical resume files from disk/S3 (GDPR Right to Erasure)
+    stmt_resumes = (
+        select(Resume)
+        .join(CandidateProfile, Resume.candidate_profile_id == CandidateProfile.id)
+        .where(CandidateProfile.user_id == current_user.id)
+    )
+    user_resumes = (await db.execute(stmt_resumes)).scalars().all()
+    for res in user_resumes:
+        if res.s3_key:
+            delete_resume_document(res.s3_key)
+
+    # 2. Delete user and cascade database records
     await db.delete(current_user)
     await db.commit()
 

@@ -73,6 +73,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           },
         });
 
+        const containerWidth = googleBtnContainerRef.current?.offsetWidth || 384;
+        const buttonWidth = Math.min(Math.max(containerWidth, 200), 400);
+
         googleBtnContainerRef.current.innerHTML = '';
         window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
           type: 'standard',
@@ -80,7 +83,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           size: 'large',
           text: tab === 'register' ? 'signup_with' : 'signin_with',
           shape: 'rectangular',
-          width: 380,
+          logo_alignment: 'left',
+          width: buttonWidth,
         });
       } catch (err) {
         console.warn('Google GSI initialization notice:', err);
@@ -396,7 +400,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             <div className="space-y-3 mb-4">
               <div
                 ref={googleBtnContainerRef}
-                className="flex items-center justify-center min-h-[40px] [&>div]:w-full"
+                className="w-full flex items-center justify-center min-h-[44px] overflow-hidden rounded-lg [&>div]:!bg-transparent [&>div]:!border-none [&>div]:!shadow-none [&>div]:w-full [&>div]:flex [&>div]:justify-center [&_iframe]:!bg-transparent [&_iframe]:!rounded-lg"
               >
                 <button
                   type="button"

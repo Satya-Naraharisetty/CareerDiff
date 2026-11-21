@@ -26,3 +26,4 @@ dist/
 .env
 storage/
 .superpowers/
+brag-output/

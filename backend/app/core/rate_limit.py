@@ -9,7 +9,29 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.redis import get_redis_client
+from app.core.security import get_client_ip
+
 logger = logging.getLogger("CareerDiff.rate_limit")
+
+
+async def check_redis_rate_limit(
+    redis_client: Any,
+    identifier: str,
+    capacity: int = 60,
+    window_seconds: int = 60,
+) -> tuple[bool, int, float]:
+    """Atomic fixed-window rate limiter via Redis INCR and EXPIRE."""
+    key = f"rl:{identifier}"
+    current = await redis_client.incr(key)
+    if current == 1:
+        await redis_client.expire(key, window_seconds)
+    ttl = await redis_client.ttl(key)
+    retry_after = float(max(1, ttl))
+    if current > capacity:
+        return False, 0, retry_after
+    remaining = max(0, capacity - current)
+    return True, remaining, 0.0
 
 
 class TokenBucket:
@@ -92,7 +114,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             or path.startswith("/api/v1/health")
             or path.startswith("/docs")
             or path.startswith("/redoc")
-            or request.headers.get("X-Bypass-Rate-Limit") == "1"
         ):
             return await call_next(request)  # type: ignore[no-any-return]
 
@@ -101,9 +122,30 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if auth_header and auth_header.startswith("Bearer "):
             identifier = f"token:{auth_header[7:27]}"
         else:
-            identifier = f"ip:{request.client.host if request.client else 'unknown'}"
+            identifier = f"ip:{get_client_ip(request)}"
 
-        allowed, remaining, retry_after = self.limiter.check(identifier)
+        allowed = True
+        remaining = self.limiter.capacity
+        retry_after = 0.0
+
+        # Attempt distributed Redis rate limiting first if available
+        redis_checked = False
+        try:
+            redis_client = get_redis_client()
+            try:
+                allowed, remaining, retry_after = await check_redis_rate_limit(
+                    redis_client=redis_client,
+                    identifier=identifier,
+                    capacity=self.limiter.capacity,
+                )
+                redis_checked = True
+            finally:
+                await redis_client.aclose()
+        except Exception:
+            redis_checked = False
+
+        if not redis_checked:
+            allowed, remaining, retry_after = self.limiter.check(identifier)
 
         if not allowed:
             logger.warning(

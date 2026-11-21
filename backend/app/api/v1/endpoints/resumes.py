@@ -40,6 +40,35 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_EXTENSIONS = (".pdf", ".docx", ".txt")
 
 
+def validate_uploaded_document_content(content: bytes, filename: str) -> None:
+    """Inspect file binary signatures and magic bytes to prevent disguised executable/script uploads."""
+    lower_fn = filename.lower()
+    # Check for executable signatures (Windows PE 'MZ', Linux ELF, Mach-O)
+    if content.startswith(b"MZ") or content.startswith(b"\x7fELF") or content.startswith(b"\xca\xfe\xba\xbe"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Disguised executable binaries are strictly forbidden.",
+        )
+    if content.startswith(b"<!DOCTYPE html") or content.startswith(b"<html") or content.startswith(b"<script"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="HTML and script documents are not permitted as resume uploads.",
+        )
+
+    if lower_fn.endswith(".pdf"):
+        if not content.startswith(b"%PDF-"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Invalid PDF structure: file does not begin with standard PDF header '%PDF-'.",
+            )
+    elif lower_fn.endswith(".docx"):
+        if not content.startswith(b"PK\x03\x04"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Invalid DOCX structure: missing standard zip archive signature.",
+            )
+
+
 async def _find_recommended_role(
     discipline: str,
     db: AsyncSession,
@@ -93,6 +122,9 @@ async def upload_resume(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="File size exceeds the 10 MB limit.",
         )
+
+    # Validate file magic bytes and binary signatures
+    validate_uploaded_document_content(content, filename)
 
     # 3. Retrieve or create candidate profile for current user
     stmt = select(CandidateProfile).where(CandidateProfile.user_id == current_user.id)
@@ -382,6 +414,7 @@ async def get_resume_by_id(
 )
 async def rewrite_resume(
     payload: ResumeRewriteRequest,
+    current_user: User = Depends(get_current_user),
 ) -> ResumeRewriteResponse:
     """Analyze resume against target JD, compute ATS score first, generate fact-grounded rewrites, and render Overleaf LaTeX."""
     return rewrite_resume_for_jd(
@@ -400,6 +433,7 @@ async def rewrite_resume(
 )
 async def render_latex_endpoint(
     payload: RenderLatexRequest,
+    current_user: User = Depends(get_current_user),
 ) -> RenderLatexResponse:
     """Render ready-to-compile LaTeX source code for a structured resume profile and template style."""
     latex = generate_latex_resume(payload.profile, template_style=payload.template_style)

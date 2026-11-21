@@ -34,3 +34,13 @@ def get_resume_document(storage_key: str) -> bytes | None:
     if local_path.is_file():
         return local_path.read_bytes()
     return None
+
+
+def delete_resume_document(storage_key: str) -> bool:
+    """Permanently delete stored resume document from disk (GDPR Article 17 Right to Erasure)."""
+    basename = Path(storage_key).name
+    local_path = UPLOAD_DIR / basename
+    if local_path.is_file():
+        local_path.unlink()
+        return True
+    return False

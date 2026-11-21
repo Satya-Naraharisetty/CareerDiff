@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
@@ -15,6 +16,9 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.core.database import get_db
@@ -240,3 +244,96 @@ def verify_google_id_token(token: str, client_id: str | None = None) -> dict[str
             detail=f"GOOGLE_AUTH_ERROR: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP address safely, respecting reverse-proxy headers if present."""
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip:
+        return x_real_ip.strip()
+
+    x_forwarded = request.headers.get("X-Forwarded-For")
+    if x_forwarded:
+        return x_forwarded.split(",")[0].strip()
+
+    return request.client.host if request.client else "127.0.0.1"
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Enforce defense-in-depth OWASP HTTP security response headers."""
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Any],
+    ) -> Response:
+        response: Response = await call_next(request)
+
+        # 1. Prevent MIME-sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # 2. Prevent clickjacking / frame embedding
+        response.headers["X-Frame-Options"] = "DENY"
+
+        # 3. HTTP Strict Transport Security (HSTS)
+        if settings.environment.lower() == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+        # 4. Strict Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # 5. Content Security Policy (CSP)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "connect-src 'self' wss: ws: https:; "
+            "object-src 'none'; "
+            "frame-ancestors 'none';"
+        )
+
+        # 6. Permissions Policy
+        response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=(self)"
+
+        # 7. Cache-Control for sensitive API routes
+        path = request.url.path
+        if (
+            path.startswith("/api/v1/auth")
+            or path.startswith("/api/v1/interviews")
+            or path.startswith("/api/v1/resumes")
+        ):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+            response.headers["Pragma"] = "no-cache"
+
+        return response
+
+
+async def assert_interview_owner(
+    interview: Any,
+    current_user: User,
+    db: AsyncSession,
+) -> None:
+    """Authoritative BOLA/IDOR defense: verify that interview belongs to current_user.
+
+    Raises 404 Not Found rather than 403 Forbidden to prevent session ID enumeration.
+    """
+    if current_user.role in ("ADMIN", "RECRUITER"):
+        return
+
+    from app.models.user import CandidateProfile
+
+    stmt = select(CandidateProfile.user_id).where(CandidateProfile.id == interview.candidate_profile_id)
+    owner_user_id = (await db.execute(stmt)).scalar_one_or_none()
+
+    if owner_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview.id}' not found.",
+        )
+

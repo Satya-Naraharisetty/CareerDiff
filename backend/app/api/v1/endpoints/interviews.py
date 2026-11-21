@@ -1,5 +1,6 @@
 """Interview lifecycle, turn execution, and session planning endpoints."""
 
+import html
 import json
 import logging
 import re
@@ -16,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.redis import get_redis
-from app.core.security import get_current_user
+from app.core.security import assert_interview_owner, get_current_user
 from app.models.evaluation import (
     AssessmentReport,
     CompetencyScore,
@@ -280,8 +281,19 @@ def _build_interview_detail(interview: Interview) -> InterviewDetailResponse:
 async def _fetch_assessment_report(
     db: AsyncSession,
     interview_id: uuid.UUID,
+    current_user: User | None = None,
 ) -> AssessmentReportRead:
     """Retrieve and format completed assessment report with claims and normalized evidence."""
+    stmt_int = select(Interview).where(Interview.id == interview_id)
+    interview = (await db.execute(stmt_int)).scalar_one_or_none()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview_id}' not found.",
+        )
+    if current_user:
+        await assert_interview_owner(interview, current_user, db)
+
     stmt_rep = (
         select(AssessmentReport)
         .options(
@@ -301,13 +313,6 @@ async def _fetch_assessment_report(
     report = (await db.execute(stmt_rep)).scalars().first()
 
     if not report:
-        stmt_int = select(Interview).where(Interview.id == interview_id)
-        interview = (await db.execute(stmt_int)).scalar_one_or_none()
-        if not interview:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Interview '{interview_id}' not found.",
-            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No assessment report has been generated yet for interview '{interview_id}'.",
@@ -482,6 +487,7 @@ async def get_interview(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Interview '{interview_id}' not found.",
         )
+    await assert_interview_owner(interview, current_user, db)
 
     return _build_interview_detail(interview)
 
@@ -498,6 +504,15 @@ async def start_interview(
     db: AsyncSession = Depends(get_db),
 ) -> InterviewTurnRead:
     """Transition session to WARMUP and generate the initial greeting question."""
+    stmt = select(Interview).where(Interview.id == interview_id)
+    interview = (await db.execute(stmt)).scalar_one_or_none()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview_id}' not found.",
+        )
+    await assert_interview_owner(interview, current_user, db)
+
     turn = await TurnService.start_interview(db, interview_id)
     return InterviewTurnRead.model_validate(turn)
 
@@ -518,6 +533,15 @@ async def submit_turn(
 
     Commits turn to PostgreSQL first, evaluates policy guardrails, and returns the next question.
     """
+    stmt = select(Interview).where(Interview.id == interview_id)
+    interview = (await db.execute(stmt)).scalar_one_or_none()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview_id}' not found.",
+        )
+    await assert_interview_owner(interview, current_user, db)
+
     return await TurnService.process_candidate_turn(db, interview_id, payload)
 
 
@@ -532,6 +556,15 @@ async def get_interview_turns(
     db: AsyncSession = Depends(get_db),
 ) -> list[InterviewTurnRead]:
     """Retrieve all turns for the interview session ordered chronologically."""
+    stmt_int = select(Interview).where(Interview.id == interview_id)
+    interview = (await db.execute(stmt_int)).scalar_one_or_none()
+    if not interview:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Interview '{interview_id}' not found.",
+        )
+    await assert_interview_owner(interview, current_user, db)
+
     stmt = (
         select(InterviewTurn)
         .where(InterviewTurn.interview_id == interview_id)
@@ -555,7 +588,7 @@ async def create_ws_ticket(
     redis: aioredis.Redis = Depends(get_redis),
 ) -> WsTicketResponse:
     """Generate a single-use resumption ticket stored in Redis with 60s TTL."""
-    # Verify interview exists
+    # Verify interview exists and verify ownership
     stmt = select(Interview).where(Interview.id == interview_id)
     interview = (await db.execute(stmt)).scalar_one_or_none()
     if not interview:
@@ -563,6 +596,7 @@ async def create_ws_ticket(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Interview '{interview_id}' not found.",
         )
+    await assert_interview_owner(interview, current_user, db)
 
     ticket = await TicketService.create_ticket(
         redis=redis,
@@ -594,8 +628,10 @@ async def get_chat_interface(
             detail="Chat interface template not found.",
         )
     html_content = template_path.read_text(encoding="utf-8")
-    html_content = html_content.replace("{{interview_id}}", str(interview_id))
-    html_content = html_content.replace("{{token}}", token or "")
+    safe_id = html.escape(str(interview_id))
+    safe_token = html.escape(token or "")
+    html_content = html_content.replace("{{interview_id}}", safe_id)
+    html_content = html_content.replace("{{token}}", safe_token)
     return HTMLResponse(content=html_content)
 
 
@@ -618,6 +654,7 @@ async def trigger_interview_evaluation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Interview '{interview_id}' not found.",
         )
+    await assert_interview_owner(interview, current_user, db)
 
     report = await AssessmentEvaluator.evaluate_interview(
         db=db,
@@ -642,7 +679,7 @@ async def get_assessment_report(
     db: AsyncSession = Depends(get_db),
 ) -> AssessmentReportRead:
     """Retrieve completed evaluation report with normalized evidence citations and claim audit."""
-    return await _fetch_assessment_report(db, interview_id)
+    return await _fetch_assessment_report(db, interview_id, current_user)
 
 
 @router.post(
@@ -667,6 +704,7 @@ async def retake_interview_turn(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Interview '{interview_id}' not found.",
         )
+    await assert_interview_owner(interview, current_user, db)
 
     # 2. Locate targeted candidate turn
     candidate_turn = next(
@@ -802,6 +840,8 @@ async def get_assessment_dossier_interface(
             detail="Assessment dossier template not found.",
         )
     html_content = template_path.read_text(encoding="utf-8")
-    html_content = html_content.replace("{{interview_id}}", str(interview_id))
-    html_content = html_content.replace("{{token}}", token or "")
+    safe_id = html.escape(str(interview_id))
+    safe_token = html.escape(token or "")
+    html_content = html_content.replace("{{interview_id}}", safe_id)
+    html_content = html_content.replace("{{token}}", safe_token)
     return HTMLResponse(content=html_content)

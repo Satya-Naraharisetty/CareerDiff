@@ -54,19 +54,26 @@ async def interview_voice_gateway(
         # 2. Connection Accepted
         await websocket.accept()
 
-        # 3. Load Session from PostgreSQL
+        # 3. Load Session from PostgreSQL and verify ticket ownership
         async with async_session_factory() as db:
             stmt = (
                 select(Interview)
                 .options(
                     selectinload(Interview.blueprint).selectinload(InterviewBlueprint.topics),
                     selectinload(Interview.turns),
+                    selectinload(Interview.candidate_profile),
                 )
                 .where(Interview.id == interview_id)
             )
             interview = (await db.execute(stmt)).scalar_one_or_none()
             if not interview:
                 await websocket.close(code=4500, reason="Interview session not found")
+                return
+
+            # Broken Object-Level Authorization (BOLA) verification
+            ticket_user_id = ticket_data.get("user_id")
+            if interview.candidate_profile and str(interview.candidate_profile.user_id) != str(ticket_user_id):
+                await websocket.close(code=4403, reason="Forbidden: ticket user does not own this interview")
                 return
 
             remaining_sec = max(
@@ -206,6 +213,9 @@ async def interview_voice_gateway(
             # Handle Binary PCM Audio Frames (50ms chunks = 1600 bytes)
             if "bytes" in message and message["bytes"]:
                 pcm_bytes: bytes = message["bytes"]
+                if len(pcm_bytes) > 8192:
+                    await websocket.close(code=1009, reason="Binary frame exceeds maximum size limit (8KB)")
+                    break
                 vad_result = vad.process_frame(pcm_bytes)
 
                 # Preempt interviewer on speech onset (Barge-in invariant <= 150ms)
@@ -249,8 +259,12 @@ async def interview_voice_gateway(
 
             # Handle Text Control Messages (JSON)
             elif "text" in message and message["text"]:
+                raw_text_msg: str = message["text"]
+                if len(raw_text_msg) > 65536:
+                    await websocket.close(code=1009, reason="Text frame exceeds maximum size limit (64KB)")
+                    break
                 try:
-                    payload: dict[str, Any] = json.loads(message["text"])
+                    payload: dict[str, Any] = json.loads(raw_text_msg)
                 except json.JSONDecodeError:
                     continue
 

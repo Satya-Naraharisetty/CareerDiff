@@ -59,10 +59,28 @@ AVAILABLE_TEMPLATES: list[TemplateMetadata] = [
 
 
 def escape_latex(text: str) -> str:
-    """Escape special LaTeX characters using single-pass regex to avoid double-escaping."""
+    """Escape special LaTeX characters and neutralize command injection vectors."""
     if not text:
         return ""
 
+    # 1. Strip null bytes and control characters
+    sanitized = text.replace("\x00", "").replace("\r", "")
+
+    # 2. Neutralize dangerous TeX macro commands
+    dangerous_macros = [
+        r"\\write18",
+        r"\\input\b",
+        r"\\openin\b",
+        r"\\include\b",
+        r"\\read\b",
+        r"\\catcode\b",
+        r"\\newwrite\b",
+        r"\\openout\b",
+    ]
+    for pattern in dangerous_macros:
+        sanitized = re.sub(pattern, "", sanitized, flags=re.IGNORECASE)
+
+    # 3. Escape special LaTeX characters via single-pass regex
     chars = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -76,7 +94,7 @@ def escape_latex(text: str) -> str:
         "^": r"\textasciicircum{}",
     }
     regex = re.compile("|".join(re.escape(k) for k in chars.keys()))
-    return regex.sub(lambda m: chars[m.group(0)], text)
+    return regex.sub(lambda m: chars[m.group(0)], sanitized)
 
 
 def parse_raw_resume_to_profile(resume_text: str) -> RewrittenResumeProfile:
