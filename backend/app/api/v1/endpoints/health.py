@@ -144,8 +144,9 @@ async def check_outbox_health() -> tuple[bool, float, dict[str, Any]]:
         return False, latency, {"error": str(exc)}
 
 
-@router.get(
+@router.api_route(
     "/health",
+    methods=["GET", "HEAD"],
     response_model=SystemHealthResponse,
     summary="Comprehensive system & integration health check",
     description="Probes PostgreSQL (Supabase), Redis (Upstash), local storage, Gemini LLM, and Outbox backlog.",

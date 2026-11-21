@@ -18,6 +18,14 @@ async def test_root_endpoint(async_client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_root_head_endpoint(async_client: AsyncClient) -> None:
+    """Verify root endpoint accepts HEAD probe from load balancers and returns 200 without body."""
+    response = await async_client.head("/")
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+@pytest.mark.asyncio
 async def test_root_health_endpoint(async_client: AsyncClient) -> None:
     """Verify top-level /health endpoint routes to system integration health probe."""
     response = await async_client.get("/health")
@@ -28,6 +36,14 @@ async def test_root_health_endpoint(async_client: AsyncClient) -> None:
     assert "redis" in data
     assert "storage" in data
     assert "outbox" in data
+
+
+@pytest.mark.asyncio
+async def test_root_health_head_endpoint(async_client: AsyncClient) -> None:
+    """Verify top-level /health accepts HEAD probe without error."""
+    response = await async_client.head("/health")
+    assert response.status_code == 200
+    assert response.content == b""
 
 
 @pytest.mark.asyncio
@@ -47,6 +63,14 @@ async def test_system_health_healthy(async_client: AsyncClient) -> None:
     assert "gemini" in data["services"]
     assert "outbox" in data["services"]
     assert data["version"] == "0.1.0"
+
+
+@pytest.mark.asyncio
+async def test_system_health_head_endpoint(async_client: AsyncClient) -> None:
+    """Verify /api/v1/health endpoint accepts HEAD probe and returns 200 without body."""
+    response = await async_client.head("/api/v1/health")
+    assert response.status_code == 200
+    assert response.content == b""
 
 
 @pytest.mark.asyncio

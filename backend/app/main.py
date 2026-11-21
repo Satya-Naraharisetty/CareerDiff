@@ -104,7 +104,7 @@ app.include_router(api_v1_router, prefix="/api/v1")
 app.include_router(ws_router, prefix="/ws/v1")
 
 
-@app.get("/", summary="Root health & metadata", tags=["Root"])
+@app.api_route("/", methods=["GET", "HEAD"], summary="Root health & metadata", tags=["Root"])
 async def root() -> dict[str, str]:
     """Provide service identity and documentation pointers."""
     return {
@@ -115,7 +115,7 @@ async def root() -> dict[str, str]:
     }
 
 
-@app.get("/health", summary="Top-level system health probe", tags=["Root"])
+@app.api_route("/health", methods=["GET", "HEAD"], summary="Top-level system health probe", tags=["Root"])
 async def root_health(response: Response) -> Any:
     """Convenience endpoint routing root /health to system integration health probe."""
     from app.api.v1.endpoints.health import get_system_health
