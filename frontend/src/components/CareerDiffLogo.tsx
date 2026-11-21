@@ -15,24 +15,24 @@ export const CareerDiffLogo: React.FC<LogoProps> = ({ className = 'h-4 w-4', siz
     className={className}
     aria-hidden="true"
   >
-    {/* Left Terminal Convergent Arm */}
+    {/* Growth Delta (Δ) Outer Frame - Career Elevation & Positive Diff */}
     <path
-      d="M4.5 4.5L10.5 12L4.5 19.5"
-      stroke="currentColor"
-      strokeWidth="2.25"
+      d="M12 3L21 19.5H3L12 3Z"
+      stroke="#34d399"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {/* Right Terminal Convergent Arm */}
+    {/* Inner Navigation Vector - Upward Career Trajectory */}
     <path
-      d="M19.5 4.5L13.5 12L19.5 19.5"
-      stroke="currentColor"
-      strokeWidth="2.25"
+      d="M8.25 15L12 9.5L15.75 15"
+      stroke="#38bdf8"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {/* Central Precision Deterministic Node */}
-    <circle cx="12" cy="12" r="1.75" fill="#34d399" />
+    {/* Apex Precision Coordinate Node */}
+    <circle cx="12" cy="9.5" r="1.1" fill="#38bdf8" />
   </svg>
 );
 

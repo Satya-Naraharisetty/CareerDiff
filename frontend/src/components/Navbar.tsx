@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => onNavigate('home')}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-750 text-zinc-100 shadow-sm group-hover:border-zinc-600 group-hover:bg-zinc-850 transition-all">
-            <CareerDiffLogo className="h-4 w-4 text-zinc-100" />
+            <CareerDiffLogo className="h-4 w-4" />
           </div>
           <span className="text-sm font-semibold tracking-tight text-white font-mono">
             CareerDiff

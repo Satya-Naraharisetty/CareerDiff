@@ -72,10 +72,10 @@
   <!-- Logo Pill Badge -->
   <g transform="translate(100, 80)">
     <rect width="250" height="42" rx="10" fill="#18181b" stroke="#27272a" stroke-width="1"/>
-    <!-- CareerDiff Monogram -->
-    <path d="M20 14L25 21L20 28" stroke="#f4f4f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M34 14L29 21L34 28" stroke="#f4f4f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="27" cy="21" r="1.8" fill="#34d399"/>
+    <!-- CareerDiff Growth Delta (Δ) Monogram -->
+    <path d="M26 10L35 28H17L26 10Z" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22 23.5L26 17.5L30 23.5" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="26" cy="17.5" r="1.2" fill="#38bdf8"/>
     <text x="44" y="26" font-family="'JetBrains Mono', monospace, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#f4f4f5" letter-spacing="1.5">CareerDiff</text>
     <rect x="160" y="10" width="76" height="22" rx="5" fill="#27272a"/>
     <text x="168" y="25" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="600" fill="#a1a1aa">ENGINE v1.0</text>
