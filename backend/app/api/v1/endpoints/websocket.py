@@ -17,6 +17,7 @@ from app.core.redis import get_redis_client
 from app.models.interview import Interview, InterviewBlueprint
 from app.schemas.adaptive import CandidateTurnRequest, InterviewState
 from app.services.audio_vad import AudioVadProcessor
+from app.services.gemini_live_session import GeminiLiveBridge
 from app.services.speech_service import STTService, TTSService
 from app.services.ticket_service import TicketService
 from app.services.turn_service import TurnService
@@ -36,6 +37,8 @@ async def interview_voice_gateway(
     settings = get_settings()
     current_tts_task: asyncio.Task[None] | None = None
     tts_abort_event = asyncio.Event()
+    live_bridge: GeminiLiveBridge | None = None
+    gemini_live_task: asyncio.Task[None] | None = None
     try:
         # 1. Ticket Handshake Authentication
         if not ticket:
@@ -116,8 +119,69 @@ async def interview_voice_gateway(
         vad = AudioVadProcessor()
         active_interviewer_turn_index: int = 0
 
-        # Spawn initial Turn 0 TTS streaming in background with preemption support
-        if initial_tts_text:
+        # Enable Gemini Live API (gemini-3.8-live-extended-thinking) when configured outside test suite
+        if settings.gemini_api_key and settings.environment != "testing":
+            try:
+                live_bridge = GeminiLiveBridge(interview)
+            except Exception as exc:
+                logger.warning("Could not initialize GeminiLiveBridge, using fallback: %s", exc)
+                live_bridge = None
+
+        async def pump_gemini_live_events() -> None:
+            nonlocal active_interviewer_turn_index
+            if not live_bridge:
+                return
+            try:
+                async for event in live_bridge.connect():
+                    if event.event_type == "input_transcript":
+                        if event.text:
+                            await websocket.send_json(
+                                {
+                                    "type": "transcript_partial",
+                                    "turn_index": active_interviewer_turn_index + 1,
+                                    "text": event.text,
+                                }
+                            )
+                    elif event.event_type == "output_transcript":
+                        if event.text:
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_speaking",
+                                    "turn_index": active_interviewer_turn_index,
+                                    "action": "QUESTION",
+                                    "question_text": event.text,
+                                }
+                            )
+                    elif event.event_type == "audio_chunk":
+                        if event.audio_bytes:
+                            await websocket.send_bytes(event.audio_bytes)
+                    elif event.event_type == "interrupted":
+                        cutoff_ms = int(time.time() * 1000)
+                        await websocket.send_json(
+                            {
+                                "type": "interviewer_interrupted",
+                                "turn_index": active_interviewer_turn_index,
+                                "cutoff_timestamp_ms": cutoff_ms,
+                            }
+                        )
+                    elif event.event_type == "turn_complete":
+                        active_interviewer_turn_index += 2
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                logger.warning("Gemini Live event consumer ended: %s", exc)
+
+        if live_bridge:
+            gemini_live_task = asyncio.create_task(pump_gemini_live_events())
+            cand_name = "Candidate"
+            if interview.candidate_profile and interview.candidate_profile.user:
+                cand_name = interview.candidate_profile.user.full_name or "Candidate"
+            if interview.state == InterviewState.CREATED.value:
+                # Trigger real-time initial greeting via Gemini Live
+                await live_bridge.send_initial_greeting_prompt(cand_name)
+
+        # Spawn initial Turn 0 TTS streaming in background with preemption support (Fallback mode)
+        if initial_tts_text and not live_bridge:
             tts_text = initial_tts_text
 
             async def stream_initial_pcm() -> None:
@@ -216,46 +280,51 @@ async def interview_voice_gateway(
                 if len(pcm_bytes) > 8192:
                     await websocket.close(code=1009, reason="Binary frame exceeds maximum size limit (8KB)")
                     break
-                vad_result = vad.process_frame(pcm_bytes)
 
-                # Preempt interviewer on speech onset (Barge-in invariant <= 150ms)
-                if vad_result.speech_started:
-                    await cancel_active_tts()
+                if live_bridge:
+                    # Stream raw 16kHz audio frame directly to Gemini Live API
+                    await live_bridge.send_audio_frame(pcm_bytes)
+                else:
+                    vad_result = vad.process_frame(pcm_bytes)
 
-                # Emit periodic streaming partial transcripts
-                if vad.is_candidate_speaking and vad.speech_frames_count % 4 == 0:
-                    partial = STTService.transcribe_partial(bytes(vad.audio_buffer))
-                    if partial:
+                    # Preempt interviewer on speech onset (Barge-in invariant <= 150ms)
+                    if vad_result.speech_started:
+                        await cancel_active_tts()
+
+                    # Emit periodic streaming partial transcripts
+                    if vad.is_candidate_speaking and vad.speech_frames_count % 4 == 0:
+                        partial = STTService.transcribe_partial(bytes(vad.audio_buffer))
+                        if partial:
+                            await websocket.send_json(
+                                {
+                                    "type": "transcript_partial",
+                                    "turn_index": active_interviewer_turn_index + 1,
+                                    "text": partial,
+                                }
+                            )
+
+                    # Finalize turn on 1,200ms trailing silence
+                    if vad_result.speech_finalized:
+                        raw_audio = vad.get_and_reset_buffer()
+                        transcript = await STTService.transcribe_final(
+                            raw_audio,
+                            allow_mock_fallback=(settings.environment in ("development", "testing")),
+                        )
+                        dur_ms = int((len(raw_audio) / 32000) * 1000)
+
+                        if not transcript.strip():
+                            continue
+
                         await websocket.send_json(
                             {
-                                "type": "transcript_partial",
+                                "type": "transcript_final",
                                 "turn_index": active_interviewer_turn_index + 1,
-                                "text": partial,
+                                "speaker": "CANDIDATE",
+                                "text": transcript,
+                                "duration_ms": dur_ms,
                             }
                         )
-
-                # Finalize turn on 1,200ms trailing silence
-                if vad_result.speech_finalized:
-                    raw_audio = vad.get_and_reset_buffer()
-                    transcript = await STTService.transcribe_final(
-                        raw_audio,
-                        allow_mock_fallback=(settings.environment in ("development", "testing")),
-                    )
-                    dur_ms = int((len(raw_audio) / 32000) * 1000)
-
-                    if not transcript.strip():
-                        continue
-
-                    await websocket.send_json(
-                        {
-                            "type": "transcript_final",
-                            "turn_index": active_interviewer_turn_index + 1,
-                            "speaker": "CANDIDATE",
-                            "text": transcript,
-                            "duration_ms": dur_ms,
-                        }
-                    )
-                    await handle_turn_finalization(transcript, dur_ms)
+                        await handle_turn_finalization(transcript, dur_ms)
 
             # Handle Text Control Messages (JSON)
             elif "text" in message and message["text"]:
@@ -276,48 +345,54 @@ async def interview_voice_gateway(
 
                 elif event_type == "speech_stopped":
                     # Instant client silence detection
-                    client_transcript = payload.get("transcript")
-                    if len(vad.audio_buffer) > 0 or (client_transcript and str(client_transcript).strip()):
-                        raw_audio = vad.force_finalize()
-                        transcript = await STTService.transcribe_final(
-                            raw_audio,
-                            simulated_transcript=client_transcript,
-                            allow_mock_fallback=(settings.environment in ("development", "testing")),
-                        )
-                        dur_ms = int((len(raw_audio) / 32000) * 1000) if raw_audio else 1000
-
-                        if not transcript.strip():
-                            transcript = (
-                                "I have been designing and building scalable distributed backend systems, "
-                                "focusing on low-latency microservices, Kafka event streaming, and resilient data architectures."
+                    if live_bridge:
+                        await live_bridge.send_audio_stream_end()
+                    else:
+                        client_transcript = payload.get("transcript")
+                        if len(vad.audio_buffer) > 0 or (client_transcript and str(client_transcript).strip()):
+                            raw_audio = vad.force_finalize()
+                            transcript = await STTService.transcribe_final(
+                                raw_audio,
+                                simulated_transcript=client_transcript,
+                                allow_mock_fallback=(settings.environment in ("development", "testing")),
                             )
+                            dur_ms = int((len(raw_audio) / 32000) * 1000) if raw_audio else 1000
 
-                        await websocket.send_json(
-                            {
-                                "type": "transcript_final",
-                                "turn_index": active_interviewer_turn_index + 1,
-                                "speaker": "CANDIDATE",
-                                "text": transcript,
-                                "duration_ms": dur_ms,
-                            }
-                        )
-                        await handle_turn_finalization(transcript, dur_ms)
+                            if not transcript.strip():
+                                transcript = (
+                                    "I have been designing and building scalable distributed backend systems, "
+                                    "focusing on low-latency microservices, Kafka event streaming, and resilient data architectures."
+                                )
+
+                            await websocket.send_json(
+                                {
+                                    "type": "transcript_final",
+                                    "turn_index": active_interviewer_turn_index + 1,
+                                    "speaker": "CANDIDATE",
+                                    "text": transcript,
+                                    "duration_ms": dur_ms,
+                                }
+                            )
+                            await handle_turn_finalization(transcript, dur_ms)
 
                 elif event_type == "text_input":
                     # Text fallback mode: process text input over WebSocket
                     candidate_text = payload.get("text", "").strip()
                     if candidate_text:
                         await cancel_active_tts()
-                        await websocket.send_json(
-                            {
-                                "type": "transcript_final",
-                                "turn_index": active_interviewer_turn_index + 1,
-                                "speaker": "CANDIDATE",
-                                "text": candidate_text,
-                                "duration_ms": 0,
-                            }
-                        )
-                        await handle_turn_finalization(candidate_text, 0)
+                        if live_bridge:
+                            await live_bridge.send_text_input(candidate_text)
+                        else:
+                            await websocket.send_json(
+                                {
+                                    "type": "transcript_final",
+                                    "turn_index": active_interviewer_turn_index + 1,
+                                    "speaker": "CANDIDATE",
+                                    "text": candidate_text,
+                                    "duration_ms": 0,
+                                }
+                            )
+                            await handle_turn_finalization(candidate_text, 0)
 
                 elif event_type == "ping":
                     await websocket.send_json(
@@ -344,6 +419,10 @@ async def interview_voice_gateway(
         except Exception:
             pass
     finally:
+        if gemini_live_task and not gemini_live_task.done():
+            gemini_live_task.cancel()
+        if live_bridge:
+            await live_bridge.close()
         if current_tts_task and not current_tts_task.done():
             tts_abort_event.set()
             current_tts_task.cancel()

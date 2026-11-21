@@ -223,12 +223,23 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
       ws.onopen = () => {
         set({ wsStatus: 'connected' });
+        // Race-condition prevention: If interviewer is already done speaking and candidate mic is not active, auto-start
+        const { isInterviewerSpeaking, isRecording, turns, mode } = get();
+        if (
+          mode === 'VOICE' &&
+          !isInterviewerSpeaking &&
+          !isRecording &&
+          turns.length > 0 &&
+          turns[turns.length - 1].speaker === 'INTERVIEWER'
+        ) {
+          get().startVoiceRecording().catch(() => {});
+        }
       };
 
       ws.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
-          // If browser native TTS is unavailable, fallback to server binary PCM audio
-          if (!BrowserSpeechSynthesizer.isSupported() && pcmPlayer) {
+          // Play server binary PCM audio (from Gemini Live 24kHz or server TTS)
+          if (pcmPlayer) {
             set({ isInterviewerSpeaking: true });
             pcmPlayer.feed(event.data);
           }
@@ -260,19 +271,34 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 }));
                 break;
               case 'interviewer_speaking':
-                set((s) => ({
-                  isInterviewerSpeaking: true,
-                  turns: [
-                    ...s.turns,
-                    {
-                      turn_index: msg.turn_index,
-                      speaker: 'INTERVIEWER',
+                set((s) => {
+                  const existingLast = s.turns[s.turns.length - 1];
+                  if (
+                    existingLast &&
+                    existingLast.speaker === 'INTERVIEWER' &&
+                    existingLast.turn_index === msg.turn_index
+                  ) {
+                    const updatedTurns = [...s.turns];
+                    updatedTurns[updatedTurns.length - 1] = {
+                      ...existingLast,
                       transcript: msg.question_text,
-                      action_taken: msg.action as EngineAction,
-                      created_at: new Date().toISOString(),
-                    },
-                  ],
-                }));
+                    };
+                    return { isInterviewerSpeaking: true, turns: updatedTurns };
+                  }
+                  return {
+                    isInterviewerSpeaking: true,
+                    turns: [
+                      ...s.turns,
+                      {
+                        turn_index: msg.turn_index,
+                        speaker: 'INTERVIEWER',
+                        transcript: msg.question_text,
+                        action_taken: msg.action as EngineAction,
+                        created_at: new Date().toISOString(),
+                      },
+                    ],
+                  };
+                });
                 break;
               case 'interviewer_interrupted':
                 BrowserSpeechSynthesizer.stop();
@@ -311,34 +337,35 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   },
 
   startVoiceRecording: async () => {
-    if (!activeWs || activeWs.readyState !== WebSocket.OPEN) {
-      set({ error: 'Cannot record audio: WebSocket is not connected' });
-      return;
-    }
-
     // Candidate begins speaking -> trigger instant barge-in if interviewer is speaking
     get().bargeIn();
 
     try {
-      if (!pcmRecorder) {
-        pcmRecorder = new PcmRecorder();
+      // 1. Initialize PCM Recorder for raw audio streaming & volume metering (if mic permission is granted)
+      try {
+        if (!pcmRecorder) {
+          pcmRecorder = new PcmRecorder();
+        }
+
+        await pcmRecorder.start(
+          (chunk) => {
+            if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+              activeWs.send(chunk);
+            }
+          },
+          (level) => {
+            set({ audioLevel: level });
+          }
+        );
+      } catch (audioErr) {
+        console.warn('PcmRecorder capture notice:', audioErr);
       }
 
-      await pcmRecorder.start(
-        (chunk) => {
-          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
-            activeWs.send(chunk);
-          }
-        },
-        (level) => {
-          set({ audioLevel: level });
-        }
-      );
-
-      // Start browser-native speech recognition to capture actual words candidate speaks
+      // 2. Start browser-native speech recognition to capture actual words candidate speaks in real time
       if (!speechRecognizer) {
         speechRecognizer = new BrowserSpeechRecognizer();
       }
+
       speechRecognizer.start(
         (liveTranscript) => {
           set({ partialTranscript: liveTranscript });
@@ -347,6 +374,9 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         () => {
           // Automatic 2.2s silence detection -> hands-free auto-commit candidate turn
           get().stopVoiceRecording();
+        },
+        (errorMsg) => {
+          set({ error: errorMsg });
         }
       );
 
@@ -370,14 +400,21 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       }
     }
 
+    const trimmed = spokenTranscript?.trim();
+
     if (activeWs && activeWs.readyState === WebSocket.OPEN) {
       activeWs.send(
         JSON.stringify({
           type: 'speech_stopped',
-          transcript: spokenTranscript || null,
+          transcript: trimmed || null,
           client_timestamp_ms: Date.now(),
         })
       );
+    } else if (trimmed) {
+      // Zero-Loss Fallback: If WebSocket dropped or is disconnected, commit candidate turn via REST
+      get().submitTextTurn(trimmed).catch((err) => {
+        console.warn('Fallback turn submission failed:', err);
+      });
     }
     set({ isRecording: false, audioLevel: 0, partialTranscript: '' });
   },

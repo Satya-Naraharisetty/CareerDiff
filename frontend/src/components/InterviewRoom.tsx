@@ -9,6 +9,7 @@ import {
   Hand,
   Layers,
   Loader2,
+  Mic,
   Network,
   Play,
   Send,
@@ -816,7 +817,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         useInterviewStore.setState({ isInterviewerSpeaking: false });
         activeSynthesizerCancelRef.current = null;
         // As soon as the question completes, automatically activate candidate microphone in voice mode
-        if (mode === 'VOICE' && wsStatus === 'connected') {
+        if (mode === 'VOICE') {
           startVoiceRecording().catch(() => {});
         }
       };
@@ -923,6 +924,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       } else if (e.key === 'Enter' && mode === 'VOICE' && isRecording && !showTextFallbackInVoice) {
         e.preventDefault();
         handleDoneSpeaking();
+      } else if (e.key === 'Enter' && mode === 'VOICE' && !isRecording && !isInterviewerSpeaking && typingTurnIndex === null && !showTextFallbackInVoice) {
+        e.preventDefault();
+        startVoiceRecording().catch(() => {});
       } else if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setShowScratchpad((prev) => !prev);
@@ -931,7 +935,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
     window.addEventListener('keydown', handleRoomKeyDown);
     return () => window.removeEventListener('keydown', handleRoomKeyDown);
-  }, [mode, isRecording, showTextFallbackInVoice, handleDoneSpeaking, handleBargeIn]);
+  }, [mode, isRecording, isInterviewerSpeaking, typingTurnIndex, showTextFallbackInVoice, handleDoneSpeaking, handleBargeIn, startVoiceRecording]);
 
   const handleSendText = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1369,11 +1373,22 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                       </div>
                     )}
 
-                    {/* Waiting / processing state */}
+                    {/* Ready to speak state: clear action button so candidate can click/tap to talk anytime */}
                     {!isRecording && !isInterviewerSpeaking && typingTurnIndex === null && (
-                      <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 py-1.5">
-                        <span className="h-2 w-2 rounded-full bg-zinc-600" />
-                        <span>Ready for next question</span>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => startVoiceRecording().catch(() => {})}
+                          title="Activate microphone and speak your answer (Key: Enter)"
+                          className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] shadow-sm shadow-emerald-950/40"
+                        >
+                          <Mic className="h-4 w-4" />
+                          <span>Start Speaking</span>
+                          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-emerald-700 text-emerald-100 rounded border border-emerald-500/50">Enter</kbd>
+                        </button>
+                        <span className="text-xs font-mono text-zinc-400 hidden md:inline">
+                          Click to speak or press Enter
+                        </span>
                       </div>
                     )}
                   </div>

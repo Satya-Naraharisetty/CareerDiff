@@ -104,6 +104,9 @@ class Settings(BaseModel):
     gemini_turn_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_TURN_MODEL", "gemini-3.8-flash")
     )
+    gemini_live_model: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_LIVE_MODEL", "gemini-3.8-live-extended-thinking")
+    )
     gemini_eval_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_EVAL_MODEL", "gemini-4-argon")
     )

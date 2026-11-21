@@ -60,15 +60,23 @@ export class PcmPlayer {
   private audioCtx: AudioContext | null = null;
   private nextPlayTime: number = 0;
   private activeSources: AudioBufferSourceNode[] = [];
+  private sampleRate: number;
 
-  constructor() {
-    // AudioContext lazily initialized on user gesture
+  constructor(sampleRate: number = 24000) {
+    this.sampleRate = sampleRate;
+  }
+
+  setSampleRate(rate: number): void {
+    if (this.sampleRate !== rate) {
+      this.sampleRate = rate;
+      this.close();
+    }
   }
 
   private getContext(): AudioContext {
     if (!this.audioCtx || this.audioCtx.state === 'closed') {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioContextClass({ sampleRate: 16000 });
+      this.audioCtx = new AudioContextClass({ sampleRate: this.sampleRate });
     }
     if (this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
@@ -77,9 +85,10 @@ export class PcmPlayer {
   }
 
   /**
-   * Queue and play raw 16kHz 16-bit signed integer Linear PCM buffer
+   * Queue and play raw 16-bit signed integer Linear PCM buffer (24kHz Gemini Live or 16kHz fallback)
    */
-  feed(pcm16Data: ArrayBuffer): void {
+  feed(pcm16Data: ArrayBuffer, customRate?: number): void {
+    const rate = customRate || this.sampleRate;
     const ctx = this.getContext();
     const int16Array = new Int16Array(pcm16Data);
     const float32Array = new Float32Array(int16Array.length);
@@ -89,7 +98,7 @@ export class PcmPlayer {
       float32Array[i] = int16Array[i] / 32768.0;
     }
 
-    const audioBuffer = ctx.createBuffer(1, float32Array.length, 16000);
+    const audioBuffer = ctx.createBuffer(1, float32Array.length, rate);
     audioBuffer.copyToChannel(float32Array, 0);
 
     const source = ctx.createBufferSource();

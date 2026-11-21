@@ -17,9 +17,11 @@ export class BrowserSpeechRecognizer {
   private currentSessionFinal: string = '';
   private currentInterimTranscript: string = '';
   private silenceTimer: number | null = null;
+  private restartTimer: number | null = null;
   private onPartialCallback: ((text: string) => void) | null = null;
   private onFinalCallback: ((text: string) => void) | null = null;
   private onSilenceCallback: (() => void) | null = null;
+  private onErrorCallback: ((errorMsg: string) => void) | null = null;
 
   static isSupported(): boolean {
     const win = window as unknown as IWindowWithSpeech;
@@ -29,12 +31,14 @@ export class BrowserSpeechRecognizer {
   start(
     onPartial?: (text: string) => void,
     onFinal?: (text: string) => void,
-    onSilence?: () => void
+    onSilence?: () => void,
+    onError?: (errorMsg: string) => void
   ): boolean {
     const win = window as unknown as IWindowWithSpeech;
     const SpeechRecognitionClass = win.SpeechRecognition || win.webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
       console.warn('SpeechRecognition API is not supported in this browser environment.');
+      onError?.('Speech recognition is not supported in this browser. Please use Google Chrome or Edge, or type your answer.');
       return false;
     }
 
@@ -42,9 +46,11 @@ export class BrowserSpeechRecognizer {
     this.abort();
 
     this.clearSilenceTimer();
+    this.clearRestartTimer();
     this.onPartialCallback = onPartial || null;
     this.onFinalCallback = onFinal || null;
     this.onSilenceCallback = onSilence || null;
+    this.onErrorCallback = onError || null;
     this.confirmedPriorText = '';
     this.currentSessionFinal = '';
     this.currentInterimTranscript = '';
@@ -96,9 +102,20 @@ export class BrowserSpeechRecognizer {
       };
 
       rec.onerror = (event: any) => {
+        const error = event.error;
         // Ignore normal non-fatal events like 'no-speech' or 'aborted'
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          console.warn('Speech recognition status:', event.error);
+        if (error === 'no-speech' || error === 'aborted') {
+          return;
+        }
+        console.warn('Speech recognition status:', error);
+        if (error === 'not-allowed') {
+          this.onErrorCallback?.('Microphone access blocked. Please allow microphone permissions in your browser address bar to speak.');
+        } else if (error === 'network') {
+          this.onErrorCallback?.('Speech recognition network service unreachable (common if blocked by Brave Shields or ad blockers). Use "Type / Edit" or allow speech services.');
+        } else if (error === 'audio-capture') {
+          this.onErrorCallback?.('No microphone input detected. Please verify your microphone is plugged in.');
+        } else if (error === 'service-not-allowed') {
+          this.onErrorCallback?.('Speech recognition service is disallowed by browser policy.');
         }
       };
 
@@ -112,11 +129,30 @@ export class BrowserSpeechRecognizer {
           this.currentSessionFinal = '';
           this.currentInterimTranscript = '';
 
-          try {
-            rec.start();
-          } catch {
-            // Restarting
-          }
+          this.clearRestartTimer();
+          // Safe asynchronous restart with 120ms backoff to prevent Chromium InvalidStateError
+          this.restartTimer = window.setTimeout(() => {
+            if (!this.isListening) return;
+            try {
+              rec.start();
+            } catch {
+              // If current instance cannot be reused, create a fresh instance
+              try {
+                const freshRec = new SpeechRecognitionClass();
+                freshRec.continuous = true;
+                freshRec.interimResults = true;
+                freshRec.lang = 'en-US';
+                freshRec.maxAlternatives = 1;
+                freshRec.onresult = rec.onresult;
+                freshRec.onerror = rec.onerror;
+                freshRec.onend = rec.onend;
+                freshRec.start();
+                this.recognition = freshRec;
+              } catch {
+                // Restarting
+              }
+            }
+          }, 120);
         }
       };
 
@@ -125,6 +161,7 @@ export class BrowserSpeechRecognizer {
       return true;
     } catch (err) {
       console.warn('Failed to start SpeechRecognition:', err);
+      this.onErrorCallback?.('Failed to start speech recognition. Please check microphone permissions.');
       return false;
     }
   }
@@ -144,9 +181,17 @@ export class BrowserSpeechRecognizer {
     }
   }
 
+  private clearRestartTimer(): void {
+    if (this.restartTimer !== null) {
+      window.clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+  }
+
   stop(): string {
     this.isListening = false;
     this.clearSilenceTimer();
+    this.clearRestartTimer();
     const finalResult = this.getFullTranscript();
 
     if (this.recognition) {
@@ -175,6 +220,7 @@ export class BrowserSpeechRecognizer {
   abort(): void {
     this.isListening = false;
     this.clearSilenceTimer();
+    this.clearRestartTimer();
     this.confirmedPriorText = '';
     this.currentSessionFinal = '';
     this.currentInterimTranscript = '';
