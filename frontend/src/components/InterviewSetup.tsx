@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { DeviceCheckModal } from './DeviceCheckModal';
 import { interviewsApi, resumesApi, rolesApi } from '../lib/api';
-import { useAuthStore } from '../stores/authStore';
+import { isSkipAuthEnabled, useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 import type {
   CompanyAnalysisResponse,
@@ -138,6 +138,7 @@ Requirements:
 
 export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview, onOpenAuth }) => {
   const { isAuthenticated } = useAuthStore();
+  const isAuthed = isAuthenticated || isSkipAuthEnabled();
   const { setInterview } = useInterviewStore();
 
   const [roles, setRoles] = useState<JobRoleRead[]>([]);
@@ -229,7 +230,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         }
 
         // Check if user already has an analyzed resume
-        if (isAuthenticated) {
+        if (isAuthed) {
           try {
             const latestResume = await resumesApi.getLatest();
             if (latestResume) {
@@ -252,7 +253,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       }
     }
     initData();
-  }, [isAuthenticated]);
+  }, [isAuthed]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -284,7 +285,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   };
 
   const handleAnalyzeResume = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthed) {
       onOpenAuth();
       return;
     }
@@ -348,7 +349,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   };
 
   const handleAnalyzeJd = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthed) {
       onOpenAuth();
       return;
     }
@@ -382,7 +383,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   };
 
   const handleCreate = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthed) {
       onOpenAuth();
       return;
     }
@@ -439,7 +440,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         </p>
       </div>
 
-      {!isAuthenticated && (
+      {!isAuthed && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/90 p-3.5 text-xs text-zinc-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm font-sans">
           <div className="flex items-center gap-2.5">
             <Lock className="h-4 w-4 shrink-0 text-zinc-400" />

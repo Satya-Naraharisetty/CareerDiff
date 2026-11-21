@@ -9,7 +9,7 @@ import { InterviewSetup } from './components/InterviewSetup';
 import { InterviewRoom } from './components/InterviewRoom';
 import { DossierView } from './components/DossierView';
 import { ResumeRewriter } from './components/ResumeRewriter';
-import { useAuthStore } from './stores/authStore';
+import { isSkipAuthEnabled, useAuthStore } from './stores/authStore';
 import { useInterviewStore } from './stores/interviewStore';
 import { BrowserSpeechSynthesizer } from './lib/speechSynthesis';
 import { stopAllMediaHardware } from './lib/audio';
@@ -34,13 +34,13 @@ export const AppContent: React.FC = () => {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
       if (saved && ['home', 'setup', 'interview', 'dossier', 'rewriter'].includes(saved)) {
-        if (!isAuthenticated && saved !== 'home') return 'home';
+        if (!isAuthenticated && !isSkipAuthEnabled() && saved !== 'home') return 'home';
         // Avoid getting stuck on interview loader on cold refresh without active session
         if (saved === 'interview') return 'setup';
         return saved as 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter';
       }
     }
-    return isAuthenticated ? 'setup' : 'home';
+    return (isAuthenticated || isSkipAuthEnabled()) ? 'setup' : 'home';
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -62,13 +62,13 @@ export const AppContent: React.FC = () => {
       return;
     }
 
-    if (isAuthenticated) {
+    if (isAuthenticated || isSkipAuthEnabled()) {
       rehydrateProfile();
     }
   }, [isAuthenticated, rehydrateProfile]);
 
   // Derive active view from authentication guard
-  const activeView = !isAuthenticated ? 'home' : currentView;
+  const activeView = (!isAuthenticated && !isSkipAuthEnabled()) ? 'home' : currentView;
 
   const handleNavigate = (view: 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter') => {
     if (view !== 'interview') {
@@ -158,7 +158,10 @@ export const AppContent: React.FC = () => {
         {activeView === 'home' && (
           <HomePage
             onGetStarted={() => {
-              if (isAuthenticated) {
+              if (isAuthenticated || isSkipAuthEnabled()) {
+                if (!isAuthenticated && isSkipAuthEnabled()) {
+                  useAuthStore.getState().loginAsDev();
+                }
                 handleNavigate('setup');
               } else {
                 setIsAuthOpen(true);

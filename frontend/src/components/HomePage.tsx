@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Terminal,
 } from 'lucide-react';
-import { useAuthStore } from '../stores/authStore';
+import { isSkipAuthEnabled, useAuthStore } from '../stores/authStore';
 
 interface HomePageProps {
   onGetStarted: () => void;
@@ -21,11 +21,15 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, onOpenDashboard }) => {
   const { isAuthenticated } = useAuthStore();
+  const isAuthed = isAuthenticated || isSkipAuthEnabled();
   const [activePreviewTab, setActivePreviewTab] = useState<'interview' | 'provenance' | 'dossier'>('interview');
   const [wrapPreviewText, setWrapPreviewText] = useState(true);
 
   const handleAction = () => {
-    if (isAuthenticated) {
+    if (isAuthed) {
+      if (!isAuthenticated && isSkipAuthEnabled()) {
+        useAuthStore.getState().loginAsDev();
+      }
       onGetStarted();
     } else {
       onOpenAuth();
@@ -63,11 +67,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
               onClick={handleAction}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98]"
             >
-              {isAuthenticated ? 'Enter Practice Workspace' : 'Start Technical Practice'}
+              {isAuthed ? 'Enter Practice Workspace' : 'Start Technical Practice'}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
 
-            {isAuthenticated && onOpenDashboard && (
+            {isAuthed && onOpenDashboard && (
               <button
                 type="button"
                 onClick={onOpenDashboard}
@@ -439,7 +443,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onGetStarted, onOpenAuth, on
               onClick={handleAction}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-sm active:scale-[0.98]"
             >
-              {isAuthenticated ? 'Enter Practice Workspace' : 'Get Started Free'}
+              {isAuthed ? 'Enter Practice Workspace' : 'Get Started Free'}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BarChart3, Command, FileText, Home, LogOut, Menu, Play, Radio, X } from 'lucide-react';
 import { CareerDiffLogo } from './CareerDiffLogo';
-import { useAuthStore } from '../stores/authStore';
+import { isSkipAuthEnabled, useAuthStore } from '../stores/authStore';
 import { useInterviewStore } from '../stores/interviewStore';
 
 interface NavbarProps {
@@ -29,9 +29,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const handleGuardedNavigate = (view: 'setup' | 'interview' | 'dossier') => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isSkipAuthEnabled()) {
       onOpenAuth();
     } else {
+      if (!isAuthenticated && isSkipAuthEnabled()) {
+        useAuthStore.getState().loginAsDev();
+      }
       onNavigate(view);
     }
   };
@@ -165,6 +168,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-medium text-xs max-w-[110px] truncate text-zinc-200 group-hover:text-white">
                   {user.full_name?.split(' ')[0] || 'Account'}
                 </span>
+                {user.auth_provider === 'LOCAL_DEV' && (
+                  <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-mono text-amber-300 font-medium">
+                    DEV
+                  </span>
+                )}
               </button>
               <div className="h-3.5 w-px bg-zinc-800" />
               <button
@@ -330,7 +338,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {(user.full_name || user.email || 'U')[0].toUpperCase()}
                   </div>
                   <div className="text-left">
-                    <p className="text-xs font-medium text-white">{user.full_name || 'Candidate'}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-medium text-white">{user.full_name || 'Candidate'}</p>
+                      {user.auth_provider === 'LOCAL_DEV' && (
+                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1 py-0.2 text-[9px] font-mono text-amber-300 font-medium">
+                          DEV
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-zinc-400 truncate max-w-[150px]">{user.email}</p>
                   </div>
                 </div>

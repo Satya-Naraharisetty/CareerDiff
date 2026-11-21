@@ -129,6 +129,17 @@ def create_access_token(
 
 def decode_access_token(token: str) -> dict[str, Any]:
     """Decode and cryptographically verify a JWT access token."""
+    if (
+        settings.skip_auth
+        and settings.environment.lower() != "production"
+        and token == "dev-local-bypass-token"
+    ):
+        return {
+            "sub": "dev-local-user",
+            "email": "dev@careerdiff.local",
+            "role": "CANDIDATE",
+        }
+
     try:
         payload: dict[str, Any] = jwt.decode(
             token,
@@ -150,11 +161,54 @@ def decode_access_token(token: str) -> dict[str, Any]:
         ) from e
 
 
+async def _get_or_create_dev_user(db: AsyncSession) -> User:
+    """Resolve or seed the default local development user when SKIP_AUTH is active."""
+    dev_email = "dev@careerdiff.local"
+    stmt = select(User).where(User.email == dev_email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        from app.models.user import CandidateProfile
+
+        _, hashed_records = generate_backup_codes(count=8)
+        user = User(
+            email=dev_email,
+            hashed_password=hash_password("DevPassword123!"),
+            full_name="Local Dev Candidate",
+            role="CANDIDATE",
+            is_active=True,
+            auth_provider="LOCAL_DEV",
+            hashed_backup_codes=hashed_records,
+        )
+        db.add(user)
+        await db.flush()
+
+        profile = CandidateProfile(
+            user_id=user.id,
+            target_seniority="SENIOR",
+            primary_discipline="BACKEND",
+            years_experience=5,
+            verified_skills=["Python", "FastAPI", "PostgreSQL", "System Design"],
+        )
+        db.add(profile)
+        await db.commit()
+        await db.refresh(user)
+
+    return user
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """FastAPI dependency resolving the authenticated User from the Bearer token."""
+    # Check if local development skip_auth bypass is active
+    if settings.skip_auth and settings.environment.lower() != "production":
+        token_str = credentials.credentials if credentials else None
+        if not token_str or token_str == "dev-local-bypass-token":
+            return await _get_or_create_dev_user(db)
+
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

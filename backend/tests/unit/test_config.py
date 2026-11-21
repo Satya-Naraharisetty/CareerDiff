@@ -105,3 +105,31 @@ def test_production_jwt_secret_validation() -> None:
         assert cfg.environment == "production"
         assert cfg.jwt_secret_key == "0" * 32
 
+
+def test_skip_auth_configuration() -> None:
+    """Verify SKIP_AUTH can be enabled in development but is forbidden in production."""
+    # Allowed in development
+    with patch.dict(
+        os.environ,
+        {
+            "ENVIRONMENT": "development",
+            "SKIP_AUTH": "true",
+        },
+    ):
+        cfg = Settings()
+        assert cfg.skip_auth is True
+
+    # Forbidden in production
+    with patch.dict(
+        os.environ,
+        {
+            "ENVIRONMENT": "production",
+            "JWT_SECRET_KEY": "0" * 32,
+            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/db",
+            "SKIP_AUTH": "true",
+        },
+    ):
+        import pytest
+        with pytest.raises(ValueError, match="SKIP_AUTH cannot be enabled in production"):
+            Settings()
+

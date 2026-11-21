@@ -18,6 +18,7 @@ interface AuthState {
   login: (credentials: UserLoginRequest) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   loginWithToken: (accessToken: string) => Promise<void>;
+  loginAsDev: () => void;
   register: (payload: UserRegisterRequest) => Promise<UserRegisterResponse>;
   recoverPassword: (payload: PasswordRecoveryRequest) => Promise<PasswordRecoveryResponse>;
   rehydrateProfile: () => Promise<void>;
@@ -32,8 +33,30 @@ const STORAGE_KEYS = [
 ];
 const STORAGE_KEY = 'CareerDiff_auth_storage';
 
+export const isSkipAuthEnabled = (): boolean => {
+  const envVal = import.meta.env.VITE_SKIP_AUTH ?? import.meta.env.VITE_SKIP_LOGIN;
+  if (envVal !== undefined) {
+    return envVal === 'true' || envVal === '1';
+  }
+  return false;
+};
+
+export const DEV_DEFAULT_TOKEN = 'dev-local-bypass-token';
+
+export const DEV_DEFAULT_USER: UserProfile = {
+  id: 'dev-local-user',
+  email: 'dev@careerdiff.local',
+  full_name: 'Dev Candidate',
+  role: 'CANDIDATE',
+  target_seniority: 'SENIOR',
+  primary_discipline: 'BACKEND',
+  auth_provider: 'LOCAL_DEV',
+  avatar_url: undefined,
+};
+
 export function isTokenExpired(token: string | null): boolean {
   if (!token) return true;
+  if (token === DEV_DEFAULT_TOKEN || token.startsWith('dev-local-')) return false;
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return false;
@@ -73,8 +96,17 @@ const loadPersistedAuth = (): { token: string | null; user: UserProfile | null }
         }
       }
     }
+
+    if (isSkipAuthEnabled()) {
+      savePersistedAuth(DEV_DEFAULT_TOKEN, DEV_DEFAULT_USER);
+      return { token: DEV_DEFAULT_TOKEN, user: DEV_DEFAULT_USER };
+    }
+
     return { token: null, user: null };
   } catch {
+    if (isSkipAuthEnabled()) {
+      return { token: DEV_DEFAULT_TOKEN, user: DEV_DEFAULT_USER };
+    }
     return { token: null, user: null };
   }
 };
@@ -232,6 +264,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
+  loginAsDev: () => {
+    savePersistedAuth(DEV_DEFAULT_TOKEN, DEV_DEFAULT_USER);
+    set({
+      token: DEV_DEFAULT_TOKEN,
+      user: DEV_DEFAULT_USER,
+      isAuthenticated: true,
+      error: null,
+    });
+  },
+
   register: async (payload: UserRegisterRequest): Promise<UserRegisterResponse> => {
     set({ isLoading: true, error: null });
     try {
@@ -286,6 +328,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       get().logout();
       return;
     }
+
+    if (token === DEV_DEFAULT_TOKEN) {
+      // In local dev bypass mode: try to get a real JWT from backend for dev@careerdiff.local
+      try {
+        const res = await authApi.login({
+          email: 'dev@careerdiff.local',
+          password: 'DevPassword123!',
+        });
+        const currentUser = get().user || DEV_DEFAULT_USER;
+        savePersistedAuth(res.access_token, currentUser);
+        set({ token: res.access_token });
+      } catch {
+        try {
+          const regRes = await authApi.register({
+            email: 'dev@careerdiff.local',
+            password: 'DevPassword123!',
+            full_name: 'Dev Candidate',
+          });
+          const currentUser = get().user || DEV_DEFAULT_USER;
+          savePersistedAuth(regRes.access_token, currentUser);
+          set({ token: regRes.access_token });
+        } catch {
+          // Backend offline or remote: keep using DEV_DEFAULT_TOKEN smoothly
+        }
+      }
+      return;
+    }
+
     try {
       const profile = await authApi.getProfile();
       const user: UserProfile = {
@@ -317,6 +387,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 if (typeof window !== 'undefined') {
   window.addEventListener('careerdiff:unauthorized', () => {
-    useAuthStore.getState().logout();
+    if (!isSkipAuthEnabled()) {
+      useAuthStore.getState().logout();
+    }
   });
 }
