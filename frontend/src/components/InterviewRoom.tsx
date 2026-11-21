@@ -36,11 +36,8 @@ interface DiagramPreset {
 }
 
 const GEMINI_LIVE_VOICES = [
-  { id: 'Puck', label: 'Alex (Warm & Natural)', description: 'Conversational, warm, natural tenor (Recommended)' },
-  { id: 'Charon', label: 'Marcus (Deep Architect)', description: 'Deep, grounded, authoritative Principal Architect' },
-  { id: 'Aoede', label: 'Maya (Expressive Staff)', description: 'Rich, articulate, dynamic Staff Engineer' },
-  { id: 'Kore', label: 'Sarah (Steady Lead)', description: 'Clear, steady, empathetic Engineering Lead' },
-  { id: 'Fenrir', label: 'James (Direct Systems)', description: 'Crisp, direct, sharp Systems Specialist' },
+  { id: 'Puck', label: 'Alex (Male)', description: 'Conversational, warm, natural male interviewer (Recommended)' },
+  { id: 'Aoede', label: 'Maya (Female)', description: 'Articulate, expressive, natural female interviewer' },
 ];
 
 const DIAGRAM_PRESETS: DiagramPreset[] = [
@@ -579,7 +576,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(false);
   const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<string>(() => {
     if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('careerdiff_gemini_voice') || 'Puck';
+      const stored = localStorage.getItem('careerdiff_gemini_voice');
+      return stored === 'Aoede' || stored === 'Kore' ? 'Aoede' : 'Puck';
     }
     return 'Puck';
   });

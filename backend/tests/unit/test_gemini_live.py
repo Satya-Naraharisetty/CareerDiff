@@ -107,7 +107,8 @@ def test_gemini_live_bridge_initialization() -> None:
     bridge = GeminiLiveBridge(interview)
     assert bridge.interview.target_seniority == "STAFF"
     assert bridge.interview.session_policy.get("target_company") == "Stripe"
-    assert bridge.voice_name == "Charon"
+    # Legacy male voice Charon safely maps to canonical male voice Puck
+    assert bridge.voice_name == "Puck"
     assert bridge._active is False
     assert bridge._session is None
 
@@ -115,6 +116,8 @@ def test_gemini_live_bridge_initialization() -> None:
     bridge_fallback = GeminiLiveBridge(interview, voice_name="NonExistentVoice")
     assert bridge_fallback.voice_name == "Puck"
 
-    # Explicit voice override test
-    bridge_override = GeminiLiveBridge(interview, voice_name="Aoede")
-    assert bridge_override.voice_name == "Aoede"
+    # Canonical female voice test
+    bridge_female = GeminiLiveBridge(interview, voice_name="Aoede")
+    assert bridge_female.voice_name == "Aoede"
+    female_prompt = build_live_system_instruction(interview, voice_name="Aoede")
+    assert "Maya" in female_prompt

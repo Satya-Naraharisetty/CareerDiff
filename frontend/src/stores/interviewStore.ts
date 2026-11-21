@@ -212,7 +212,8 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       }
       let selectedVoice = 'Puck';
       if (typeof localStorage !== 'undefined') {
-        selectedVoice = localStorage.getItem('careerdiff_gemini_voice') || 'Puck';
+        const stored = localStorage.getItem('careerdiff_gemini_voice');
+        selectedVoice = stored === 'Aoede' || stored === 'Kore' ? 'Aoede' : 'Puck';
       }
       const separator = ticketRes.websocket_url.includes('?') ? '&' : '?';
       const wsUrl = `${wsBase}${ticketRes.websocket_url}${separator}voice=${encodeURIComponent(selectedVoice)}`;

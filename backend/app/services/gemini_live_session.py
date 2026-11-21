@@ -29,29 +29,27 @@ class GeminiLiveEvent:
     audio_bytes: bytes | None = None
 
 
-SUPPORTED_VOICES = {"Puck", "Charon", "Aoede", "Kore", "Fenrir"}
+SUPPORTED_VOICES = {"Puck", "Aoede"}
 
 VOICE_PERSONAS: dict[str, dict[str, str]] = {
     "Puck": {
         "interviewer_name": "Alex",
+        "gender": "Male",
         "style": "warm, conversational, engaging, and collaborative—like a friendly senior peer engineer having a whiteboard discussion",
-    },
-    "Charon": {
-        "interviewer_name": "Marcus",
-        "style": "calm, deep, grounded, and authoritative—like a thoughtful Principal Architect evaluating system durability",
     },
     "Aoede": {
         "interviewer_name": "Maya",
+        "gender": "Female",
         "style": "rich, articulate, dynamic, and expressive—like an insightful Staff Engineer exploring architecture trade-offs",
     },
-    "Kore": {
-        "interviewer_name": "Sarah",
-        "style": "clear, steady, empathetic, and professional—like an experienced Engineering Lead focusing on clarity and reliability",
-    },
-    "Fenrir": {
-        "interviewer_name": "James",
-        "style": "crisp, direct, focused, and technically sharp—like a Systems Specialist zeroing in on concurrency and latency bottlenecks",
-    },
+}
+
+VOICE_FALLBACK_MAP: dict[str, str] = {
+    "Puck": "Puck",
+    "Charon": "Puck",
+    "Fenrir": "Puck",
+    "Aoede": "Aoede",
+    "Kore": "Aoede",
 }
 
 
@@ -138,7 +136,8 @@ class GeminiLiveBridge:
         policy = getattr(interview, "session_policy", {}) or {}
         policy_voice = policy.get("interviewer_voice") if isinstance(policy, dict) else None
         cand_voice = voice_name or policy_voice or self.settings.gemini_live_voice or "Puck"
-        self.voice_name = cand_voice if cand_voice in SUPPORTED_VOICES else "Puck"
+        resolved_voice = VOICE_FALLBACK_MAP.get(cand_voice, cand_voice if cand_voice in SUPPORTED_VOICES else "Puck")
+        self.voice_name = resolved_voice
 
     async def connect(self) -> AsyncGenerator[GeminiLiveEvent, None]:
         """Establish Gemini Live WebSocket connection and yield live events continuously."""
