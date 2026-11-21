@@ -82,28 +82,39 @@ def test_build_live_system_instruction() -> None:
         blueprint=blueprint,
     )
 
-    prompt = build_live_system_instruction(interview)
+    prompt = build_live_system_instruction(interview, voice_name="Puck")
 
     assert "GlobalFinTech Corp" in prompt
     assert "SENIOR" in prompt
     assert "Venkat Raman" in prompt
     assert "Distributed Systems & Concurrency" in prompt
     assert "Kafka" in prompt
-    assert "conversational fillers" in prompt
-    assert "1 to 3 sentences maximum" in prompt
+    assert "Alex" in prompt
+    assert "Spoken Conversational Realism" in prompt
+    assert "Prosody & Inflection" in prompt
+    assert "warm, natural human tone" in prompt
 
 
 def test_gemini_live_bridge_initialization() -> None:
-    """Verify GeminiLiveBridge initializes with target interview and settings."""
+    """Verify GeminiLiveBridge initializes with target interview, settings, and voice."""
     interview = Interview(
         id=uuid.uuid4(),
         candidate_profile_id=uuid.uuid4(),
         role_id=uuid.uuid4(),
         target_seniority="STAFF",
-        session_policy={"target_company": "Stripe"},
+        session_policy={"target_company": "Stripe", "interviewer_voice": "Charon"},
     )
     bridge = GeminiLiveBridge(interview)
     assert bridge.interview.target_seniority == "STAFF"
     assert bridge.interview.session_policy.get("target_company") == "Stripe"
+    assert bridge.voice_name == "Charon"
     assert bridge._active is False
     assert bridge._session is None
+
+    # Unsupported voice fallback test
+    bridge_fallback = GeminiLiveBridge(interview, voice_name="NonExistentVoice")
+    assert bridge_fallback.voice_name == "Puck"
+
+    # Explicit voice override test
+    bridge_override = GeminiLiveBridge(interview, voice_name="Aoede")
+    assert bridge_override.voice_name == "Aoede"

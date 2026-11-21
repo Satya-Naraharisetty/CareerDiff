@@ -29,8 +29,34 @@ class GeminiLiveEvent:
     audio_bytes: bytes | None = None
 
 
-def build_live_system_instruction(interview: Interview) -> str:
-    """Build detailed interviewer system prompt based on candidate resume and blueprint."""
+SUPPORTED_VOICES = {"Puck", "Charon", "Aoede", "Kore", "Fenrir"}
+
+VOICE_PERSONAS: dict[str, dict[str, str]] = {
+    "Puck": {
+        "interviewer_name": "Alex",
+        "style": "warm, conversational, engaging, and collaborative—like a friendly senior peer engineer having a whiteboard discussion",
+    },
+    "Charon": {
+        "interviewer_name": "Marcus",
+        "style": "calm, deep, grounded, and authoritative—like a thoughtful Principal Architect evaluating system durability",
+    },
+    "Aoede": {
+        "interviewer_name": "Maya",
+        "style": "rich, articulate, dynamic, and expressive—like an insightful Staff Engineer exploring architecture trade-offs",
+    },
+    "Kore": {
+        "interviewer_name": "Sarah",
+        "style": "clear, steady, empathetic, and professional—like an experienced Engineering Lead focusing on clarity and reliability",
+    },
+    "Fenrir": {
+        "interviewer_name": "James",
+        "style": "crisp, direct, focused, and technically sharp—like a Systems Specialist zeroing in on concurrency and latency bottlenecks",
+    },
+}
+
+
+def build_live_system_instruction(interview: Interview, voice_name: str = "Puck") -> str:
+    """Build detailed interviewer system prompt based on candidate resume, blueprint, and voice persona."""
     seniority = getattr(interview, "target_seniority", None) or "SENIOR"
 
     policy = getattr(interview, "session_policy", {}) or {}
@@ -43,6 +69,10 @@ def build_live_system_instruction(interview: Interview) -> str:
     candidate_name = "Candidate"
     if getattr(interview, "candidate_profile", None) and interview.candidate_profile.user:
         candidate_name = interview.candidate_profile.user.full_name or "Candidate"
+
+    persona = VOICE_PERSONAS.get(voice_name, VOICE_PERSONAS["Puck"])
+    interviewer_name = persona["interviewer_name"]
+    interviewer_style = persona["style"]
 
     topics_summary = ""
     blueprint = getattr(interview, "blueprint", None)
@@ -67,35 +97,48 @@ def build_live_system_instruction(interview: Interview) -> str:
             claims_summary = "\n".join(claim_lines)
 
     return (
-        f"You are the Lead Technical Interviewer at {company}, conducting a live {seniority} engineering interview "
-        f"with {candidate_name}.\n\n"
+        f"You are {interviewer_name}, Lead Technical Interviewer at {company}, conducting an interactive, live {seniority} engineering interview "
+        f"with {candidate_name}.\n"
+        f"Your vocal style is {interviewer_style}.\n\n"
         f"Interview Blueprint & Competencies:\n"
         f"{topics_summary or '- Distributed Systems, Concurrency, and System Architecture'}\n\n"
-        f"Candidate Resume Context (Verify these claims if relevant):\n"
+        f"Candidate Resume Claims (Verify and explore these during relevant topics):\n"
         f"{claims_summary or '- Senior Software Engineer background'}\n\n"
-        f"Conversational Directives for Voice Interaction:\n"
-        f"1. You are speaking aloud over a live voice connection. Keep responses concise, punchy, and conversational "
-        f"(1 to 3 sentences maximum per turn).\n"
-        f"2. Ask only ONE focused, technically probing question at a time.\n"
-        f"3. When the candidate explains an architecture or design decision, use natural spoken conversational fillers "
-        f"while analyzing their reasoning (e.g., 'Understood, let's look at that partition key strategy...', "
-        f"'Got it, what happens if that replica node crashes?').\n"
-        f"4. Probe for failure modes, concurrency race conditions, consensus trade-offs, and scalability bottlenecks.\n"
-        f"5. Maintain a professional, encouraging, yet rigorous technical standard fitting a {seniority} interview at {company}.\n"
-        f"6. Never reveal solutions or evaluate yourself; continuously challenge the candidate to justify their technical decisions."
+        f"Human Vocal Delivery & Conversational Directives:\n"
+        f"1. Spoken Conversational Realism: You are speaking live over an audio voice call. Speak with an authentic, "
+        f"warm, natural human tone—just like a real engineer having an engaging whiteboard discussion over Zoom or coffee.\n"
+        f"2. Prosody & Inflection: Never sound robotic, flat, or scripted. Vary your pitch contours, pacing, and vocal inflection "
+        f"dynamically as a human speaker does. Emphasize key architectural concepts with natural spoken emphasis.\n"
+        f"3. Spoken Fillers & Active Listening: When the candidate answers, briefly acknowledge their point before asking the next question "
+        f"(e.g., 'Got it...', 'Hmm, interesting trade-off—', 'Right, that makes total sense.', 'Understood, let's look closer at that...'). "
+        f"Use natural human conversational rhythm with occasional micro-pauses for thought.\n"
+        f"4. Concise Spoken Turns: Keep your spoken output to 1 to 2 crisp, focused sentences per turn. Do not give speeches or monologues. "
+        f"Ask exactly ONE clear, technically probing question at a time.\n"
+        f"5. Conversational Contractions: Always use natural spoken contractions ('I'd', 'we've', 'that's', 'let's', 'it's', 'you're') "
+        f"instead of stiff, formal written phrases ('I would', 'let us', 'that is').\n"
+        f"6. Natural Dialogue Transitions: Never announce administrative states (e.g., do not say 'Moving to Topic 2' or 'Question 3:'). "
+        f"Seamlessly weave transitions into the conversation: 'Nice. Building on that, how would this handle a network partition between data centers?'\n"
+        f"7. Professional & Encouraging Rigor: Maintain high technical standards for a {seniority} role at {company}, "
+        f"while being respectful, curious, and collaborative.\n"
+        f"8. Never reveal solutions or evaluate yourself; continuously challenge the candidate to justify their technical decisions."
     )
 
 
 class GeminiLiveBridge:
     """Bidirectional streaming bridge connecting CareerDiff voice gateway to Gemini Live API."""
 
-    def __init__(self, interview: Interview) -> None:
+    def __init__(self, interview: Interview, voice_name: str | None = None) -> None:
         self.interview = interview
         self.settings = get_settings()
         self._session: Any = None
         self._active = False
         self._input_transcript_buffer: list[str] = []
         self._output_transcript_buffer: list[str] = []
+
+        policy = getattr(interview, "session_policy", {}) or {}
+        policy_voice = policy.get("interviewer_voice") if isinstance(policy, dict) else None
+        cand_voice = voice_name or policy_voice or self.settings.gemini_live_voice or "Puck"
+        self.voice_name = cand_voice if cand_voice in SUPPORTED_VOICES else "Puck"
 
     async def connect(self) -> AsyncGenerator[GeminiLiveEvent, None]:
         """Establish Gemini Live WebSocket connection and yield live events continuously."""
@@ -107,7 +150,7 @@ class GeminiLiveBridge:
             http_options=types.HttpOptions(api_version="v1alpha"),
         )
 
-        system_instruction = build_live_system_instruction(self.interview)
+        system_instruction = build_live_system_instruction(self.interview, voice_name=self.voice_name)
 
         # Attempt gemini-3.8-live-extended-thinking first, with fallback to gemini-3.8-live
         model_candidates = [
@@ -123,6 +166,11 @@ class GeminiLiveBridge:
             is_extended_thinking = "extended-thinking" in model_name
             config_args: dict[str, Any] = {
                 "response_modalities": [types.Modality.AUDIO],
+                "speech_config": types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=self.voice_name)
+                    )
+                ),
                 "system_instruction": types.Content(parts=[types.Part(text=system_instruction)]),
                 "input_audio_transcription": types.AudioTranscriptionConfig(),
                 "output_audio_transcription": types.AudioTranscriptionConfig(),

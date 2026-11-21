@@ -107,6 +107,9 @@ class Settings(BaseModel):
     gemini_live_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_LIVE_MODEL", "gemini-3.8-live-extended-thinking")
     )
+    gemini_live_voice: str = Field(
+        default_factory=lambda: os.getenv("GEMINI_LIVE_VOICE", "Puck")
+    )
     gemini_eval_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_EVAL_MODEL", "gemini-4-argon")
     )

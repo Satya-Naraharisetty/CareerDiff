@@ -35,6 +35,14 @@ interface DiagramPreset {
   description: string;
 }
 
+const GEMINI_LIVE_VOICES = [
+  { id: 'Puck', label: 'Alex (Warm & Natural)', description: 'Conversational, warm, natural tenor (Recommended)' },
+  { id: 'Charon', label: 'Marcus (Deep Architect)', description: 'Deep, grounded, authoritative Principal Architect' },
+  { id: 'Aoede', label: 'Maya (Expressive Staff)', description: 'Rich, articulate, dynamic Staff Engineer' },
+  { id: 'Kore', label: 'Sarah (Steady Lead)', description: 'Clear, steady, empathetic Engineering Lead' },
+  { id: 'Fenrir', label: 'James (Direct Systems)', description: 'Crisp, direct, sharp Systems Specialist' },
+];
+
 const DIAGRAM_PRESETS: DiagramPreset[] = [
   {
     name: 'Microservices & Gateway',
@@ -569,21 +577,23 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [typingTurnIndex, setTypingTurnIndex] = useState<number | null>(null);
   const [typedText, setTypedText] = useState<string>('');
   const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(false);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>('');
-
-  useEffect(() => {
-    const updateVoices = () => {
-      const list = BrowserSpeechSynthesizer.getAvailableVoices();
-      setAvailableVoices(list);
-      const best = BrowserSpeechSynthesizer.getBestVoice();
-      if (best) setSelectedVoice(best.name);
-    };
-    updateVoices();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+  const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<string>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('careerdiff_gemini_voice') || 'Puck';
     }
-  }, []);
+    return 'Puck';
+  });
+
+  const handleVoiceChange = (newVoice: string) => {
+    setSelectedGeminiVoice(newVoice);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('careerdiff_gemini_voice', newVoice);
+    }
+    if (mode === 'VOICE') {
+      initVoiceSession().catch(() => {});
+    }
+  };
+
   const lastSpokenTurnRef = useRef<number | null>(null);
   const activeSynthesizerCancelRef = useRef<(() => void) | null>(null);
   const roomVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -1091,26 +1101,23 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
               <span className="hidden sm:inline">{!isVoiceMuted ? 'Voice' : 'Muted'}</span>
             </button>
 
-            {/* High-Fidelity Natural Voice Selector */}
-            {availableVoices.length > 0 && !isVoiceMuted && (
-              <select
-                value={selectedVoice}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSelectedVoice(v);
-                  if (typeof localStorage !== 'undefined') {
-                    localStorage.setItem('careerdiff_interviewer_voice', v);
-                  }
-                }}
-                title="Select Interviewer Natural Voice"
-                className="hidden xl:inline-block rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-[11px] font-mono text-zinc-300 focus:outline-none focus:border-zinc-600 max-w-[140px] truncate"
-              >
-                {availableVoices.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name.replace(/(Microsoft|Google|Online|\(Natural\)|English \(United States\))/gi, '').trim() || v.name}
-                  </option>
-                ))}
-              </select>
+            {/* High-Fidelity Gemini Live Natural Voice Persona Selector */}
+            {!isVoiceMuted && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs font-mono">
+                <span className="text-[11px] text-zinc-500 hidden sm:inline">Voice:</span>
+                <select
+                  value={selectedGeminiVoice}
+                  onChange={(e) => handleVoiceChange(e.target.value)}
+                  title="Interviewer Voice Persona & Human Tone (Gemini Multimodal Live)"
+                  className="bg-transparent text-[11px] font-mono text-zinc-200 focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate"
+                >
+                  {GEMINI_LIVE_VOICES.map((v) => (
+                    <option key={v.id} value={v.id} title={v.description} className="bg-zinc-900 text-zinc-200">
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
 
             <button

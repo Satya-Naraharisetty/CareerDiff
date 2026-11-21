@@ -61,6 +61,7 @@ export class PcmPlayer {
   private nextPlayTime: number = 0;
   private activeSources: AudioBufferSourceNode[] = [];
   private sampleRate: number;
+  private inputNode: AudioNode | null = null;
 
   constructor(sampleRate: number = 24000) {
     this.sampleRate = sampleRate;
@@ -76,7 +77,48 @@ export class PcmPlayer {
   private getContext(): AudioContext {
     if (!this.audioCtx || this.audioCtx.state === 'closed') {
       const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioCtx = new AudioContextClass({ sampleRate: this.sampleRate });
+      const ctx = new AudioContextClass({ sampleRate: this.sampleRate });
+      this.audioCtx = ctx;
+
+      // Studio-Grade Acoustic Processing Graph for Human Vocal Realism:
+      // 1. High-Pass Filter: Cuts sub-audible low rumble & DC offset (< 80 Hz)
+      const highPass = ctx.createBiquadFilter();
+      highPass.type = 'highpass';
+      highPass.frequency.value = 80;
+      highPass.Q.value = 0.7;
+
+      // 2. Vocal Presence Peaking EQ: Emphasizes vocal clarity & intimacy (2.8 kHz, +1.8 dB)
+      const presence = ctx.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = 2800;
+      presence.Q.value = 0.9;
+      presence.gain.value = 1.8;
+
+      // 3. High-Shelf De-Hiss Filter: Rolls off harsh digital sibilance (> 9.5 kHz, -1.5 dB)
+      const deHiss = ctx.createBiquadFilter();
+      deHiss.type = 'highshelf';
+      deHiss.frequency.value = 9500;
+      deHiss.gain.value = -1.5;
+
+      // 4. Dynamics Compressor: Provides broadcast-level speech warmth & consistency
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -22;
+      compressor.knee.value = 10;
+      compressor.ratio.value = 3.0;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.12;
+
+      // 5. Master Gain Node
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 1.0;
+
+      highPass.connect(presence);
+      presence.connect(deHiss);
+      deHiss.connect(compressor);
+      compressor.connect(masterGain);
+      masterGain.connect(ctx.destination);
+
+      this.inputNode = highPass;
     }
     if (this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
@@ -91,6 +133,8 @@ export class PcmPlayer {
     const rate = customRate || this.sampleRate;
     const ctx = this.getContext();
     const int16Array = new Int16Array(pcm16Data);
+    if (int16Array.length === 0) return;
+
     const float32Array = new Float32Array(int16Array.length);
 
     // Convert Int16 [-32768, 32767] to Float32 [-1.0, 1.0]
@@ -103,11 +147,13 @@ export class PcmPlayer {
 
     const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(ctx.destination);
+    source.connect(this.inputNode || ctx.destination);
 
     const currentTime = ctx.currentTime;
+    // Jitter lead buffer: if playback queue has fallen behind, add a 50ms buffer
+    // to prevent packet-arrival underrun clicks/pops.
     if (this.nextPlayTime < currentTime) {
-      this.nextPlayTime = currentTime;
+      this.nextPlayTime = currentTime + 0.05;
     }
 
     source.start(this.nextPlayTime);
@@ -145,6 +191,7 @@ export class PcmPlayer {
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
       this.audioCtx.close().catch(() => { });
       this.audioCtx = null;
+      this.inputNode = null;
     }
   }
 }

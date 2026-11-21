@@ -31,6 +31,7 @@ async def interview_voice_gateway(
     websocket: WebSocket,
     interview_id: uuid.UUID,
     ticket: str | None = Query(default=None),
+    voice: str | None = Query(default=None),
 ) -> None:
     """Real-time voice streaming endpoint multiplexing 16kHz PCM audio and JSON control frames."""
     redis = get_redis_client()
@@ -122,7 +123,7 @@ async def interview_voice_gateway(
         # Enable Gemini Live API (gemini-3.8-live-extended-thinking) when configured outside test suite
         if settings.gemini_api_key and settings.environment != "testing":
             try:
-                live_bridge = GeminiLiveBridge(interview)
+                live_bridge = GeminiLiveBridge(interview, voice_name=voice)
             except Exception as exc:
                 logger.warning("Could not initialize GeminiLiveBridge, using fallback: %s", exc)
                 live_bridge = None
