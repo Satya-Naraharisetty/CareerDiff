@@ -180,6 +180,8 @@ export class BrowserSpeechSynthesizer {
       return () => {};
     }
 
+    options.onTypingProgress?.('', 0);
+
     // Ensure audio subsystem is active
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
@@ -210,10 +212,35 @@ export class BrowserSpeechSynthesizer {
       }
     };
 
+    let simulatedProgress = 0;
+
     utterance.onstart = () => {
       if (cancelled) return;
       this.isSpeakingNow = true;
       options.onStart?.();
+
+      // Start typewriter pacing only after speech has physically onset
+      const totalWords = cleanSpeech.split(/\s+/).length;
+      const estDurationSec = Math.max(1.2, totalWords / 2.6); // ~155 WPM
+      const intervalMs = 40;
+      const stepIncrement = Math.max(1, (fullText.length / (estDurationSec * 1000)) * intervalMs);
+
+      fallbackTimer = window.setInterval(() => {
+        if (cancelled) {
+          if (fallbackTimer !== null) clearInterval(fallbackTimer);
+          return;
+        }
+
+        // If browser boundary events are driving typing, let them lead
+        if (hasBoundaryFired) return;
+
+        simulatedProgress = Math.min(fullText.length, simulatedProgress + stepIncrement);
+        options.onTypingProgress?.(fullText.slice(0, Math.round(simulatedProgress)), Math.round(simulatedProgress));
+
+        if (simulatedProgress >= fullText.length) {
+          if (fallbackTimer !== null) clearInterval(fallbackTimer);
+        }
+      }, intervalMs);
     };
 
     utterance.onboundary = (event) => {
@@ -249,30 +276,6 @@ export class BrowserSpeechSynthesizer {
       options.onEnd?.();
       options.onError?.(err);
     };
-
-    // Smooth fallback typewriter to ensure real-time typing even if onboundary is unhandled
-    const totalWords = cleanSpeech.split(/\s+/).length;
-    const estDurationSec = Math.max(1.2, totalWords / 2.6); // ~155 WPM
-    const intervalMs = 40;
-    const stepIncrement = Math.max(1, (fullText.length / (estDurationSec * 1000)) * intervalMs);
-
-    let simulatedProgress = 0;
-    fallbackTimer = window.setInterval(() => {
-      if (cancelled) {
-        if (fallbackTimer !== null) clearInterval(fallbackTimer);
-        return;
-      }
-
-      // If browser boundary events are driving typing, let them lead
-      if (hasBoundaryFired) return;
-
-      simulatedProgress = Math.min(fullText.length, simulatedProgress + stepIncrement);
-      options.onTypingProgress?.(fullText.slice(0, Math.round(simulatedProgress)), Math.round(simulatedProgress));
-
-      if (simulatedProgress >= fullText.length) {
-        if (fallbackTimer !== null) clearInterval(fallbackTimer);
-      }
-    }, intervalMs);
 
     try {
       window.speechSynthesis.speak(utterance);

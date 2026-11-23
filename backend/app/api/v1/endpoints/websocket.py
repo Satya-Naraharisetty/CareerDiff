@@ -277,50 +277,51 @@ async def interview_voice_gateway(
 
             async def stream_initial_pcm() -> None:
                 try:
-                    logger.info("Streaming Turn 0 ElevenLabs-quality neural audio chunks to client for interview %s...", interview_id)
-                    chunks_sent = 0
-                    async for chunk in TTSService.synthesize_pcm_stream(
-                        tts_text, voice_name=voice, realtime_delay=False
-                    ):
-                        if tts_abort_event.is_set():
-                            break
-                        if chunks_sent == 0:
-                            # Synchronized dispatch: emit interviewer_speaking together with first audio chunk
-                            await websocket.send_json(
-                                {
-                                    "type": "interviewer_speaking",
-                                    "turn_index": active_interviewer_turn_index,
-                                    "action": "WARMUP",
-                                    "question_text": tts_text,
-                                }
-                            )
-                        await websocket.send_bytes(chunk)
-                        chunks_sent += 1
-                    if not tts_abort_event.is_set():
-                        if chunks_sent == 0:
-                            logger.info("[VOICE GATEWAY] No server PCM audio available; signaling browser TTS fallback for Turn 0")
-                            await websocket.send_json(
-                                {
-                                    "type": "interviewer_speaking",
-                                    "turn_index": active_interviewer_turn_index,
-                                    "action": "WARMUP",
-                                    "question_text": tts_text,
-                                }
-                            )
-                            await websocket.send_json(
-                                {
-                                    "type": "tts_fallback_browser",
-                                    "turn_index": active_interviewer_turn_index,
-                                    "question_text": tts_text,
-                                }
-                            )
-                        else:
+                    logger.info("Synthesizing and streaming Turn 0 ElevenLabs-quality neural audio for interview %s...", interview_id)
+                    pcm_raw = await TTSService.prewarm(tts_text, voice_name=voice)
+                    if tts_abort_event.is_set():
+                        return
+                    if pcm_raw:
+                        duration_ms = int(len(pcm_raw) / (TTSService.SAMPLE_RATE * TTSService.BYTES_PER_SAMPLE) * 1000)
+                        # Synchronized dispatch: emit interviewer_speaking together with exact audio duration
+                        await websocket.send_json(
+                            {
+                                "type": "interviewer_speaking",
+                                "turn_index": active_interviewer_turn_index,
+                                "action": "WARMUP",
+                                "question_text": tts_text,
+                                "duration_ms": duration_ms,
+                            }
+                        )
+                        chunk_size = TTSService.CHUNK_SIZE_BYTES
+                        for offset in range(0, len(pcm_raw), chunk_size):
+                            if tts_abort_event.is_set():
+                                break
+                            await websocket.send_bytes(pcm_raw[offset : offset + chunk_size])
+                        if not tts_abort_event.is_set():
                             await websocket.send_json(
                                 {
                                     "type": "interviewer_audio_done",
                                     "turn_index": active_interviewer_turn_index,
                                 }
                             )
+                    else:
+                        logger.info("[VOICE GATEWAY] No server PCM audio available; signaling browser TTS fallback for Turn 0")
+                        await websocket.send_json(
+                            {
+                                "type": "interviewer_speaking",
+                                "turn_index": active_interviewer_turn_index,
+                                "action": "WARMUP",
+                                "question_text": tts_text,
+                            }
+                        )
+                        await websocket.send_json(
+                            {
+                                "type": "tts_fallback_browser",
+                                "turn_index": active_interviewer_turn_index,
+                                "question_text": tts_text,
+                            }
+                        )
                 except asyncio.CancelledError:
                     pass
 
@@ -377,50 +378,50 @@ async def interview_voice_gateway(
 
                 async def stream_response_pcm() -> None:
                     try:
-                        logger.info("[TTS] Streaming synthesized ElevenLabs-quality neural audio for Turn #%d...", interviewer_reply.turn_index)
-                        chunks_sent = 0
-                        async for chunk in TTSService.synthesize_pcm_stream(
-                            interviewer_reply.transcript, voice_name=voice, realtime_delay=False
-                        ):
-                            if tts_abort_event.is_set():
-                                break
-                            if chunks_sent == 0:
-                                # Synchronized dispatch: emit interviewer_speaking together with first audio chunk
-                                await websocket.send_json(
-                                    {
-                                        "type": "interviewer_speaking",
-                                        "turn_index": interviewer_reply.turn_index,
-                                        "action": interviewer_reply.action_taken.value,
-                                        "question_text": interviewer_reply.transcript,
-                                    }
-                                )
-                            await websocket.send_bytes(chunk)
-                            chunks_sent += 1
-                        if not tts_abort_event.is_set():
-                            if chunks_sent == 0:
-                                logger.info("[TTS] No server PCM audio available; signaling browser TTS fallback for Turn #%d", interviewer_reply.turn_index)
-                                await websocket.send_json(
-                                    {
-                                        "type": "interviewer_speaking",
-                                        "turn_index": interviewer_reply.turn_index,
-                                        "action": interviewer_reply.action_taken.value,
-                                        "question_text": interviewer_reply.transcript,
-                                    }
-                                )
-                                await websocket.send_json(
-                                    {
-                                        "type": "tts_fallback_browser",
-                                        "turn_index": interviewer_reply.turn_index,
-                                        "question_text": interviewer_reply.transcript,
-                                    }
-                                )
-                            else:
+                        logger.info("[TTS] Synthesizing and streaming neural audio for Turn #%d...", interviewer_reply.turn_index)
+                        pcm_raw = await TTSService.prewarm(interviewer_reply.transcript, voice_name=voice)
+                        if tts_abort_event.is_set():
+                            return
+                        if pcm_raw:
+                            duration_ms = int(len(pcm_raw) / (TTSService.SAMPLE_RATE * TTSService.BYTES_PER_SAMPLE) * 1000)
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_speaking",
+                                    "turn_index": interviewer_reply.turn_index,
+                                    "action": interviewer_reply.action_taken.value,
+                                    "question_text": interviewer_reply.transcript,
+                                    "duration_ms": duration_ms,
+                                }
+                            )
+                            chunk_size = TTSService.CHUNK_SIZE_BYTES
+                            for offset in range(0, len(pcm_raw), chunk_size):
+                                if tts_abort_event.is_set():
+                                    break
+                                await websocket.send_bytes(pcm_raw[offset : offset + chunk_size])
+                            if not tts_abort_event.is_set():
                                 await websocket.send_json(
                                     {
                                         "type": "interviewer_audio_done",
                                         "turn_index": interviewer_reply.turn_index,
                                     }
                                 )
+                        else:
+                            logger.info("[TTS] No server PCM audio available; signaling browser TTS fallback for Turn #%d", interviewer_reply.turn_index)
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_speaking",
+                                    "turn_index": interviewer_reply.turn_index,
+                                    "action": interviewer_reply.action_taken.value,
+                                    "question_text": interviewer_reply.transcript,
+                                }
+                            )
+                            await websocket.send_json(
+                                {
+                                    "type": "tts_fallback_browser",
+                                    "turn_index": interviewer_reply.turn_index,
+                                    "question_text": interviewer_reply.transcript,
+                                }
+                            )
                     except asyncio.CancelledError:
                         pass
 

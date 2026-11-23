@@ -63,6 +63,11 @@ export class PcmPlayer {
   private sampleRate: number;
   private inputNode: AudioNode | null = null;
   public onAllEnded: (() => void) | null = null;
+  public onProgress: ((ratio: number) => void) | null = null;
+  public onPlaybackStart: (() => void) | null = null;
+  private progressInterval: number | null = null;
+  private utteranceStartTime: number = 0;
+  private totalUtteranceDuration: number = 0;
 
   constructor(sampleRate: number = 24000) {
     this.sampleRate = sampleRate;
@@ -146,6 +151,21 @@ export class PcmPlayer {
   }
 
   /**
+   * Pre-configures utterance duration for perfect character-audio lockstep.
+   */
+  prepareUtterance(expectedDurationSec?: number): void {
+    if (this.progressInterval !== null) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
+    const ctx = this.getContext();
+    this.utteranceStartTime = Math.max(ctx.currentTime + 0.05, this.nextPlayTime);
+    this.totalUtteranceDuration = expectedDurationSec || 0;
+    this.onProgress?.(0.0);
+    this.startProgressTracking();
+  }
+
+  /**
    * Queue and play raw 16-bit signed integer Linear PCM buffer (24kHz Gemini Live or 16kHz fallback)
    */
   feed(pcm16Data: ArrayBuffer, customRate?: number): void {
@@ -175,6 +195,21 @@ export class PcmPlayer {
       this.nextPlayTime = currentTime + 0.05;
     }
 
+    if (this.activeSources.length === 0) {
+      this.utteranceStartTime = this.nextPlayTime;
+      if (this.totalUtteranceDuration <= 0) {
+        this.totalUtteranceDuration = audioBuffer.duration;
+      }
+      this.startProgressTracking();
+    } else if (this.totalUtteranceDuration > 0) {
+      this.totalUtteranceDuration = Math.max(
+        this.totalUtteranceDuration,
+        this.nextPlayTime - this.utteranceStartTime + audioBuffer.duration
+      );
+    } else {
+      this.totalUtteranceDuration += audioBuffer.duration;
+    }
+
     source.start(this.nextPlayTime);
     this.nextPlayTime += audioBuffer.duration;
 
@@ -184,10 +219,48 @@ export class PcmPlayer {
       if (idx !== -1) {
         this.activeSources.splice(idx, 1);
       }
-      if (this.activeSources.length === 0 && this.onAllEnded) {
-        this.onAllEnded();
+      if (this.activeSources.length === 0) {
+        if (this.progressInterval !== null) {
+          clearInterval(this.progressInterval);
+          this.progressInterval = null;
+        }
+        if (this.onProgress) {
+          this.onProgress(1.0);
+        }
+        if (this.onAllEnded) {
+          this.onAllEnded();
+        }
       }
     };
+  }
+
+  private startProgressTracking(): void {
+    if (this.progressInterval !== null) {
+      clearInterval(this.progressInterval);
+    }
+    let playbackStarted = false;
+    this.progressInterval = window.setInterval(() => {
+      if (!this.audioCtx) {
+        if (this.progressInterval !== null) {
+          clearInterval(this.progressInterval);
+          this.progressInterval = null;
+        }
+        return;
+      }
+      const cur = this.audioCtx.currentTime;
+      if (cur < this.utteranceStartTime) {
+        this.onProgress?.(0.0);
+        return;
+      }
+      if (!playbackStarted) {
+        playbackStarted = true;
+        this.onPlaybackStart?.();
+      }
+      const elapsed = cur - this.utteranceStartTime;
+      const total = Math.max(0.1, this.totalUtteranceDuration);
+      const ratio = Math.max(0.0, Math.min(1.0, elapsed / total));
+      this.onProgress?.(ratio);
+    }, 40);
   }
 
   activeSourcesCount(): number {
@@ -198,6 +271,10 @@ export class PcmPlayer {
    * Immediately stops all ongoing playback (Barge-In Preemption)
    */
   stopAll(): void {
+    if (this.progressInterval !== null) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
     for (const src of this.activeSources) {
       try {
         src.stop(0);

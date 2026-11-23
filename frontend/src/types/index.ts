@@ -405,6 +405,7 @@ export type WsServerMessage =
     turn_index: number;
     action: string;
     question_text: string;
+    duration_ms?: number;
   }
   | {
     type: 'interviewer_interrupted';

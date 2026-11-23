@@ -26,6 +26,7 @@ interface InterviewStoreState {
   isRecording: boolean;
   audioLevel: number;
   isInterviewerSpeaking: boolean;
+  interviewerSpeechProgress: number;
   currentTopic: string | null;
   remainingSeconds: number;
   preferredLanguage: string;
@@ -89,6 +90,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
   isRecording: false,
   audioLevel: 0,
   isInterviewerSpeaking: false,
+  interviewerSpeechProgress: 1.0,
   currentTopic: null,
   remainingSeconds: 1800,
   preferredLanguage: 'Python',
@@ -296,8 +298,14 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
       if (pcmPlayer) pcmPlayer.close();
       pcmPlayer = new PcmPlayer();
+      pcmPlayer.onPlaybackStart = () => {
+        set({ isInterviewerSpeaking: true });
+      };
+      pcmPlayer.onProgress = (ratio) => {
+        set({ interviewerSpeechProgress: ratio, isInterviewerSpeaking: true });
+      };
       pcmPlayer.onAllEnded = () => {
-        set({ isInterviewerSpeaking: false });
+        set({ isInterviewerSpeaking: false, interviewerSpeechProgress: 1.0 });
         if (get().mode === 'VOICE' && !get().isRecording) {
           get().startVoiceRecording().catch(() => {});
         }
@@ -411,6 +419,12 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 });
                 break;
               case 'interviewer_speaking':
+                if (pcmPlayer) {
+                  const estDurationSec = msg.duration_ms
+                    ? msg.duration_ms / 1000
+                    : Math.max(1.5, (msg.question_text || '').split(/\s+/).length / 2.5);
+                  pcmPlayer.prepareUtterance(estDurationSec);
+                }
                 set((s) => {
                   const existingIdx = s.turns.findIndex(
                     (t) => t.turn_index === msg.turn_index && t.speaker === 'INTERVIEWER'
@@ -422,10 +436,11 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                       transcript: msg.question_text,
                       action_taken: (msg.action as EngineAction) || updatedTurns[existingIdx].action_taken,
                     };
-                    return { isInterviewerSpeaking: true, turns: updatedTurns };
+                    return { isInterviewerSpeaking: true, interviewerSpeechProgress: 0.0, turns: updatedTurns };
                   }
                   return {
                     isInterviewerSpeaking: true,
+                    interviewerSpeechProgress: 0.0,
                     turns: [
                       ...s.turns,
                       {
@@ -444,7 +459,7 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 if (pcmPlayer) {
                   pcmPlayer.stopAll();
                 }
-                set({ isInterviewerSpeaking: false });
+                set({ isInterviewerSpeaking: false, interviewerSpeechProgress: 1.0 });
                 break;
               case 'state_change':
                 set({

@@ -588,6 +588,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     isRecording,
     audioLevel,
     isInterviewerSpeaking,
+    interviewerSpeechProgress,
     remainingSeconds,
     isVoiceMuted,
     preferredLanguage,
@@ -610,7 +611,6 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [diagramCode, setDiagramCode] = useState<string>(DIAGRAM_PRESETS[0].syntax);
   const [incidentLogs, setIncidentLogs] = useState<string[]>([]);
   const [incidentScript, setIncidentScript] = useState<string>('');
-  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [attachScratchpad, setAttachScratchpad] = useState(true);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
@@ -665,6 +665,28 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const activeSynthesizerCancelRef = useRef<(() => void) | null>(null);
   const roomVideoRef = useRef<HTMLVideoElement | null>(null);
   const roomStreamRef = useRef<MediaStream | null>(null);
+
+  const spokenTurnsRef = useRef<Set<number>>(new Set());
+  const prevSpeakingRef = useRef(isInterviewerSpeaking);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollBottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Mark turn as fully spoken when interviewer finishes speaking
+  useEffect(() => {
+    if (prevSpeakingRef.current && !isInterviewerSpeaking && turns.length > 0) {
+      const latestTurn = turns[turns.length - 1];
+      if (latestTurn.speaker === 'INTERVIEWER') {
+        spokenTurnsRef.current.add(latestTurn.turn_index);
+        setTypingTurnIndex(null);
+      }
+    }
+    prevSpeakingRef.current = isInterviewerSpeaking;
+  }, [isInterviewerSpeaking, turns]);
+
+  // Smooth WhatsApp auto-scroll as new messages, words, or transcripts arrive
+  useEffect(() => {
+    chatScrollBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [turns.length, typedText, partialTranscript, isRecording]);
 
   const setRoomVideoRef = useCallback((node: HTMLVideoElement | null) => {
     roomVideoRef.current = node;
@@ -986,15 +1008,37 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
     }
   }, [isRoomCameraActive]);
 
-  // Synchronized real-time typewriter for interviewer question
+  // Synchronized real-time typewriter for interviewer question (in parallel with audio)
   useEffect(() => {
     if (turns.length === 0) return;
     const latestTurn = turns[turns.length - 1];
 
-    if (
-      latestTurn.speaker === 'INTERVIEWER' &&
-      latestTurn.turn_index !== lastSpokenTurnRef.current
-    ) {
+    if (latestTurn.speaker !== 'INTERVIEWER') return;
+
+    if (spokenTurnsRef.current.has(latestTurn.turn_index)) {
+      setTypingTurnIndex(null);
+      return;
+    }
+
+    if (mode === 'VOICE') {
+      if (!isInterviewerSpeaking) {
+        // Holding before audio onset: keep text hidden so it doesn't leak ahead of audio
+        setTypingTurnIndex(latestTurn.turn_index);
+        setTypedText('');
+        return;
+      }
+      setTypingTurnIndex(latestTurn.turn_index);
+      const progress = Math.max(0, Math.min(1.0, interviewerSpeechProgress));
+      if (progress <= 0.01) {
+        setTypedText('');
+      } else {
+        const visibleChars = Math.max(1, Math.ceil(latestTurn.transcript.length * progress));
+        setTypedText(latestTurn.transcript.slice(0, visibleChars));
+      }
+      return;
+    }
+
+    if (latestTurn.turn_index !== lastSpokenTurnRef.current) {
       lastSpokenTurnRef.current = latestTurn.turn_index;
       setTypingTurnIndex(latestTurn.turn_index);
       setTypedText('');
@@ -1004,24 +1048,10 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
         activeSynthesizerCancelRef.current = null;
       }
 
-      const onTypingProgress = (current: string) => {
-        setTypedText(current);
-      };
-
-      const silent = mode === 'VOICE' || isVoiceMuted;
-
-      const onEnd = () => {
+      if (isVoiceMuted) {
+        setTypedText(latestTurn.transcript);
+        spokenTurnsRef.current.add(latestTurn.turn_index);
         setTypingTurnIndex(null);
-        activeSynthesizerCancelRef.current = null;
-        if (mode === 'VOICE') return;
-        useInterviewStore.setState({ isInterviewerSpeaking: false });
-      };
-
-      if (silent) {
-        activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.fallbackTypewriter(
-          latestTurn.transcript,
-          { onTypingProgress, onEnd }
-        );
         return;
       }
 
@@ -1029,19 +1059,26 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
       activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
         latestTurn.transcript,
         {
-          voiceName: selectedGeminiVoice,
           onStart: () => {},
-          onEnd,
-          onError: () => onEnd(),
-          onBoundary: (_, charIndex) => {
-            const nextSpace = latestTurn.transcript.indexOf(' ', charIndex);
-            const sliceEnd = nextSpace === -1 ? latestTurn.transcript.length : nextSpace;
-            setTypedText(latestTurn.transcript.slice(0, sliceEnd));
+          onEnd: () => {
+            spokenTurnsRef.current.add(latestTurn.turn_index);
+            setTypingTurnIndex(null);
+            activeSynthesizerCancelRef.current = null;
+            useInterviewStore.setState({ isInterviewerSpeaking: false });
+          },
+          onError: () => {
+            spokenTurnsRef.current.add(latestTurn.turn_index);
+            setTypingTurnIndex(null);
+            activeSynthesizerCancelRef.current = null;
+            useInterviewStore.setState({ isInterviewerSpeaking: false });
+          },
+          onTypingProgress: (current: string) => {
+            setTypedText(current);
           },
         }
       );
     }
-  }, [turns, mode, isVoiceMuted, selectedGeminiVoice]);
+  }, [turns, mode, isVoiceMuted, isInterviewerSpeaking, interviewerSpeechProgress]);
 
   const cleanupHardwareMedia = () => {
     try {
@@ -1137,7 +1174,6 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
 
   const lastTurn = turns[turns.length - 1];
   const lastInterviewerTurn = [...turns].reverse().find((t) => t.speaker === 'INTERVIEWER');
-  const lastCandidateTurn = [...turns].reverse().find((t) => t.speaker === 'CANDIDATE');
 
   const awaitingCandidate =
     !!lastTurn && lastTurn.speaker === 'INTERVIEWER' && !isSubmitting && sessionState !== 'COMPLETED';
@@ -1190,6 +1226,12 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
             <span className="font-medium text-zinc-200 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800 max-w-[140px] sm:max-w-none truncate">
               {currentTopic || 'Session Warmup'}
             </span>
+            {blueprint?.topics?.find((t) => t.topic_name === currentTopic && t.mapped_claims_count > 0) && (
+              <span className="hidden lg:inline-flex items-center gap-1 rounded bg-emerald-950/60 px-2 py-0.5 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-800/40">
+                <CheckCircle className="h-3 w-3 text-emerald-400" />
+                Claim Grounded
+              </span>
+            )}
             {lastInterviewerTurn?.question_archetype && ARCHETYPE_CONFIG[lastInterviewerTurn.question_archetype] && (
               <span
                 className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-mono border ${
@@ -1391,93 +1433,124 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
             </div>
           </div>
 
-          {/* DUAL-COLUMN TRANSLUCENT REAL-TIME TRANSCRIPT OVERLAY */}
-          <div className="relative z-10 flex-1 flex flex-col justify-end p-3 sm:p-5 pointer-events-auto overflow-y-auto space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 items-end">
-              {/* LEFT: Interviewer Live Streaming Transcript */}
-              <div className="flex flex-col gap-1.5">
-                <div className="rounded-2xl border border-sky-500/25 bg-slate-950/85 p-3.5 sm:p-4.5 backdrop-blur-xl shadow-2xl text-zinc-100 transition-all">
-                  <div className="flex items-center justify-between gap-2 mb-1.5 font-mono text-[11px]">
-                    <span className="font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                      Interviewer
-                    </span>
-                    <span className="text-zinc-500">
-                      Turn #{lastInterviewerTurn ? lastInterviewerTurn.turn_index : 0}
-                    </span>
+          {/* WHATSAPP-STYLE VERTICAL CHRONOLOGICAL REAL-TIME TRANSCRIPT OVERLAY */}
+          <div
+            ref={chatContainerRef}
+            className="relative z-10 flex-1 flex flex-col justify-end p-3 sm:p-5 pointer-events-auto overflow-y-auto space-y-3.5 scroll-smooth"
+          >
+            <div className="flex flex-col space-y-3.5 justify-end min-h-full">
+              {turns.length === 0 && (
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/25 bg-slate-950/85 p-3.5 sm:p-4.5 backdrop-blur-xl shadow-2xl text-zinc-100">
+                    <div className="flex items-center gap-2 mb-1.5 font-mono text-[11px] text-sky-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
+                      <span className="font-bold uppercase tracking-wider">
+                        {selectedGeminiVoice === 'Aoede' ? 'Maya (Interviewer)' : 'Alex (Interviewer)'}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-sans text-zinc-400 italic">
+                      Waiting for interviewer introduction...
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm font-sans leading-relaxed text-zinc-100 whitespace-pre-wrap">
-                    {typingTurnIndex !== null
-                      ? typedText
-                      : lastInterviewerTurn?.transcript || 'Waiting for interviewer introduction...'}
-                    {typingTurnIndex !== null && (
-                      <span className="inline-block w-1.5 h-3.5 ml-1 bg-sky-400 animate-pulse align-baseline rounded-[1px]" />
-                    )}
-                  </p>
                 </div>
-              </div>
+              )}
 
-              {/* RIGHT: Candidate Live Streaming Transcript */}
-              <div className="flex flex-col gap-1.5 items-end">
-                <div className="w-full rounded-2xl border border-emerald-500/35 bg-slate-950/85 p-3.5 sm:p-4.5 backdrop-blur-xl shadow-2xl text-zinc-100 transition-all">
-                  <div className="flex items-center justify-between gap-2 mb-1.5 font-mono text-[11px]">
-                    <span className="text-zinc-500">
-                      Turn #{lastCandidateTurn ? lastCandidateTurn.turn_index : 1}
-                    </span>
-                    <span className="font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                      {isRecording && (
-                        <span className="text-[10px] text-emerald-400 font-mono animate-pulse">
-                          ● STREAMING
+              {turns.map((turn, idx) => {
+                const isInterviewer = turn.speaker === 'INTERVIEWER';
+                const isLatestTurn = idx === turns.length - 1;
+                const isCurrentlyTyping = isLatestTurn && isInterviewer && typingTurnIndex === turn.turn_index;
+                const hasBeenSpoken = spokenTurnsRef.current.has(turn.turn_index);
+
+                if (isInterviewer) {
+                  return (
+                    <div key={`turn-${turn.turn_index}-${idx}`} className="flex justify-start animate-in fade-in duration-200">
+                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/30 bg-slate-950/85 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100">
+                        <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
+                          <span className="font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                            <span className={`h-1.5 w-1.5 rounded-full bg-sky-400 ${isInterviewerSpeaking && isLatestTurn ? 'animate-ping' : ''}`} />
+                            {selectedGeminiVoice === 'Aoede' ? 'Maya (Interviewer)' : 'Alex (Interviewer)'}
+                          </span>
+                          <span className="text-zinc-500 text-[10px]">
+                            Turn #{turn.turn_index}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm font-sans leading-relaxed text-zinc-100 whitespace-pre-wrap">
+                          {isCurrentlyTyping ? (
+                            <>
+                              {typedText}
+                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-sky-400 animate-pulse align-baseline rounded-[1px]" />
+                            </>
+                          ) : !hasBeenSpoken && isLatestTurn && isInterviewerSpeaking ? (
+                            <>
+                              {typedText}
+                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-sky-400 animate-pulse align-baseline rounded-[1px]" />
+                            </>
+                          ) : !hasBeenSpoken && isLatestTurn && mode === 'VOICE' && !isInterviewerSpeaking ? (
+                            <span className="text-zinc-400 italic flex items-center gap-2">
+                              <span className="inline-block h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+                              Interviewer is preparing question...
+                            </span>
+                          ) : (
+                            turn.transcript
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div key={`turn-${turn.turn_index}-${idx}`} className="flex justify-end animate-in fade-in duration-200">
+                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/35 bg-slate-950/85 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100">
+                        <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
+                          <span className="text-zinc-500 text-[10px]">
+                            Turn #{turn.turn_index}
+                          </span>
+                          <span className="font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                            You (Candidate)
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm font-sans leading-relaxed text-zinc-100 whitespace-pre-wrap">
+                          {turn.transcript}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+              })}
+
+              {/* CANDIDATE LIVE STREAMING SPEECH BUBBLE (Overlaid in WhatsApp flow) */}
+              {isRecording && (
+                <div className="flex justify-end animate-in fade-in duration-150">
+                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/50 bg-slate-950/90 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100 ring-1 ring-emerald-500/20">
+                    <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
+                      <span className="text-emerald-400 font-mono text-[10px] animate-pulse flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                        LIVE TRANSCRIBING
+                      </span>
+                      <span className="font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        You (Speaking...)
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-sans leading-relaxed text-zinc-100 whitespace-pre-wrap">
+                      {partialTranscript && partialTranscript.trim() ? (
+                        <>
+                          {partialTranscript}
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
+                        </>
+                      ) : (
+                        <span className="text-zinc-400 italic font-mono text-xs flex items-center gap-2">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          Listening to your voice... Speak naturally...
                         </span>
                       )}
-                      You (Candidate)
-                    </span>
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm font-sans leading-relaxed text-zinc-100 whitespace-pre-wrap">
-                    {isRecording && partialTranscript && partialTranscript.trim()
-                      ? partialTranscript
-                      : lastCandidateTurn?.transcript ||
-                        (isRecording ? 'Listening for your voice...' : 'Speak into your microphone naturally...')}
-                    {isRecording && (
-                      <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
-                    )}
-                  </p>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Conversation History Drawer (Collapsible) */}
-            {showHistoryDrawer && turns.length > 2 && (
-              <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/95 p-3 backdrop-blur-2xl space-y-2 text-xs font-mono shadow-2xl">
-                <div className="flex items-center justify-between text-zinc-400 border-b border-zinc-800 pb-1.5 mb-1">
-                  <span className="flex items-center gap-1.5 font-semibold text-zinc-200">
-                    <History className="h-3.5 w-3.5 text-zinc-400" /> Earlier Turns ({turns.length - 2})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowHistoryDrawer(false)}
-                    className="text-[11px] text-zinc-400 hover:text-white"
-                  >
-                    Hide
-                  </button>
-                </div>
-                {turns.slice(0, -2).map((t, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-2 rounded border text-[11px] font-sans ${
-                      t.speaker === 'INTERVIEWER'
-                        ? 'border-sky-950 bg-sky-950/20 text-zinc-300'
-                        : 'border-emerald-950 bg-emerald-950/20 text-zinc-200'
-                    }`}
-                  >
-                    <span className="font-semibold font-mono text-[10px] uppercase text-zinc-400 mr-2">
-                      {t.speaker}:
-                    </span>
-                    {t.transcript}
-                  </div>
-                ))}
-              </div>
-            )}
+              <div ref={chatScrollBottomRef} />
+            </div>
           </div>
 
           {/* BOTTOM HUD: Controls & Ergonomics Bar */}
@@ -1497,15 +1570,11 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                 <span className="hidden sm:inline">{showCamera ? 'Camera On' : 'Camera Off'}</span>
               </button>
 
-              {turns.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => setShowHistoryDrawer((prev) => !prev)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 text-xs font-mono"
-                >
+              {turns.length > 0 && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-zinc-800 bg-zinc-900/80 text-zinc-400 text-xs font-mono">
                   <History className="h-3 w-3" />
-                  <span>{showHistoryDrawer ? 'Hide History' : 'History'}</span>
-                </button>
+                  <span>{turns.length} turns</span>
+                </span>
               )}
             </div>
 
