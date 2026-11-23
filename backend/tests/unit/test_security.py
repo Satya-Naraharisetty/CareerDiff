@@ -122,16 +122,11 @@ def test_verify_google_id_token_invalid_signature() -> None:
         assert "INVALID_GOOGLE_TOKEN" in exc_info.value.detail
 
 
-def test_skip_auth_token_bypass() -> None:
-    """Verify decode_access_token resolves mock claims when skip_auth is enabled in non-production."""
-    from unittest.mock import patch
-
-    from app.core.config import Settings
+def test_invalid_bypass_token_rejected() -> None:
+    """Verify decode_access_token strictly rejects arbitrary tokens including legacy bypass strings."""
     from app.core.security import decode_access_token
 
-    dev_settings = Settings(environment="development", skip_auth=True)
-    with patch("app.core.security.settings", dev_settings):
-        payload = decode_access_token("dev-local-bypass-token")
-        assert payload["sub"] == "dev-local-user"
-        assert payload["email"] == "dev@careerdiff.local"
-        assert payload["role"] == "CANDIDATE"
+    with pytest.raises(HTTPException) as exc_info:
+        decode_access_token("dev-local-bypass-token")
+    assert exc_info.value.status_code == 401
+    assert "Invalid authentication token" in exc_info.value.detail

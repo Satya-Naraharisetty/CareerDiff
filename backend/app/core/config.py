@@ -58,10 +58,6 @@ class Settings(BaseModel):
 
     environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development"))
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
-    skip_auth: bool = Field(
-        default_factory=lambda: os.getenv("SKIP_AUTH", os.getenv("SKIP_LOGIN", "false")).lower()
-        in ("1", "true", "yes")
-    )
 
     database_url: str = Field(default_factory=get_default_database_url)
     test_database_url: str = Field(
@@ -146,7 +142,7 @@ class Settings(BaseModel):
     @property
     def is_local_dev(self) -> bool:
         """True only for explicit local development/testing environments."""
-        return self.environment.lower() in ("development", "testing")
+        return self.environment.lower() in ("development", "testing", "local", "dev")
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
@@ -161,11 +157,6 @@ class Settings(BaseModel):
                     "CRITICAL SECURITY CONFIGURATION ERROR: In 'production' environment, "
                     "JWT_SECRET_KEY must be explicitly set with a high-entropy secret "
                     "of at least 32 characters (256-bit entropy)."
-                )
-            if self.skip_auth:
-                raise ValueError(
-                    "CRITICAL SECURITY CONFIGURATION ERROR: SKIP_AUTH cannot be enabled "
-                    "in production environment."
                 )
         return self
 
