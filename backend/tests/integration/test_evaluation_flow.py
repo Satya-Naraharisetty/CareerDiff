@@ -92,8 +92,7 @@ async def test_full_interview_completion_outbox_and_evaluation_flow(
         f"/api/v1/interviews/{interview_id}/report",
         headers=headers,
     )
-    assert rep_pre_res.status_code == 409
-    assert rep_pre_res.json()["detail"] == "REPORT_NOT_READY"
+    assert rep_pre_res.status_code == 404
 
     # 4. Start Interview (Turn 0)
     start_res = await async_client.post(

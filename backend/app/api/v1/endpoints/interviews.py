@@ -30,6 +30,7 @@ from app.schemas.adaptive import (
     CandidateTurnRequest,
     EngineAction,
     InterviewDetailResponse,
+    InterviewState,
     InterviewerTurnResponse,
     InterviewTurnRead,
 )
@@ -339,7 +340,15 @@ async def _fetch_assessment_report(
     report = (await db.execute(stmt_rep)).scalars().first()
 
     if not report:
-        # 409 (not 404) so clients can tell "still being scored" apart from "does not exist".
+        # If the interview has not reached COMPLETED state, it is not being scored.
+        # Return 404 so clients know there is no report for this session,
+        # preventing infinite 409 polling loops for warmup/abandoned sessions.
+        if interview.state != InterviewState.COMPLETED.value:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Interview '{interview_id}' is not completed yet (state: {interview.state}).",
+            )
+        # 409 (not 404) when completed so clients can tell "still being scored" apart from "does not exist".
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="REPORT_NOT_READY",
@@ -474,16 +483,34 @@ async def get_latest_assessment_report(
             detail="No candidate profile found for current user.",
         )
 
-    stmt_interview = (
+    # Prioritize the most recent interview that has a completed assessment report
+    stmt_interview_with_report = (
         select(Interview)
-        .where(Interview.candidate_profile_id == profile.id)
-        .order_by(Interview.created_at.desc())
+        .join(AssessmentReport, AssessmentReport.interview_id == Interview.id)
+        .where(
+            Interview.candidate_profile_id == profile.id,
+            AssessmentReport.is_latest.is_(True),
+        )
+        .order_by(AssessmentReport.created_at.desc())
     )
-    interview = (await db.execute(stmt_interview)).scalars().first()
+    interview = (await db.execute(stmt_interview_with_report)).scalars().first()
+
+    if not interview:
+        # Fall back to the most recent completed interview in case it is actively being scored
+        stmt_completed = (
+            select(Interview)
+            .where(
+                Interview.candidate_profile_id == profile.id,
+                Interview.state == InterviewState.COMPLETED.value,
+            )
+            .order_by(Interview.created_at.desc())
+        )
+        interview = (await db.execute(stmt_completed)).scalars().first()
+
     if not interview:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No interviews found for current user.",
+            detail="No completed interview reports found for current user.",
         )
 
     return await _fetch_assessment_report(db, interview.id)

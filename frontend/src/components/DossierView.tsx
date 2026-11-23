@@ -787,13 +787,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
 
   // Handle switching to a specific historical session dossier
   const handleSelectHistoricalSession = (selectedId: string) => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('careerdiff_active_interview_id', selectedId);
-      }
-    } catch {}
     setSelectedSessionId(selectedId);
-    useInterviewStore.setState({ interviewId: selectedId });
     setDashboardTab('dossier');
   };
 
@@ -809,9 +803,13 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
     setIsReportEmpty(false);
     setPendingSeconds(0);
 
-    let targetId = selectedSessionId || interviewId;
-    if (!targetId && typeof localStorage !== 'undefined') {
-      targetId = localStorage.getItem('careerdiff_active_interview_id');
+    // Only target the active interview from store if the user hasn't explicitly chosen
+    // a session AND the active interview was actually completed (i.e. waiting to be scored).
+    // If the active interview is in WARMUP, CREATED, or paused, it has no report.
+    const activeState = useInterviewStore.getState().state;
+    let targetId: string | null = selectedSessionId;
+    if (!targetId && activeState === 'COMPLETED' && interviewId) {
+      targetId = interviewId;
     }
 
     async function fetchOrPollReport() {
@@ -824,19 +822,35 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
         setIsLoadingReport(false);
         if (data?.interview_id) {
           setSelectedSessionId(data.interview_id);
-          try {
-            localStorage.setItem('careerdiff_active_interview_id', data.interview_id);
-          } catch {}
-          if (data.interview_id !== interviewId) {
-            useInterviewStore.setState({ interviewId: data.interview_id });
-          }
         }
       } catch (err) {
         if (!isMounted) return;
         const status = err instanceof ApiError ? err.status : 0;
 
-        // Report is still being scored: keep polling with visible progress.
+        // Check if the target session in history is incomplete/unscored
+        const sessionInHistory = historyData?.items?.find((s) => s.id === targetId);
+        const isNotCompleted = sessionInHistory
+          ? sessionInHistory.state !== 'COMPLETED'
+          : !selectedSessionId && useInterviewStore.getState().state !== 'COMPLETED';
+
+        // Report is still being scored: keep polling with visible progress only if genuinely COMPLETED
         if (status === 409) {
+          if (isNotCompleted) {
+            // Uncompleted/abandoned session will never have a report. Do not poll!
+            try {
+              localStorage.removeItem('careerdiff_active_interview_id');
+            } catch {}
+            useInterviewStore.setState({ interviewId: null });
+            if (!selectedSessionId) {
+              targetId = null;
+              pollTimeoutId = setTimeout(fetchOrPollReport, 0);
+              return;
+            }
+            setIsReportEmpty(true);
+            setIsLoadingReport(false);
+            return;
+          }
+
           const elapsed = Date.now() - startedAt;
           setPendingSeconds(Math.round(elapsed / 1000));
           if (elapsed < MAX_WAIT_MS) {
@@ -849,11 +863,12 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
         }
 
         if (status === 404) {
-          if (targetId) {
-            // Stale id: clear and try fallback
+          if (targetId && !selectedSessionId) {
+            // Stale id from store/localStorage: clear and fall back to latest report
             try {
               localStorage.removeItem('careerdiff_active_interview_id');
             } catch {}
+            useInterviewStore.setState({ interviewId: null });
             targetId = null;
             pollTimeoutId = setTimeout(fetchOrPollReport, 0);
             return;
@@ -875,7 +890,7 @@ export const DossierView: React.FC<DossierViewProps> = ({ onReset }) => {
         clearTimeout(pollTimeoutId);
       }
     };
-  }, [interviewId, selectedSessionId, reloadKey]);
+  }, [interviewId, selectedSessionId, reloadKey, historyData]);
 
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return '—';
