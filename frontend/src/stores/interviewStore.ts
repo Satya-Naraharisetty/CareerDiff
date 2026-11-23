@@ -358,6 +358,26 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                   }
                 }, 350);
                 break;
+              case 'tts_fallback_browser':
+                // Server TTS has no audio; speak question via native browser speech synthesis
+                if (!get().isVoiceMuted) {
+                  set({ isInterviewerSpeaking: true, serverAudioActive: false });
+                  BrowserSpeechSynthesizer.speak(msg.question_text || '', {
+                    onEnd: () => {
+                      set({ isInterviewerSpeaking: false });
+                      if (get().mode === 'VOICE' && !get().isRecording) {
+                        get().startVoiceRecording().catch(() => {});
+                      }
+                    },
+                    onError: () => {
+                      set({ isInterviewerSpeaking: false });
+                      if (get().mode === 'VOICE' && !get().isRecording) {
+                        get().startVoiceRecording().catch(() => {});
+                      }
+                    },
+                  });
+                }
+                break;
               case 'transcript_partial':
                 if (msg.text) {
                   set({ partialTranscript: msg.text });

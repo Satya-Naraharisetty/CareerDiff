@@ -94,31 +94,6 @@ const COMPANY_PERSONAS: {
 
 const SUPPORTED_LANGUAGES = ['Python', 'Java', 'TypeScript', 'JavaScript', 'Go', 'Rust', 'C++', 'C#', 'SQL'];
 
-const SAMPLE_RESUME_TEXT = `Alex Rivera
-Senior Distributed Systems & Backend Engineer
-alex.rivera@example.com | 7+ years of experience
-
-SUMMARY
-Senior Backend Architect with 7+ years of hands-on experience designing high-throughput distributed microservices, event streaming architectures, and resilient databases in Python, FastAPI, Kafka, and PostgreSQL.
-
-TECHNICAL SKILLS
-Languages & Frameworks: Python, FastAPI, Django, TypeScript
-Databases & Storage: PostgreSQL, Redis, SQLAlchemy, Alembic, Cassandra
-Distributed Systems: Kafka, RabbitMQ, Microservices, gRPC, Distributed Locking
-Infrastructure: Docker, Kubernetes, AWS, CI/CD, Linux
-
-PROFESSIONAL EXPERIENCE
-Senior Backend Engineer | FinTech Systems (2021 - Present)
-• Architected low-latency Kafka pipeline processing 50k events/sec with sub-25ms P99 latency.
-• Scaled PostgreSQL database using read replicas, custom MVCC query tuning, and Redis caching.
-• Developed resilient microservices using Python and FastAPI with automatic circuit breakers and idempotency keys.
-• Implemented distributed locking with Redlock algorithm to eliminate double-spend race conditions in payment ledger.
-
-Backend Software Engineer | CloudScale Inc (2018 - 2021)
-• Built RESTful API platform handling 15M daily requests with 99.99% uptime.
-• Migrated legacy monolithic services to Docker containers orchestrated by Kubernetes on AWS.
-• Reduced database query bottlenecks by 45% through composite B-tree indexing and connection pooling.`;
-
 const SAMPLE_JD_TEXT = `Role: Senior Distributed Systems Architect - Payments Infrastructure
 Company: GlobalFinTech Corp
 Location: Remote (US / EMEA)
@@ -257,23 +232,6 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         setRoles(rolesRes.items || []);
         if (rolesRes.items?.length > 0) {
           setSelectedRole(rolesRes.items[0]);
-        }
-
-        // Check if user already has an analyzed resume
-        if (isAuthed) {
-          try {
-            const latestResume = await resumesApi.getLatest();
-            if (latestResume) {
-              setResumeAnalysis(latestResume);
-              setSeniority(latestResume.detected_seniority);
-              if (latestResume.recommended_role_id) {
-                const matched = rolesRes.items.find((r) => r.id === latestResume.recommended_role_id);
-                if (matched) setSelectedRole(matched);
-              }
-            }
-          } catch {
-            // No resume uploaded yet
-          }
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to load setup catalog';
@@ -763,19 +721,9 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-zinc-400">
-                  <span>Candidate resume plain text / markdown:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResumeText(SAMPLE_RESUME_TEXT);
-                      void analyzeResumeTextContent(SAMPLE_RESUME_TEXT);
-                    }}
-                    className="text-zinc-300 hover:text-white underline font-mono text-[11px] self-start sm:self-auto"
-                  >
-                    Load Sample Senior Resume
-                  </button>
-                </div>
+                <span className="block text-xs text-zinc-400">
+                  Candidate resume plain text / markdown:
+                </span>
                 <textarea
                   rows={6}
                   value={resumeText}
@@ -865,17 +813,11 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
 
             {/* Phase 1 Navigation Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setResumeTab('paste');
-                  setResumeText(SAMPLE_RESUME_TEXT);
-                  void analyzeResumeTextContent(SAMPLE_RESUME_TEXT);
-                }}
-                className="text-xs text-zinc-400 hover:text-emerald-400 underline transition-colors"
-              >
-                Load Sample Senior Architect Resume
-              </button>
+              <span className="text-xs text-zinc-500 font-mono">
+                {resumeAnalysis
+                  ? '✓ Resume verified. Ready to calibrate target role.'
+                  : 'Resume upload or paste required to proceed.'}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -1784,14 +1726,6 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   >
                     <Camera className="h-4 w-4 text-zinc-400" />
                     <span>Test Audio &amp; Camera</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsDeviceCheckOpen(true)}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-bold text-zinc-950 hover:bg-zinc-200 transition-all shadow-lg active:scale-95"
-                  >
-                    <span>Enter Live Interview Room</span>
-                    <ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
               </div>

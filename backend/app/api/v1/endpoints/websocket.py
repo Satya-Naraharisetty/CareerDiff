@@ -128,7 +128,7 @@ async def interview_voice_gateway(
                 }
             )
 
-            # If interview is newly created or in WARMUP, ensure Turn 0 is emitted
+            # If interview is newly created or in WARMUP, prepare Turn 0
             if interview.state == InterviewState.CREATED.value:
                 turn_0 = await TurnService.start_interview(db, interview_id)
                 initial_tts_text = turn_0.transcript
@@ -140,39 +140,27 @@ async def interview_voice_gateway(
                         "active_competency": None,
                     }
                 )
-                await websocket.send_json(
-                    {
-                        "type": "interviewer_speaking",
-                        "turn_index": 0,
-                        "action": "WARMUP",
-                        "question_text": turn_0.transcript,
-                    }
-                )
-                logger.info("[VOICE GATEWAY] Emitted Turn 0 WARMUP greeting to UI for interview %s", interview_id)
+                logger.info("[VOICE GATEWAY] Initialized Turn 0 WARMUP greeting for interview %s", interview_id)
             elif interview.state == InterviewState.WARMUP.value and len(interview.turns) >= 1:
-                # Reconnection / refresh sync: emit existing Turn 0 text for UI sync, but do NOT re-synthesize initial TTS audio
+                # Reconnection / refresh sync: emit existing Turn 0 text for UI sync, and stream prewarmed audio if Turn 0
                 turn_0 = interview.turns[0]
-                await websocket.send_json(
-                    {
-                        "type": "interviewer_speaking",
-                        "turn_index": turn_0.turn_index,
-                        "action": "WARMUP",
-                        "question_text": turn_0.transcript,
-                    }
-                )
+                if len(interview.turns) == 1:
+                    initial_tts_text = turn_0.transcript
+                else:
+                    # Mid-session reconnect: restore current turn display
+                    await websocket.send_json(
+                        {
+                            "type": "interviewer_speaking",
+                            "turn_index": turn_0.turn_index,
+                            "action": "WARMUP",
+                            "question_text": turn_0.transcript,
+                        }
+                    )
                 logger.info("[VOICE GATEWAY] Resumed and synchronized Turn 0 WARMUP greeting for interview %s", interview_id)
             elif interview.state == InterviewState.WARMUP.value and len(interview.turns) == 0:
                 turn_0 = await TurnService.start_interview(db, interview_id)
                 initial_tts_text = turn_0.transcript
-                await websocket.send_json(
-                    {
-                        "type": "interviewer_speaking",
-                        "turn_index": 0,
-                        "action": "WARMUP",
-                        "question_text": turn_0.transcript,
-                    }
-                )
-                logger.info("[VOICE GATEWAY] Emitted initial Turn 0 WARMUP greeting for interview %s", interview_id)
+                logger.info("[VOICE GATEWAY] Initialized initial Turn 0 WARMUP greeting for interview %s", interview_id)
 
         # 4. Initialize Stream Handlers
         vad = AudioVadProcessor()
@@ -290,19 +278,49 @@ async def interview_voice_gateway(
             async def stream_initial_pcm() -> None:
                 try:
                     logger.info("Streaming Turn 0 ElevenLabs-quality neural audio chunks to client for interview %s...", interview_id)
+                    chunks_sent = 0
                     async for chunk in TTSService.synthesize_pcm_stream(
                         tts_text, voice_name=voice, realtime_delay=False
                     ):
                         if tts_abort_event.is_set():
                             break
+                        if chunks_sent == 0:
+                            # Synchronized dispatch: emit interviewer_speaking together with first audio chunk
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_speaking",
+                                    "turn_index": active_interviewer_turn_index,
+                                    "action": "WARMUP",
+                                    "question_text": tts_text,
+                                }
+                            )
                         await websocket.send_bytes(chunk)
+                        chunks_sent += 1
                     if not tts_abort_event.is_set():
-                        await websocket.send_json(
-                            {
-                                "type": "interviewer_audio_done",
-                                "turn_index": active_interviewer_turn_index,
-                            }
-                        )
+                        if chunks_sent == 0:
+                            logger.info("[VOICE GATEWAY] No server PCM audio available; signaling browser TTS fallback for Turn 0")
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_speaking",
+                                    "turn_index": active_interviewer_turn_index,
+                                    "action": "WARMUP",
+                                    "question_text": tts_text,
+                                }
+                            )
+                            await websocket.send_json(
+                                {
+                                    "type": "tts_fallback_browser",
+                                    "turn_index": active_interviewer_turn_index,
+                                    "question_text": tts_text,
+                                }
+                            )
+                        else:
+                            await websocket.send_json(
+                                {
+                                    "type": "interviewer_audio_done",
+                                    "turn_index": active_interviewer_turn_index,
+                                }
+                            )
                 except asyncio.CancelledError:
                     pass
 
@@ -354,35 +372,55 @@ async def interview_voice_gateway(
                     interviewer_reply.action_taken.value,
                 )
 
-                # Notify UI interviewer is speaking
-                await websocket.send_json(
-                    {
-                        "type": "interviewer_speaking",
-                        "turn_index": interviewer_reply.turn_index,
-                        "action": interviewer_reply.action_taken.value,
-                        "question_text": interviewer_reply.transcript,
-                    }
-                )
-
                 # Stream outbound 100ms PCM chunks with preemption support
                 tts_abort_event.clear()
 
                 async def stream_response_pcm() -> None:
                     try:
                         logger.info("[TTS] Streaming synthesized ElevenLabs-quality neural audio for Turn #%d...", interviewer_reply.turn_index)
+                        chunks_sent = 0
                         async for chunk in TTSService.synthesize_pcm_stream(
                             interviewer_reply.transcript, voice_name=voice, realtime_delay=False
                         ):
                             if tts_abort_event.is_set():
                                 break
+                            if chunks_sent == 0:
+                                # Synchronized dispatch: emit interviewer_speaking together with first audio chunk
+                                await websocket.send_json(
+                                    {
+                                        "type": "interviewer_speaking",
+                                        "turn_index": interviewer_reply.turn_index,
+                                        "action": interviewer_reply.action_taken.value,
+                                        "question_text": interviewer_reply.transcript,
+                                    }
+                                )
                             await websocket.send_bytes(chunk)
+                            chunks_sent += 1
                         if not tts_abort_event.is_set():
-                            await websocket.send_json(
-                                {
-                                    "type": "interviewer_audio_done",
-                                    "turn_index": interviewer_reply.turn_index,
-                                }
-                            )
+                            if chunks_sent == 0:
+                                logger.info("[TTS] No server PCM audio available; signaling browser TTS fallback for Turn #%d", interviewer_reply.turn_index)
+                                await websocket.send_json(
+                                    {
+                                        "type": "interviewer_speaking",
+                                        "turn_index": interviewer_reply.turn_index,
+                                        "action": interviewer_reply.action_taken.value,
+                                        "question_text": interviewer_reply.transcript,
+                                    }
+                                )
+                                await websocket.send_json(
+                                    {
+                                        "type": "tts_fallback_browser",
+                                        "turn_index": interviewer_reply.turn_index,
+                                        "question_text": interviewer_reply.transcript,
+                                    }
+                                )
+                            else:
+                                await websocket.send_json(
+                                    {
+                                        "type": "interviewer_audio_done",
+                                        "turn_index": interviewer_reply.turn_index,
+                                    }
+                                )
                     except asyncio.CancelledError:
                         pass
 

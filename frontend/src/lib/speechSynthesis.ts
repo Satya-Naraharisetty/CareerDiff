@@ -301,7 +301,13 @@ export class BrowserSpeechSynthesizer {
   static fallbackTypewriter(fullText: string, options: SpeechSynthesisOptions = {}): () => void {
     let cancelled = false;
     let currentIdx = 0;
-    const step = Math.max(1, Math.round(fullText.length / 75)); // Complete in ~1.5 - 3.0s
+    // Conversational speaking pace: ~140-150 words per minute (~2.35 words/second)
+    // Compute dynamic interval based on word count to match acoustic neural speech duration
+    const words = fullText.trim().split(/\s+/).filter(Boolean).length;
+    const estimatedSeconds = Math.max(1.0, words / 2.35);
+    const charsPerSec = fullText.length / estimatedSeconds;
+    const intervalMs = Math.max(45, Math.min(85, Math.round(1000 / Math.max(1, charsPerSec))));
+    const step = 1;
 
     options.onStart?.();
 
@@ -317,7 +323,7 @@ export class BrowserSpeechSynthesizer {
         clearInterval(timer);
         options.onEnd?.();
       }
-    }, 35);
+    }, intervalMs);
 
     const cancelFn = () => {
       cancelled = true;

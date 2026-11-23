@@ -162,6 +162,17 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Local development bypass token handler
+    if credentials.credentials == "dev-local-bypass-token":
+        if settings.environment != "production":
+            stmt_dev = select(User).where(User.email == "venkatnaraharisetty.01@gmail.com")
+            dev_user = (await db.execute(stmt_dev)).scalar_one_or_none()
+            if not dev_user:
+                stmt_dev = select(User).order_by(User.created_at.desc())
+                dev_user = (await db.execute(stmt_dev)).scalars().first()
+            if dev_user:
+                return dev_user
+
     payload = decode_access_token(credentials.credentials)
     user_id_str = payload.get("sub")
     if not user_id_str:

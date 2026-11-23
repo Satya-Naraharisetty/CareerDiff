@@ -87,13 +87,40 @@ class TTSService:
     CHUNK_SIZE_BYTES: int = 4800  # 2400 samples * 2 bytes = 4800 bytes @ 24kHz
 
     VOICE_MAP: dict[str, str] = {
-        "Puck": "en-US-AndrewMultilingualNeural",
-        "Alex": "en-US-AndrewMultilingualNeural",
-        "Aoede": "en-US-AvaMultilingualNeural",
-        "Maya": "en-US-AvaMultilingualNeural",
+        "Puck": "en-US-AndrewNeural",
+        "Alex": "en-US-AndrewNeural",
+        "Aoede": "en-US-AvaNeural",
+        "Maya": "en-US-AvaNeural",
     }
 
+    FALLBACK_VOICES_MALE: list[str] = [
+        "en-US-AndrewNeural",
+        "en-US-GuyNeural",
+        "en-US-BrianNeural",
+        "en-US-ChristopherNeural",
+    ]
+
+    FALLBACK_VOICES_FEMALE: list[str] = [
+        "en-US-AvaNeural",
+        "en-US-JennyNeural",
+        "en-US-AriaNeural",
+        "en-US-EmmaNeural",
+    ]
+
     _PCM_CACHE: dict[str, bytes] = {}
+
+    @classmethod
+    def get_candidate_voices(cls, voice_name: str | None = None) -> list[str]:
+        """Resolve primary and fallback neural voices for high reliability."""
+        primary = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewNeural")
+        is_female = (
+            (voice_name and voice_name.lower() in ("aoede", "maya", "female", "jenny", "ava"))
+            or "ava" in primary.lower()
+            or "jenny" in primary.lower()
+        )
+        pool = cls.FALLBACK_VOICES_FEMALE if is_female else cls.FALLBACK_VOICES_MALE
+        candidates = [primary] + [v for v in pool if v != primary]
+        return candidates
 
     @classmethod
     async def prewarm(cls, text: str, voice_name: str | None = None) -> bytes | None:
@@ -102,34 +129,36 @@ class TTSService:
         if not clean_text:
             return None
 
-        neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
-        cache_key = f"{neural_voice}:{clean_text}"
-        if cache_key in cls._PCM_CACHE:
-            return cls._PCM_CACHE[cache_key]
+        candidates = cls.get_candidate_voices(voice_name)
+        for neural_voice in candidates:
+            cache_key = f"{neural_voice}:{clean_text}"
+            if cache_key in cls._PCM_CACHE:
+                return cls._PCM_CACHE[cache_key]
 
-        try:
-            import edge_tts
-            import miniaudio
+            try:
+                import edge_tts
+                import miniaudio
 
-            communicate = edge_tts.Communicate(clean_text, neural_voice)
-            audio_chunks: list[bytes] = []
-            async for chunk in communicate.stream():
-                if chunk.get("type") == "audio" and chunk.get("data"):
-                    audio_chunks.append(chunk["data"])
+                communicate = edge_tts.Communicate(clean_text, neural_voice)
+                audio_chunks: list[bytes] = []
+                async for chunk in communicate.stream():
+                    if chunk.get("type") == "audio" and chunk.get("data"):
+                        audio_chunks.append(chunk["data"])
 
-            if audio_chunks:
-                mp3_bytes = b"".join(audio_chunks)
-                decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
-                pcm_raw = decoded.samples.tobytes()
-                cls._PCM_CACHE[cache_key] = pcm_raw
-                logger.info(
-                    "[TTS] Prewarmed and cached %d neural PCM bytes for key '%s'",
-                    len(pcm_raw),
-                    cache_key[:50],
-                )
-                return pcm_raw
-        except Exception as exc:
-            logger.warning("[TTS] Prewarm error: %s", exc)
+                if audio_chunks:
+                    mp3_bytes = b"".join(audio_chunks)
+                    decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
+                    pcm_raw = decoded.samples.tobytes()
+                    cls._PCM_CACHE[cache_key] = pcm_raw
+                    logger.info(
+                        "[TTS] Prewarmed and cached %d neural PCM bytes for voice '%s'",
+                        len(pcm_raw),
+                        neural_voice,
+                    )
+                    return pcm_raw
+            except Exception as exc:
+                logger.warning("[TTS] Prewarm error for voice '%s': %s", neural_voice, exc)
+
         return None
 
     @classmethod
@@ -149,87 +178,74 @@ class TTSService:
         if not clean_text:
             return
 
-        neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
-        cache_key = f"{neural_voice}:{clean_text}"
+        candidates = cls.get_candidate_voices(voice_name)
 
-        # 1. Instant Cache Hit: Yield prewarmed PCM chunks immediately (0ms delay)
-        if cache_key in cls._PCM_CACHE:
-            pcm_raw = cls._PCM_CACHE[cache_key]
-            chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
-            total_len = len(pcm_raw)
-            logger.info(
-                "[TTS] Instant cache hit: streaming %d neural PCM bytes (~%.1fs audio) for voice '%s'",
-                total_len,
-                total_len / (cls.SAMPLE_RATE * cls.BYTES_PER_SAMPLE),
-                neural_voice,
-            )
-            for offset in range(0, total_len, chunk_size):
-                if realtime_delay:
-                    await asyncio.sleep(chunk_duration_ms / 1000)
-                yield pcm_raw[offset : offset + chunk_size]
-            return
-
-        logger.info(
-            "[TTS] Synthesizing neural speech with voice '%s' (%d chars)",
-            neural_voice,
-            len(clean_text),
-        )
-
-        try:
-            import edge_tts
-            import miniaudio
-
-            communicate = edge_tts.Communicate(clean_text, neural_voice)
-            audio_chunks: list[bytes] = []
-            async for chunk in communicate.stream():
-                if chunk.get("type") == "audio" and chunk.get("data"):
-                    audio_chunks.append(chunk["data"])
-
-            if audio_chunks:
-                mp3_bytes = b"".join(audio_chunks)
-                decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
-                pcm_raw = decoded.samples.tobytes()
-                cls._PCM_CACHE[cache_key] = pcm_raw
-
+        # 1. Check instant in-memory cache across candidates
+        for neural_voice in candidates:
+            cache_key = f"{neural_voice}:{clean_text}"
+            if cache_key in cls._PCM_CACHE:
+                pcm_raw = cls._PCM_CACHE[cache_key]
                 chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
                 total_len = len(pcm_raw)
                 logger.info(
-                    "[TTS] Successfully decoded %d neural PCM bytes (~%.1fs audio)",
+                    "[TTS] Instant cache hit: streaming %d neural PCM bytes (~%.1fs audio) for voice '%s'",
                     total_len,
                     total_len / (cls.SAMPLE_RATE * cls.BYTES_PER_SAMPLE),
+                    neural_voice,
                 )
-
                 for offset in range(0, total_len, chunk_size):
-                    chunk_bytes = pcm_raw[offset : offset + chunk_size]
                     if realtime_delay:
                         await asyncio.sleep(chunk_duration_ms / 1000)
-                    yield chunk_bytes
+                    yield pcm_raw[offset : offset + chunk_size]
                 return
-        except Exception as exc:
-            logger.warning("[TTS] edge-tts neural synthesis fallback triggered: %s", exc)
 
-        # Fallback acoustic carrier synthesis if external neural engine is offline
-        words = clean_text.split()
-        est_duration_sec = max(0.5, len(words) / 2.5)
-        num_chunks = max(1, int(est_duration_sec * (1000 / chunk_duration_ms)))
-        samples_per_chunk = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000))
-        freq = 320.0
+        # 2. Synthesize using candidate voices in order of fidelity
+        for neural_voice in candidates:
+            cache_key = f"{neural_voice}:{clean_text}"
+            logger.info(
+                "[TTS] Synthesizing neural speech with voice '%s' (%d chars)",
+                neural_voice,
+                len(clean_text),
+            )
 
-        for i in range(num_chunks):
-            start_sample = i * samples_per_chunk
-            raw_samples: list[int] = []
-            for j in range(samples_per_chunk):
-                sample_idx = start_sample + j
-                t = sample_idx / cls.SAMPLE_RATE
-                envelope = 0.5 * (1.0 + math.sin(2 * math.pi * 3.0 * t))
-                val = int(envelope * 6000.0 * math.sin(2 * math.pi * freq * t))
-                val = max(-32767, min(32767, val))
-                raw_samples.append(val)
+            try:
+                import edge_tts
+                import miniaudio
 
-            chunk_bytes = struct.pack(f"<{samples_per_chunk}h", *raw_samples)
-            if realtime_delay:
-                await asyncio.sleep(chunk_duration_ms / 1000)
-            yield chunk_bytes
+                communicate = edge_tts.Communicate(clean_text, neural_voice)
+                audio_chunks: list[bytes] = []
+                async for chunk in communicate.stream():
+                    if chunk.get("type") == "audio" and chunk.get("data"):
+                        audio_chunks.append(chunk["data"])
+
+                if audio_chunks:
+                    mp3_bytes = b"".join(audio_chunks)
+                    decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
+                    pcm_raw = decoded.samples.tobytes()
+                    cls._PCM_CACHE[cache_key] = pcm_raw
+
+                    chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
+                    total_len = len(pcm_raw)
+                    logger.info(
+                        "[TTS] Successfully decoded %d neural PCM bytes (~%.1fs audio) with '%s'",
+                        total_len,
+                        total_len / (cls.SAMPLE_RATE * cls.BYTES_PER_SAMPLE),
+                        neural_voice,
+                    )
+
+                    for offset in range(0, total_len, chunk_size):
+                        chunk_bytes = pcm_raw[offset : offset + chunk_size]
+                        if realtime_delay:
+                            await asyncio.sleep(chunk_duration_ms / 1000)
+                        yield chunk_bytes
+                    return
+            except Exception as exc:
+                logger.warning("[TTS] edge-tts error with voice '%s': %s", neural_voice, exc)
+
+        logger.warning(
+            "[TTS] All edge-tts neural voices exhausted for text: '%s'. Yielding empty to trigger browser Web Speech API fallback.",
+            clean_text[:50],
+        )
 
     @classmethod
     def generate_silence(cls, duration_ms: int = 100) -> bytes:

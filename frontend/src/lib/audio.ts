@@ -295,7 +295,12 @@ export class PcmRecorder {
     };
 
     this.sourceNode.connect(this.scriptProcessor);
-    this.scriptProcessor.connect(this.audioCtx.destination);
+    // Connect through a zero-gain node to keep the ScriptProcessor running in Chromium
+    // without leaking candidate microphone audio into output speakers (prevents feedback loop & hum)
+    const silentSink = this.audioCtx.createGain();
+    silentSink.gain.value = 0.0;
+    this.scriptProcessor.connect(silentSink);
+    silentSink.connect(this.audioCtx.destination);
   }
 
   private downsampleToPcm16(

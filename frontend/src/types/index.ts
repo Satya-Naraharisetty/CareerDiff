@@ -416,6 +416,11 @@ export type WsServerMessage =
     turn_index: number;
   }
   | {
+    type: 'tts_fallback_browser';
+    turn_index: number;
+    question_text: string;
+  }
+  | {
     type: 'state_change';
     previous_state: string;
     new_state: string;

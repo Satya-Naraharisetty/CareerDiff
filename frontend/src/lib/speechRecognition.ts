@@ -14,7 +14,6 @@ export class BrowserSpeechRecognizer {
   private recognition: any = null;
   private isListening: boolean = false;
   private confirmedPriorText: string = '';
-  private currentSessionFinal: string = '';
   private currentInterimTranscript: string = '';
   private silenceTimer: number | null = null;
   private restartTimer: number | null = null;
@@ -53,20 +52,21 @@ export class BrowserSpeechRecognizer {
         return;
       }
 
-      let finalChunk = '';
       let interimChunk = '';
-
-      for (let i = 0; i < event.results.length; i++) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const item = event.results[i];
         const text = item[0]?.transcript || '';
         if (item.isFinal) {
-          finalChunk += (finalChunk ? ' ' : '') + text.trim();
+          this.confirmedPriorText = (
+            (this.confirmedPriorText ? this.confirmedPriorText.trim() + ' ' : '') +
+            text.trim()
+          ).trim();
+          interimChunk = '';
         } else {
           interimChunk += (interimChunk ? ' ' : '') + text.trim();
         }
       }
 
-      this.currentSessionFinal = finalChunk;
       this.currentInterimTranscript = interimChunk;
 
       const fullCombined = this.getFullTranscript();
@@ -104,53 +104,27 @@ export class BrowserSpeechRecognizer {
 
     rec.onend = () => {
       if (!this.isListening) return;
-      // Preserve confirmed final text from finished sentence; drop volatile interim guesses
-      if (this.currentSessionFinal.trim()) {
-        this.confirmedPriorText = (
-          (this.confirmedPriorText ? this.confirmedPriorText.trim() + ' ' : '') +
-          this.currentSessionFinal.trim()
-        ).trim();
-      }
-      this.currentSessionFinal = '';
-      this.currentInterimTranscript = '';
-      this.scheduleRestart(80);
+      // Seamlessly restart if Chrome ended on brief silence without destroying instance
+      this.clearRestartTimer();
+      this.restartTimer = window.setTimeout(() => {
+        if (this.isListening && this.recognition) {
+          try {
+            this.recognition.start();
+          } catch {
+            this.clearRestartTimer();
+            this.restartTimer = window.setTimeout(() => {
+              if (this.isListening && this.recognition) {
+                try {
+                  this.recognition.start();
+                } catch {}
+              }
+            }, 250);
+          }
+        }
+      }, 60);
     };
 
     return rec;
-  }
-
-  private scheduleRestart(delayMs: number): void {
-    this.clearRestartTimer();
-    this.restartTimer = window.setTimeout(() => {
-      if (!this.isListening) return;
-      this.teardownCurrentInstance();
-      try {
-        const rec = this.initFreshInstance();
-        if (rec) {
-          rec.start();
-          this.recognition = rec;
-          console.info('[SpeechRecognition] Active listening loop resumed.');
-        }
-      } catch (err) {
-        console.warn('[SpeechRecognition] Restart attempt notice:', err);
-        // Exponential backoff retry so candidate speech recognition never dies mid-interview
-        if (this.isListening) {
-          this.scheduleRestart(Math.min(1200, Math.round(delayMs * 1.5 + 80)));
-        }
-      }
-    }, delayMs);
-  }
-
-  private teardownCurrentInstance(): void {
-    if (this.recognition) {
-      try {
-        this.recognition.onresult = null;
-        this.recognition.onerror = null;
-        this.recognition.onend = null;
-        this.recognition.abort();
-      } catch {}
-      this.recognition = null;
-    }
   }
 
   start(
@@ -168,8 +142,6 @@ export class BrowserSpeechRecognizer {
       return false;
     }
 
-    this.abort();
-
     this.clearSilenceTimer();
     this.clearRestartTimer();
     this.onPartialCallback = onPartial || null;
@@ -178,27 +150,28 @@ export class BrowserSpeechRecognizer {
     this.onErrorCallback = onError || null;
     this.isMutedFn = isMuted || null;
     this.confirmedPriorText = '';
-    this.currentSessionFinal = '';
     this.currentInterimTranscript = '';
     this.isListening = true;
 
-    try {
-      const rec = this.initFreshInstance();
-      if (!rec) return false;
-      rec.start();
-      this.recognition = rec;
-      return true;
-    } catch (err) {
-      console.warn('Initial SpeechRecognition start busy/delayed, scheduling auto-resume:', err);
-      this.scheduleRestart(150);
-      return true;
+    if (!this.recognition) {
+      this.recognition = this.initFreshInstance();
     }
+
+    if (this.recognition) {
+      try {
+        this.recognition.start();
+        return true;
+      } catch (err) {
+        console.info('[SpeechRecognition] Recognition already active or starting:', err);
+        return true;
+      }
+    }
+    return false;
   }
 
   getFullTranscript(): string {
     const parts: string[] = [];
     if (this.confirmedPriorText.trim()) parts.push(this.confirmedPriorText.trim());
-    if (this.currentSessionFinal.trim()) parts.push(this.currentSessionFinal.trim());
     if (this.currentInterimTranscript.trim()) parts.push(this.currentInterimTranscript.trim());
     return parts.join(' ').trim();
   }
@@ -225,18 +198,10 @@ export class BrowserSpeechRecognizer {
 
     if (this.recognition) {
       try {
-        this.recognition.onresult = null;
-        this.recognition.onerror = null;
-        this.recognition.onend = null;
-        this.recognition.onspeechstart = null;
-        this.recognition.onspeechend = null;
-        this.recognition.onaudiostart = null;
-        this.recognition.onaudioend = null;
         this.recognition.stop();
       } catch {
         // Safe ignore
       }
-      this.recognition = null;
     }
 
     if (this.onFinalCallback && finalResult) {
@@ -251,22 +216,13 @@ export class BrowserSpeechRecognizer {
     this.clearSilenceTimer();
     this.clearRestartTimer();
     this.confirmedPriorText = '';
-    this.currentSessionFinal = '';
     this.currentInterimTranscript = '';
     if (this.recognition) {
       try {
-        this.recognition.onresult = null;
-        this.recognition.onerror = null;
-        this.recognition.onend = null;
-        this.recognition.onspeechstart = null;
-        this.recognition.onspeechend = null;
-        this.recognition.onaudiostart = null;
-        this.recognition.onaudioend = null;
         this.recognition.abort();
       } catch {
         // Safe ignore
       }
-      this.recognition = null;
     }
   }
 }
