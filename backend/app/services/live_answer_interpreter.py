@@ -1,8 +1,15 @@
 """Live turn semantic interpreter for rapid answer depth and action recommendation."""
 
+import json
+import logging
 import re
+from typing import Any
 
+from app.core.config import get_settings
+from app.core.llm import make_genai_client
 from app.schemas.adaptive import AnswerDepth, EngineAction, InterpretationResult
+
+logger = logging.getLogger("CareerDiff.live_interpreter")
 
 
 class LiveAnswerInterpreter:
@@ -104,10 +111,7 @@ class LiveAnswerInterpreter:
                 observed_depth=AnswerDepth.DEEP,
                 contradiction_detected=False,
                 recommended_action=EngineAction.CHALLENGE,
-                rationale=(
-                    f"Candidate demonstrated technical depth mentioning {matched_entities[:3]}. "
-                    "Challenging failure modes and trade-offs."
-                ),
+                rationale="Candidate demonstrated technical depth and addressed component trade-offs. Challenging failure modes.",
                 entities_mentioned=matched_entities,
             )
 
@@ -118,4 +122,78 @@ class LiveAnswerInterpreter:
             recommended_action=EngineAction.PROBE_DEEPER,
             rationale="Candidate gave a coherent high-level answer. Probing deeper implementation.",
             entities_mentioned=matched_entities,
+        )
+
+    @classmethod
+    async def interpret_with_gemini(
+        cls,
+        candidate_transcript: str,
+        active_topic_name: str,
+        consecutive_probes: int = 0,
+        mapped_claim_texts: list[str] | None = None,
+    ) -> InterpretationResult:
+        """Evaluate candidate response using Gemini AI semantic reasoning."""
+        settings = get_settings()
+        if not settings.gemini_api_key or settings.environment == "testing":
+            return cls.interpret(
+                candidate_transcript=candidate_transcript,
+                active_topic_name=active_topic_name,
+                consecutive_probes=consecutive_probes,
+                mapped_claim_texts=mapped_claim_texts,
+            )
+
+        prompt = (
+            f"You are a Staff Technical Interviewer evaluating a candidate's spoken answer.\n\n"
+            f"Active Topic: {active_topic_name}\n"
+            f"Candidate Transcript:\n\"{candidate_transcript.strip()}\"\n\n"
+            f"Task: Evaluate technical accuracy, depth, and system reasoning.\n"
+            f"Respond ONLY with valid JSON in this format:\n"
+            f"{{\n"
+            f'  "observed_depth": "DEEP" | "ADEQUATE" | "SHALLOW" | "STUCK",\n'
+            f'  "recommended_action": "CHALLENGE" | "PROBE_DEEPER" | "SIMPLIFY" | "VERIFY_CLAIM" | "CHANGE_TOPIC",\n'
+            f'  "rationale": "one concise sentence explaining your technical assessment",\n'
+            f'  "entities_mentioned": ["architecture", "components"]\n'
+            f"}}"
+        )
+        try:
+            from google.genai import types
+
+            client = make_genai_client(timeout_ms=10000)
+            res = await client.aio.models.generate_content(
+                model=settings.gemini_turn_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            if res and res.text:
+                data = json.loads(res.text)
+                depth_map = {
+                    "DEEP": AnswerDepth.DEEP,
+                    "ADEQUATE": AnswerDepth.ADEQUATE,
+                    "SHALLOW": AnswerDepth.SHALLOW,
+                    "STUCK": AnswerDepth.STUCK,
+                }
+                action_map = {
+                    "CHALLENGE": EngineAction.CHALLENGE,
+                    "PROBE_DEEPER": EngineAction.PROBE_DEEPER,
+                    "SIMPLIFY": EngineAction.SIMPLIFY,
+                    "VERIFY_CLAIM": EngineAction.VERIFY_CLAIM,
+                    "CHANGE_TOPIC": EngineAction.CHANGE_TOPIC,
+                }
+                depth = depth_map.get(str(data.get("observed_depth", "")).upper(), AnswerDepth.ADEQUATE)
+                action = action_map.get(str(data.get("recommended_action", "")).upper(), EngineAction.PROBE_DEEPER)
+                return InterpretationResult(
+                    observed_depth=depth,
+                    contradiction_detected=bool(data.get("contradiction_detected", False)),
+                    recommended_action=action,
+                    rationale=str(data.get("rationale") or "Candidate response evaluated by Gemini AI."),
+                    entities_mentioned=list(data.get("entities_mentioned", [])),
+                )
+        except Exception as exc:
+            logger.warning("Gemini live answer interpretation fallback: %s", exc)
+
+        return cls.interpret(
+            candidate_transcript=candidate_transcript,
+            active_topic_name=active_topic_name,
+            consecutive_probes=consecutive_probes,
+            mapped_claim_texts=mapped_claim_texts,
         )

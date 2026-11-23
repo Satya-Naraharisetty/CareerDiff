@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { BarChart3, Command, FileText, Home, LogOut, Menu, Play, Radio, X } from 'lucide-react';
+import { BarChart3, Command, FileText, LogOut, Menu, Play, X } from 'lucide-react';
 import { CareerDiffLogo } from './CareerDiffLogo';
 import { isSkipAuthEnabled, useAuthStore } from '../stores/authStore';
-import { useInterviewStore } from '../stores/interviewStore';
 
 interface NavbarProps {
   onOpenAuth: () => void;
@@ -20,7 +19,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCommandPalette,
 }) => {
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { state: interviewState } = useInterviewStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -39,7 +37,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const isSessionActive = interviewState !== 'CREATED' && interviewState !== 'COMPLETED';
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
   const paletteShortcut = isMac ? '⌘K' : 'Ctrl+K';
   const initialOf = (u: { full_name?: string; email?: string } | null | undefined) =>
@@ -73,21 +70,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <button
             type="button"
-            onClick={() => onNavigate('home')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
-              currentView === 'home'
+            onClick={() => handleGuardedNavigate('dossier')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+              currentView === 'dossier' || currentView === 'home'
                 ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
             }`}
           >
-            <Home className="h-3.5 w-3.5 text-zinc-400" />
-            <span>Home</span>
+            <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Dashboard</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleGuardedNavigate('setup')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
               currentView === 'setup'
                 ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
@@ -99,40 +96,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             type="button"
-            onClick={() => handleGuardedNavigate(isSessionActive ? 'interview' : 'setup')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
-              currentView === 'interview'
-                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-            }`}
-          >
-            <Radio className={`h-3.5 w-3.5 ${isSessionActive ? 'text-emerald-400' : 'text-zinc-400'}`} />
-            <span>Live Session</span>
-            {isSessionActive && (
-              <span className="relative flex h-2 w-2 ml-0.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleGuardedNavigate('dossier')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
-              currentView === 'dossier'
-                ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700/80'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
-            }`}
-          >
-            <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => onNavigate('rewriter')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-full transition-all duration-150 ${
               currentView === 'rewriter'
                 ? 'bg-zinc-800 text-emerald-400 shadow-sm border border-emerald-500/30'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
@@ -251,17 +216,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="flex flex-col space-y-1" aria-label="Mobile Navigation">
             <button
               onClick={() => {
-                onNavigate('home');
+                handleGuardedNavigate('dossier');
                 setMobileMenuOpen(false);
               }}
               className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'home'
+                currentView === 'dossier' || currentView === 'home'
                   ? 'bg-zinc-800 text-white'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
               }`}
             >
-              <Home className="h-4 w-4 text-zinc-400" />
-              <span>Home</span>
+              <BarChart3 className="h-4 w-4 text-emerald-400" />
+              <span>Dashboard</span>
             </button>
 
             <button
@@ -277,41 +242,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Play className="h-4 w-4 text-zinc-400" />
               <span>Practice Workspace</span>
-            </button>
-
-            <button
-              onClick={() => {
-                handleGuardedNavigate(isSessionActive ? 'interview' : 'setup');
-                setMobileMenuOpen(false);
-              }}
-              className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'interview'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Radio className={`h-4 w-4 ${isSessionActive ? 'text-emerald-400' : 'text-zinc-400'}`} />
-                <span>Live Session</span>
-              </div>
-              {isSessionActive && (
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                handleGuardedNavigate('dossier');
-                setMobileMenuOpen(false);
-              }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                currentView === 'dossier'
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-              }`}
-            >
-              <BarChart3 className="h-4 w-4 text-emerald-400" />
-              <span>Performance Dashboard</span>
             </button>
 
             <button

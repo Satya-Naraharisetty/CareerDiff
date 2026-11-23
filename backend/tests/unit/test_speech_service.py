@@ -10,8 +10,8 @@ def test_stt_partial_transcription() -> None:
     # 0.2s of audio (6400 bytes at 32k bytes/sec) -> too short for partial
     assert STTService.transcribe_partial(b"\x00" * 6400) == ""
 
-    # 1.0s of audio (32000 bytes) -> returns partial text with ellipsis
-    partial = STTService.transcribe_partial(b"\x00" * 32000)
+    # 1.0s of audio (32000 bytes) with hint -> returns partial text with ellipsis
+    partial = STTService.transcribe_partial(b"\x00" * 32000, word_hint="explaining system architecture")
     assert partial.endswith("...")
     assert len(partial.split()) >= 2
 
@@ -23,9 +23,9 @@ async def test_stt_final_transcription() -> None:
     res = await STTService.transcribe_final(b"\x00" * 16000, simulated_transcript="Hello systems")
     assert res == "Hello systems"
 
-    # Default speech transcription for substantial audio
-    res_default = await STTService.transcribe_final(b"\x00" * 32000)
-    assert "Kafka" in res_default
+    # Audio without transcription returns empty string (no hardcoded buzzwords)
+    res_empty = await STTService.transcribe_final(b"\x00" * 6400)
+    assert res_empty == ""
 
 
 @pytest.mark.asyncio

@@ -29,7 +29,7 @@ def test_rms_calculation() -> None:
 
 def test_speech_onset_and_trailing_silence_finalization() -> None:
     """Verify that speech energy triggers speech onset and 24 silence frames trigger completion."""
-    vad = AudioVadProcessor(energy_threshold_rms=400.0)
+    vad = AudioVadProcessor(energy_threshold_rms=400.0, trailing_silence_frames=24)
     loud_frame = generate_pcm_frame(amplitude=4000)
     silence_frame = generate_pcm_frame(amplitude=0)
 

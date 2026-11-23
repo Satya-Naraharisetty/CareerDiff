@@ -43,24 +43,26 @@ const viewFromPath = (path: string): View | null => {
 };
 const isInterviewLive = () => {
   const { state, interviewId } = useInterviewStore.getState();
-  return !!interviewId && state !== 'CREATED' && state !== 'COMPLETED';
+  return Boolean(interviewId && state !== 'COMPLETED');
 };
 
 export const AppContent: React.FC = () => {
   const { isAuthenticated, rehydrateProfile } = useAuthStore();
   const [currentView, setCurrentView] = useState<View>(() => {
     const fromUrl = typeof window !== 'undefined' ? viewFromPath(window.location.pathname) : null;
+    const hasActiveInterview =
+      typeof localStorage !== 'undefined' && !!localStorage.getItem('careerdiff_active_interview_id');
     if (fromUrl) {
       if (!isAuthenticated && !isSkipAuthEnabled() && fromUrl !== 'home') return 'home';
-      // Avoid getting stuck on interview loader on cold refresh without active session
-      return fromUrl === 'interview' ? 'setup' : fromUrl;
+      // Preserve live interview room on cold browser refresh if an active session ID is stored
+      if (fromUrl === 'interview') return hasActiveInterview ? 'interview' : 'setup';
+      return fromUrl;
     }
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
       if (saved && ['home', 'setup', 'interview', 'dossier', 'rewriter'].includes(saved)) {
         if (!isAuthenticated && !isSkipAuthEnabled() && saved !== 'home') return 'home';
-        // Avoid getting stuck on interview loader on cold refresh without active session
-        if (saved === 'interview') return 'setup';
+        if (saved === 'interview') return hasActiveInterview ? 'interview' : 'setup';
         return saved as 'home' | 'setup' | 'interview' | 'dossier' | 'rewriter';
       }
     }

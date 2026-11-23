@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Briefcase,
   Building2,
+  Camera,
   CheckCircle2,
   Clock,
   Code2,
@@ -152,6 +154,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const [isAnalyzingCompany, setIsAnalyzingCompany] = useState<boolean>(false);
   const [companyAnalysisResult, setCompanyAnalysisResult] = useState<CompanyAnalysisResponse | null>(null);
   const [isDeviceCheckOpen, setIsDeviceCheckOpen] = useState<boolean>(false);
+  const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   // Step 1: Resume Ingestion State (DEFAULT OPTION IS UPLOAD FILE)
   const [resumeTab, setResumeTab] = useState<'upload' | 'paste'>('upload');
@@ -507,118 +510,93 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
         </div>
       )}
 
-      {/* 3-Stage Workflow Stepper */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5 backdrop-blur-sm shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono">
-          {/* Stage 1 */}
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
-                resumeAnalysis
-                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
-                  : isAnalyzingResume
-                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
-                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-              }`}
-            >
-              {resumeAnalysis ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : isAnalyzingResume ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                '01'
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-zinc-200 truncate">
-                {resumeAnalysis ? 'Resume Ingested' : 'Ingest Resume'}
-              </div>
-              <div className="text-[11px] text-zinc-500 truncate">
-                {resumeAnalysis
-                  ? `${resumeAnalysis.claims.length} claims extracted`
-                  : 'Upload file or paste text'}
-              </div>
-            </div>
-          </div>
-
-          {/* Stage 2 */}
-          <div className="flex items-center gap-3 sm:border-l sm:border-zinc-800/80 sm:pl-4">
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
-                jdAnalysis || selectedRole
-                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
-                  : isAnalyzingJd
-                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
-                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-              }`}
-            >
-              {jdAnalysis || selectedRole ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : isAnalyzingJd ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                '02'
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-zinc-200 truncate">
-                {jdAnalysis
-                  ? 'JD Calibrated'
-                  : selectedRole
-                  ? 'Role Selected'
-                  : 'Target Calibration'}
-              </div>
-              <div className="text-[11px] text-zinc-500 truncate">
-                {jdAnalysis
-                  ? jdAnalysis.extracted_title
-                  : selectedRole
-                  ? selectedRole.name
-                  : 'Paste JD or pick discipline'}
-              </div>
-            </div>
-          </div>
-
-          {/* Stage 3 */}
-          <div className="flex items-center gap-3 sm:border-l sm:border-zinc-800/80 sm:pl-4">
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
-                createdBlueprint
-                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-400 shadow-sm shadow-emerald-500/10'
-                  : isCreating
-                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 animate-pulse'
-                  : 'bg-zinc-950 border-zinc-800 text-zinc-400'
-              }`}
-            >
-              {createdBlueprint ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : isCreating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                '03'
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-zinc-200 truncate">
-                {createdBlueprint ? 'Blueprint Compiled' : 'Compile Blueprint'}
-              </div>
-              <div className="text-[11px] text-zinc-500 truncate">
-                {createdBlueprint
-                  ? `${Math.round(createdBlueprint.total_allocated_seconds / 60)}m interview plan`
-                  : 'Adaptive rubric ready'}
-              </div>
-            </div>
-          </div>
+      {/* 5-Phase Interactive Calibration Stepper */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-2 sm:p-3 backdrop-blur-md shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 font-mono text-xs">
+          {[
+            {
+              phase: 1 as const,
+              num: '01',
+              title: 'Resume',
+              subtitle: resumeAnalysis ? `${resumeAnalysis.claims.length} Claims` : 'Upload File',
+            },
+            {
+              phase: 2 as const,
+              num: '02',
+              title: 'Job Description',
+              subtitle: jdAnalysis ? jdAnalysis.extracted_title : selectedRole ? selectedRole.name : 'Target Role',
+            },
+            {
+              phase: 3 as const,
+              num: '03',
+              title: 'Seniority & Lang',
+              subtitle: `${seniority} • ${preferredLanguage}`,
+            },
+            {
+              phase: 4 as const,
+              num: '04',
+              title: 'Persona & Format',
+              subtitle: `${companyPersona} • ${duration}m`,
+            },
+            {
+              phase: 5 as const,
+              num: '05',
+              title: 'Initialize & Launch',
+              subtitle: createdBlueprint ? 'Compiled' : 'Review & Start',
+            },
+          ].map((item) => {
+            const isActive = currentPhase === item.phase;
+            const isCompleted = currentPhase > item.phase;
+            return (
+              <button
+                key={item.phase}
+                type="button"
+                onClick={() => setCurrentPhase(item.phase)}
+                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
+                  isActive
+                    ? 'border-emerald-500/80 bg-emerald-950/40 text-white shadow-sm ring-1 ring-emerald-500/40'
+                    : isCompleted
+                    ? 'border-zinc-800 bg-zinc-950/80 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-400'
+                }`}
+              >
+                <div
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
+                    isActive
+                      ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
+                      : isCompleted
+                      ? 'border-emerald-700/80 bg-emerald-950/80 text-emerald-400'
+                      : 'border-zinc-800 bg-zinc-950 text-zinc-500'
+                  }`}
+                >
+                  {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : item.num}
+                </div>
+                <div className="min-w-0">
+                  <div
+                    className={`font-semibold truncate ${
+                      isActive ? 'text-white' : isCompleted ? 'text-zinc-200' : 'text-zinc-400'
+                    }`}
+                  >
+                    {item.title}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 truncate hidden sm:block">
+                    {item.subtitle}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Main Configuration Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* STEP 1: RESUME INGESTION (DEFAULT OPTION IS UPLOAD) */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
+      {/* Main Phased Configuration Area */}
+      <div className="space-y-6">
+        {/* PHASE 1: RESUME INGESTION */}
+        {currentPhase === 1 && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-6 animate-in fade-in duration-200">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80 mb-4">
               <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                <FileText className="h-3.5 w-3.5 text-zinc-400" /> 1. Upload Candidate Resume (Default)
+                <FileText className="h-3.5 w-3.5 text-zinc-400" /> Phase 1: Candidate Experience &amp; Resume Ingestion
               </h2>
 
               <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-800 self-start sm:self-auto">
@@ -814,14 +792,41 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 </div>
               </div>
             )}
-          </div>
 
-          {/* STEP 2: PASTE JD OR CHOOSE DISCIPLINE */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80 mb-4">
-              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5 text-zinc-400" /> 2. Target Calibration: Paste JD or Pick Discipline
-              </h2>
+            {/* Phase 1 Navigation Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setResumeTab('paste');
+                  setResumeText(SAMPLE_RESUME_TEXT);
+                }}
+                className="text-xs text-zinc-400 hover:text-emerald-400 underline transition-colors"
+              >
+                Load Sample Senior Architect Resume
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPhase(2)}
+                disabled={isAnalyzingResume}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+              >
+                <span>Continue to Job Description</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PHASE 2: TARGET JOB DESCRIPTION & ALIGNMENT */}
+        {currentPhase === 2 && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Target Calibration Card */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+                <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <Briefcase className="h-3.5 w-3.5 text-zinc-400" /> Phase 2: Target Calibration (Paste JD or Pick Discipline)
+                </h2>
 
               <div className="flex rounded-lg bg-zinc-950 p-1 border border-zinc-800 self-start sm:self-auto">
                 <button
@@ -1128,11 +1133,40 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             )}
           </div>
 
-          {/* STEP 4: TARGET SENIORITY LEVEL */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm">
-            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-4 flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" /> Step 4: Target Seniority Level
-            </h2>
+          {/* Phase 2 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(1)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-700 transition-all shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back: Resume Ingestion</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(3)}
+              disabled={isAnalyzingJd}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+            >
+              <span>Continue to Seniority &amp; Language</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+        {/* PHASE 3: SENIORITY LEVEL & PREFERRED IMPLEMENTATION LANGUAGE */}
+        {currentPhase === 3 && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Target Seniority Level Card */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pb-2 border-b border-zinc-800/80">
+                <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" /> Phase 3 (Part A): Target Seniority Level
+                </h2>
+                <span className="text-[11px] font-mono text-zinc-400">Calibrates system design &amp; architectural scope</span>
+              </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {SENIORITY_LEVELS.map((lvl) => {
                 const isSelected = seniority === lvl.id;
@@ -1222,6 +1256,31 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
             </div>
           </div>
 
+          {/* Phase 3 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(2)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-700 transition-all shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back: Job Description</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(4)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+            >
+              <span>Continue to Persona &amp; Format</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 4: COMPANY PERSONA, SCALE, DURATION & INTERACTION */}
+      {currentPhase === 4 && (
+        <div className="space-y-6 animate-in fade-in duration-200">
           {/* STEP 6: COMPANY INTERVIEW PERSONA */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
@@ -1445,109 +1504,260 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </div>
             </div>
           </div>
+
+          {/* Phase 4 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(3)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-700 transition-all shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back: Seniority &amp; Language</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!createdBlueprint && selectedRole) {
+                  void handleCreate();
+                }
+                setCurrentPhase(5);
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+            >
+              <span>Review &amp; Initialize Session</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Right Summary / Blueprint Preview Column */}
-        <div className="space-y-6">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 sm:p-6 shadow-xl sticky top-20">
-            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-300 mb-4 flex items-center justify-between">
-              <span>Grounded Session Blueprint</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            </h3>
-
-            {createdBlueprint ? (
-              <div className="space-y-4">
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-300 font-mono flex items-center justify-between">
-                  <span>Session Blueprint compiled</span>
-                  <span className="font-semibold text-emerald-400">{Math.round(createdBlueprint.total_allocated_seconds / 60)}m track</span>
+      {/* PHASE 5: THE INITIALIZATION POINT */}
+      {currentPhase === 5 && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header & Status Banner */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 backdrop-blur-sm shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-zinc-800/80">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs font-bold">
+                  05
                 </div>
+                <div>
+                  <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-200">
+                    Phase 5: Session Initialization &amp; Preflight
+                  </h2>
+                  <p className="text-xs text-zinc-400">
+                    Review your grounded configuration and verified experience claims before entering the live interview room.
+                  </p>
+                </div>
+              </div>
+              {createdBlueprint ? (
+                <span className="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 border border-emerald-800/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400 shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Blueprint Compiled &amp; Grounded
+                </span>
+              ) : (
+                <span className="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-full bg-amber-950/80 border border-amber-800/80 px-3 py-1 text-xs font-mono font-bold text-amber-400 shadow-sm">
+                  Pending Blueprint Compilation
+                </span>
+              )}
+            </div>
 
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-zinc-400">
-                    Topic Timeline &amp; Mapped Resume Claims
+            {/* 4-Card Calibration Summary Matrix */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
+              {/* Card 1: Candidate Claims */}
+              <div className="rounded-lg bg-zinc-950/80 border border-zinc-800/80 p-3.5 space-y-1.5">
+                <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5 text-zinc-400" /> Resume Profile
                   </span>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {createdBlueprint.topics.map((t, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg bg-zinc-950 p-2.5 text-xs border border-zinc-800 space-y-1 font-mono"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-zinc-200">{t.topic_name}</span>
-                          <span className="text-zinc-400 font-mono text-[11px]">{t.allocated_seconds}s</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                          <span>Allocated budget</span>
-                          <span className="text-emerald-400 font-medium">
-                            {t.mapped_claims_count} Claim{t.mapped_claims_count === 1 ? '' : 's'} Mapped
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <span className="text-emerald-400 font-bold">{resumeAnalysis ? 'Loaded' : 'None'}</span>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsDeviceCheckOpen(true)}
-                  className="w-full mt-4 flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all active:scale-[0.98] shadow-sm"
-                >
-                  Enter Live Interview Room
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                <div className="text-white font-semibold text-sm truncate">
+                  {resumeAnalysis ? `${resumeAnalysis.claims.length} Claims Verified` : 'No Resume'}
+                </div>
+                <p className="text-[11px] text-zinc-500 font-sans truncate">
+                  {resumeAnalysis?.recommended_role_name || resumeAnalysis?.primary_discipline || 'Experience claims extracted'}
+                </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-lg bg-zinc-950 p-4 border border-zinc-800 space-y-2.5 text-xs font-mono">
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Resume Context:</span>
-                    <span className="font-medium text-emerald-400">
-                      {resumeAnalysis ? `${resumeAnalysis.claims.length} Claims Loaded` : 'No Resume Uploaded'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Target Role / JD:</span>
-                    <span className="font-medium text-zinc-200 max-w-[160px] truncate">
-                      {selectedRole?.name || 'None'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Seniority Track:</span>
-                    <span className="font-medium text-zinc-200">{seniority}</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Time Budget:</span>
-                    <span className="font-medium text-zinc-200">{duration} Minutes</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Protocol:</span>
-                    <span className="font-medium text-zinc-200">{mode}</span>
-                  </div>
-                  <div className="flex justify-between text-zinc-400">
-                    <span>Code Language:</span>
-                    <span className="font-medium text-emerald-400">{preferredLanguage}</span>
-                  </div>
-                  {matchAnalysis && (
-                    <div className="flex justify-between text-zinc-400 pt-1 border-t border-zinc-800/60">
-                      <span>JD Alignment:</span>
-                      <span className="font-medium text-emerald-400">{matchAnalysis.match_score_pct}% Match</span>
+
+              {/* Card 2: Target JD & Seniority */}
+              <div className="rounded-lg bg-zinc-950/80 border border-zinc-800/80 p-3.5 space-y-1.5">
+                <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="h-3.5 w-3.5 text-zinc-400" /> Target &amp; Track
+                  </span>
+                  <span className="text-emerald-400 font-bold">{seniority}</span>
+                </div>
+                <div className="text-white font-semibold text-sm truncate">
+                  {selectedRole?.name || 'Standard Track'}
+                </div>
+                <p className="text-[11px] text-zinc-500 font-sans truncate">
+                  {matchAnalysis ? `${matchAnalysis.match_score_pct}% Match Alignment` : 'Calibrated discipline'}
+                </p>
+              </div>
+
+              {/* Card 3: Persona & Architecture */}
+              <div className="rounded-lg bg-zinc-950/80 border border-zinc-800/80 p-3.5 space-y-1.5">
+                <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3.5 w-3.5 text-zinc-400" /> Company Persona
+                  </span>
+                  <span className="text-indigo-400 font-bold">{companyPersona}</span>
+                </div>
+                <div className="text-white font-semibold text-sm truncate">
+                  {targetCompany.trim() || 'Custom Archetype'}
+                </div>
+                <p className="text-[11px] text-zinc-500 font-sans truncate">
+                  Language: <span className="text-emerald-400 font-semibold">{preferredLanguage}</span>
+                </p>
+              </div>
+
+              {/* Card 4: Format & Duration */}
+              <div className="rounded-lg bg-zinc-950/80 border border-zinc-800/80 p-3.5 space-y-1.5">
+                <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-zinc-400" /> Session Format
+                  </span>
+                  <span className="text-zinc-200 font-bold">{duration} mins</span>
+                </div>
+                <div className="text-white font-semibold text-sm truncate">
+                  {mode === 'VOICE' ? 'Live Voice (WS)' : 'Text Turn Mode'}
+                </div>
+                <p className="text-[11px] text-zinc-500 font-sans truncate">
+                  Neural 24kHz Studio Audio
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Blueprint Topic Breakdown or Compile CTA */}
+          {createdBlueprint ? (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6 backdrop-blur-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800/80 pb-3">
+                <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Grounded Session Blueprint &amp; Topic Schedule
+                </h3>
+                <span className="text-xs font-mono text-emerald-400 font-bold">
+                  {Math.round(createdBlueprint.total_allocated_seconds / 60)}m Allocated Session
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {createdBlueprint.topics.map((t, idx) => (
+                  <div
+                    key={idx}
+                    className="rounded-lg bg-zinc-950/80 p-3.5 border border-zinc-800/80 space-y-2 font-mono text-xs hover:border-zinc-700 transition-colors"
+                  >
+                    <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                      <span className="font-semibold text-zinc-100 text-sm truncate">{t.topic_name}</span>
+                      <span className="rounded bg-zinc-900 border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-300 font-bold">
+                        {Math.round(t.allocated_seconds / 60)}m ({t.allocated_seconds}s)
+                      </span>
                     </div>
-                  )}
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-500">Grounded Claims:</span>
+                      <span className="text-emerald-400 font-semibold">
+                        {t.mapped_claims_count} Claim{t.mapped_claims_count === 1 ? '' : 's'} Mapped
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Hardware Preflight Banner */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300">
+                    <Camera className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white font-mono">Hardware Readiness Preflight</div>
+                    <div className="text-xs text-zinc-400 font-sans">
+                      Verify microphone input, camera self-view, and network latency before entering.
+                    </div>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={isCreating || !selectedRole}
-                  onClick={handleCreate}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-white py-2.5 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] shadow-sm"
-                >
-                  {isCreating ? 'Compiling Blueprint...' : 'Initialize Session Blueprint'}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeviceCheckOpen(true)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 px-4 py-2.5 text-xs font-semibold text-white transition-all shadow-sm active:scale-95"
+                  >
+                    <Camera className="h-4 w-4 text-zinc-400" />
+                    <span>Test Audio &amp; Camera</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDeviceCheckOpen(true)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-bold text-zinc-950 hover:bg-zinc-200 transition-all shadow-lg active:scale-95"
+                  >
+                    <span>Enter Live Interview Room</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/40 p-8 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1.5">
+                <h3 className="text-sm font-semibold text-white font-mono">
+                  Ready to Compile Grounded Blueprint
+                </h3>
+                <p className="text-xs text-zinc-400 font-sans">
+                  Click below to compile your adaptive session blueprint grounded in your verified resume claims and target company architecture.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isCreating || !selectedRole}
+                onClick={handleCreate}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-xs font-bold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md active:scale-95"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Compiling Blueprint...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Initialize Session Blueprint</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Phase 5 Navigation Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => setCurrentPhase(4)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-zinc-300 hover:text-white hover:border-zinc-700 transition-all shadow-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back: Persona &amp; Format</span>
+            </button>
+
+            {createdBlueprint && (
+              <button
+                type="button"
+                onClick={() => setIsDeviceCheckOpen(true)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-bold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+              >
+                <span>Enter Live Interview Room</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
             )}
           </div>
         </div>
+      )}
       </div>
 
       {/* Hardware Readiness & Permissions Check Modal */}

@@ -519,9 +519,11 @@ const AudioEqualizer: React.FC<{
                 : 'text-zinc-500'
           }
         >
-          {isRecording ? 'PCM STREAM' : isInterviewerSpeaking ? 'INTERVIEWER' : 'STANDBY'}
+          {isRecording ? 'LIVE AUDIO' : isInterviewerSpeaking ? 'INTERVIEWER' : 'STANDBY'}
         </span>
-        <span className="text-zinc-600 hidden sm:inline text-[11px]">16kHz Mono</span>
+        <span className="text-zinc-500 hidden sm:inline text-[10px]">
+          {isRecording ? 'Mic Active' : isInterviewerSpeaking ? 'Speaking' : 'Ready'}
+        </span>
       </div>
     </div>
   );
@@ -529,6 +531,7 @@ const AudioEqualizer: React.FC<{
 
 export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const {
+    interviewId,
     state: sessionState,
     mode,
     targetSeniority,
@@ -548,6 +551,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     notice,
     sendTypedAnswer,
     startInterview,
+    rehydrateSession,
     initVoiceSession,
     startVoiceRecording,
     stopVoiceRecording,
@@ -564,13 +568,31 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [executionOutput, setExecutionOutput] = useState<string | null>(null);
   const [isRunningCode, setIsRunningCode] = useState(false);
-  // Camera self-view is opt-in and never leaves the device.
-  const [showCamera, setShowCamera] = useState<boolean>(false);
+  // Camera self-view defaults to enabled (or user choice from DeviceCheckModal / localStorage)
+  const [showCamera, setShowCamera] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('careerdiff_camera_enabled');
+      if (stored !== null) return stored === 'true';
+    }
+    return true; // Enabled by default in video interview
+  });
   const [typedAnswer, setTypedAnswer] = useState('');
   const [showTypeFallback, setShowTypeFallback] = useState(false);
   const [confirmingConclude, setConfirmingConclude] = useState(false);
   const autoConcludedRef = useRef(false);
   const [isRoomCameraActive, setIsRoomCameraActive] = useState<boolean>(false);
+
+  const handleToggleCamera = useCallback(() => {
+    setShowCamera((prev) => {
+      const next = !prev;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('careerdiff_camera_enabled', next ? 'true' : 'false');
+        }
+      } catch {}
+      return next;
+    });
+  }, []);
   // Real-time typewriter and synchronized interviewer speech state
   const [typingTurnIndex, setTypingTurnIndex] = useState<number | null>(null);
   const [typedText, setTypedText] = useState<string>('');
@@ -586,9 +608,6 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     setSelectedGeminiVoice(newVoice);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('careerdiff_gemini_voice', newVoice);
-    }
-    if (mode === 'VOICE') {
-      initVoiceSession().catch(() => {});
     }
   };
 
@@ -758,6 +777,15 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     }
   }, [typedText, typingTurnIndex]);
 
+  // Rehydrate session details on cold browser refresh if interviewId exists but turns are missing
+  useEffect(() => {
+    if (interviewId && turns.length === 0) {
+      rehydrateSession(interviewId).catch((err) => {
+        console.warn('Interview session rehydration notice:', err);
+      });
+    }
+  }, [interviewId, turns.length, rehydrateSession]);
+
   // Initialize session on mount
   useEffect(() => {
     // Only trigger HTTP start if in TEXT mode; in VOICE mode, initVoiceSession starts and synchronizes the session cleanly over WebSocket
@@ -776,16 +804,48 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     let active = true;
     if (showCamera) {
       const preferredVideoId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_preferred_video_device') : null;
-      navigator.mediaDevices
-        ?.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 360 },
-            facingMode: 'user',
-            ...(preferredVideoId ? { deviceId: { ideal: preferredVideoId } } : {}),
-          },
-        })
-        .then((stream) => {
+
+      const acquireCamera = async () => {
+        try {
+          let stream: MediaStream | null = null;
+          if (preferredVideoId) {
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                  width: { ideal: 640 },
+                  height: { ideal: 360 },
+                  facingMode: 'user',
+                  deviceId: { exact: preferredVideoId },
+                },
+              });
+            } catch {
+              // Exact device unavailable, try ideal deviceId
+              try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                  video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 360 },
+                    facingMode: 'user',
+                    deviceId: { ideal: preferredVideoId },
+                  },
+                });
+              } catch {
+                // Fall back to any available video stream
+                stream = null;
+              }
+            }
+          }
+
+          if (!stream) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 640 },
+                height: { ideal: 360 },
+                facingMode: 'user',
+              },
+            });
+          }
+
           if (!active) {
             stream.getTracks().forEach((t) => t.stop());
             return;
@@ -797,14 +857,25 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             roomVideoRef.current.srcObject = stream;
             roomVideoRef.current.play().catch(() => {});
           }
-        })
-        .catch((err) => {
+        } catch (err) {
           console.warn('Candidate camera not available in interview room:', err);
           if (active) {
             setIsRoomCameraActive(false);
-            setShowCamera(false);
           }
-        });
+        }
+      };
+
+      acquireCamera();
+    } else {
+      setIsRoomCameraActive(false);
+      if (roomStreamRef.current) {
+        roomStreamRef.current.getTracks().forEach((track) => track.stop());
+        roomStreamRef.current = null;
+      }
+      if (roomVideoRef.current) {
+        roomVideoRef.current.pause();
+        roomVideoRef.current.srcObject = null;
+      }
     }
 
     return () => {
@@ -852,22 +923,18 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         setTypedText(current);
       };
 
-      // When the server streams the interviewer's real voice (Gemini Live / server TTS), the browser
-      // must not speak too: only animate the text, and let the audio player drive the mic hand-off.
-      const serverVoice = mode === 'VOICE' && useInterviewStore.getState().serverAudioActive;
-      const silent = isVoiceMuted || serverVoice;
+      // In VOICE mode, audio is exclusively handled via server streaming (Gemini Live / Neural PCM).
+      // The browser must ONLY run the typewriter animation for text display, never browser TTS speech,
+      // preventing any race condition where a browser voice speaks before server PCM audio arrives.
+      const silent = mode === 'VOICE' || isVoiceMuted;
 
       const onEnd = () => {
         setTypingTurnIndex(null);
         activeSynthesizerCancelRef.current = null;
-        if (useInterviewStore.getState().serverAudioActive && mode === 'VOICE') {
+        if (mode === 'VOICE') {
           return; // pcmPlayer.onAllEnded / interviewer_audio_done start the mic
         }
         useInterviewStore.setState({ isInterviewerSpeaking: false });
-        // As soon as the question completes, automatically activate candidate microphone in voice mode
-        if (mode === 'VOICE') {
-          startVoiceRecording().catch(() => {});
-        }
       };
 
       if (silent) {
@@ -879,7 +946,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
       }
 
       useInterviewStore.setState({ isInterviewerSpeaking: true });
-      // Speak out interviewer question audibly while streaming the typewriter progress
+      // In TEXT mode with voice unmuted, speak out interviewer question with matching persona
       activeSynthesizerCancelRef.current = BrowserSpeechSynthesizer.speak(
         latestTurn.transcript,
         {
@@ -1014,8 +1081,11 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
     setConfirmingConclude(false);
     setIsRoomCameraActive(false);
     cleanupHardwareMedia();
-    await concludeSession();
-    onConclude();
+    try {
+      await concludeSession();
+    } finally {
+      onConclude();
+    }
   };
 
   const requestConclude = () => {
@@ -1130,12 +1200,16 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
           <button
             type="button"
-            onClick={() => setShowCamera((v) => !v)}
+            onClick={handleToggleCamera}
             aria-pressed={showCamera}
             title={showCamera ? 'Turn off camera self-view' : 'Turn on camera self-view (stays on your device)'}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors"
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+              showCamera
+                ? 'border-emerald-600/60 bg-emerald-950/40 text-emerald-300'
+                : 'border-zinc-800 bg-zinc-950 text-zinc-300 hover:text-white hover:border-zinc-700'
+            }`}
           >
-            {showCamera ? <Camera className="h-3.5 w-3.5" /> : <CameraOff className="h-3.5 w-3.5" />}
+            {showCamera ? <Camera className="h-3.5 w-3.5 text-emerald-400" /> : <CameraOff className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">Self-view</span>
           </button>
 
@@ -1180,17 +1254,29 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
         {/* Main Conversation Stream Column */}
         <div className={`relative flex flex-col min-h-0 ${showScratchpad ? 'lg:col-span-7' : 'flex-1'}`}>
           {/* Centered Camera Self-View with Live Subtitles Overlay */}
-          {showCamera && isRoomCameraActive && (
-            <div className="mx-auto mb-3 w-64 sm:w-80 aspect-video rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden relative shrink-0 animate-in fade-in zoom-in-95 duration-150">
+          {showCamera && (
+            <div
+              className={`mx-auto mb-3 aspect-video rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl overflow-hidden relative shrink-0 transition-all duration-200 animate-in fade-in zoom-in-95 ${
+                showScratchpad ? 'w-48 sm:w-56' : 'w-64 sm:w-80'
+              }`}
+            >
               <video
                 ref={setRoomVideoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover scale-x-[-1]"
+                className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-300 ${
+                  isRoomCameraActive ? 'opacity-100' : 'opacity-0'
+                }`}
               />
+              {!isRoomCameraActive && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-zinc-900/90 text-zinc-400 text-xs font-mono">
+                  <Camera className="h-5 w-5 text-emerald-400 animate-pulse" />
+                  <span>Connecting camera...</span>
+                </div>
+              )}
               <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-950/80 border border-zinc-800 text-[11px] font-mono text-emerald-400 backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className={`h-1.5 w-1.5 rounded-full ${isRoomCameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 Live Self-View
               </div>
 
@@ -1203,10 +1289,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                   <span className="truncate">{typedText || (turns.length > 0 ? turns[turns.length - 1].transcript : '')}</span>
                 </div>
               )}
-              {!isInterviewerSpeaking && (isRecording || partialTranscript) && (
+              {!isInterviewerSpeaking && Boolean(partialTranscript && partialTranscript.trim()) && (
                 <div className="absolute bottom-2 inset-x-2 rounded-xl bg-black/85 backdrop-blur-md px-3 py-1.5 text-xs text-white border border-emerald-500/50 shadow-md flex items-center gap-2 animate-in fade-in">
                   <span className="text-cyan-400 font-semibold shrink-0">You:</span>
-                  <span className="truncate font-sans">{partialTranscript || 'Listening... speak naturally'}</span>
+                  <span className="truncate font-sans">{partialTranscript}</span>
                 </div>
               )}
             </div>
@@ -1311,7 +1397,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             })}
 
             {/* Real-Time Live Candidate Speaking Bubble on the Right */}
-            {(isRecording || partialTranscript) && (
+            {Boolean(partialTranscript && partialTranscript.trim()) && (
               <div className="flex justify-end gap-3 sm:gap-4 animate-in fade-in duration-150">
                 <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-none border border-emerald-500/50 bg-emerald-950/40 p-4 text-white shadow-lg shadow-emerald-950/20 font-sans">
                   <div className="flex items-center justify-between gap-3 mb-1.5 font-mono">
@@ -1324,23 +1410,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
-                    {partialTranscript ? (
-                      <>
-                        {partialTranscript}
-                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
-                      </>
-                    ) : (
-                      <span className="text-zinc-400 italic text-xs font-mono">
-                        {audioLevel > 0.04 ? (
-                          <span className="text-emerald-400 not-italic flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            Listening to you speak... transcribing
-                          </span>
-                        ) : (
-                          'Listening... speak your answer naturally (auto-continues when you pause)'
-                        )}
-                      </span>
-                    )}
+                    {partialTranscript}
+                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
                   </p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-950 border border-cyan-600/50 text-cyan-300 shadow-sm ring-2 ring-emerald-500/40">

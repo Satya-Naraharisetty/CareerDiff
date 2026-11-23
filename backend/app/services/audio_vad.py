@@ -24,13 +24,18 @@ class AudioVadProcessor:
     FRAME_DURATION_MS: int = 50
     FRAME_SIZE_BYTES: int = 1600  # 800 samples * 2 bytes = 1600 bytes
 
-    # Silence threshold: 1,200 ms of trailing silence = 24 consecutive 50ms frames
-    TRAILING_SILENCE_FRAMES_REQUIRED: int = 24
+    # Silence threshold: 2,200 ms of trailing silence = 44 consecutive 50ms frames (aligns with natural speech pauses)
+    TRAILING_SILENCE_FRAMES_REQUIRED: int = 44
     MIN_SPEECH_FRAMES_REQUIRED: int = 4  # At least 200ms of speech before finalization
     DEFAULT_ENERGY_THRESHOLD_RMS: float = 180.0
 
-    def __init__(self, energy_threshold_rms: float = DEFAULT_ENERGY_THRESHOLD_RMS) -> None:
+    def __init__(
+        self,
+        energy_threshold_rms: float = DEFAULT_ENERGY_THRESHOLD_RMS,
+        trailing_silence_frames: int = TRAILING_SILENCE_FRAMES_REQUIRED,
+    ) -> None:
         self.energy_threshold_rms = energy_threshold_rms
+        self.trailing_silence_frames_required = trailing_silence_frames
         self.is_candidate_speaking: bool = False
         self.speech_frames_count: int = 0
         self.trailing_silence_frames: int = 0
@@ -76,7 +81,7 @@ class AudioVadProcessor:
 
                 # If trailing silence limit reached and candidate spoke enough
                 if (
-                    self.trailing_silence_frames >= self.TRAILING_SILENCE_FRAMES_REQUIRED
+                    self.trailing_silence_frames >= self.trailing_silence_frames_required
                     and self.speech_frames_count >= self.MIN_SPEECH_FRAMES_REQUIRED
                 ):
                     speech_finalized = True

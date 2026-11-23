@@ -50,6 +50,7 @@ interface InterviewStoreState {
   toggleMic: () => void;
   toggleCamera: () => void;
   toggleVoiceMute: () => void;
+  rehydrateSession: (interviewId: string) => Promise<void>;
   loadTurns: (interviewId: string) => Promise<void>;
   startInterview: () => Promise<void>;
   submitTextTurn: (text: string, codeSnippet?: string) => Promise<void>;
@@ -140,6 +141,28 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
 
   setMode: (mode) => {
     set({ mode });
+  },
+
+  rehydrateSession: async (interviewId: string) => {
+    try {
+      const detail = await interviewsApi.get(interviewId);
+      const turns = await interviewsApi.getTurns(interviewId);
+      const remaining = Math.max(
+        0,
+        (detail.scheduled_duration_minutes || 30) * 60 - (detail.actual_duration_seconds || 0)
+      );
+      set({
+        interviewId: detail.id,
+        state: detail.state,
+        targetSeniority: detail.target_seniority,
+        turns: turns || [],
+        remainingSeconds: remaining,
+        currentTopic: detail.current_topic || null,
+        error: null,
+      });
+    } catch (err: unknown) {
+      console.warn('Failed to rehydrate session:', err);
+    }
   },
 
   loadTurns: async (interviewId: string) => {
@@ -336,36 +359,48 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 }, 350);
                 break;
               case 'transcript_partial':
-                if (!get().partialTranscript || msg.text.length > get().partialTranscript.length) {
+                if (msg.text) {
                   set({ partialTranscript: msg.text });
                 }
                 break;
               case 'transcript_final':
-                set((s) => ({
-                  turns: [
-                    ...s.turns,
-                    {
-                      turn_index: msg.turn_index,
-                      speaker: msg.speaker as 'CANDIDATE',
+                set((s) => {
+                  const existingIdx = s.turns.findIndex(
+                    (t) => t.turn_index === msg.turn_index && t.speaker === 'CANDIDATE'
+                  );
+                  if (existingIdx !== -1) {
+                    const updatedTurns = [...s.turns];
+                    updatedTurns[existingIdx] = {
+                      ...updatedTurns[existingIdx],
                       transcript: msg.text,
-                      created_at: new Date().toISOString(),
-                    },
-                  ],
-                  partialTranscript: '',
-                }));
+                    };
+                    return { turns: updatedTurns, partialTranscript: '' };
+                  }
+                  return {
+                    turns: [
+                      ...s.turns,
+                      {
+                        turn_index: msg.turn_index,
+                        speaker: msg.speaker as 'CANDIDATE',
+                        transcript: msg.text,
+                        created_at: new Date().toISOString(),
+                      },
+                    ],
+                    partialTranscript: '',
+                  };
+                });
                 break;
               case 'interviewer_speaking':
                 set((s) => {
-                  const existingLast = s.turns[s.turns.length - 1];
-                  if (
-                    existingLast &&
-                    existingLast.speaker === 'INTERVIEWER' &&
-                    existingLast.turn_index === msg.turn_index
-                  ) {
+                  const existingIdx = s.turns.findIndex(
+                    (t) => t.turn_index === msg.turn_index && t.speaker === 'INTERVIEWER'
+                  );
+                  if (existingIdx !== -1) {
                     const updatedTurns = [...s.turns];
-                    updatedTurns[updatedTurns.length - 1] = {
-                      ...existingLast,
+                    updatedTurns[existingIdx] = {
+                      ...updatedTurns[existingIdx],
                       transcript: msg.question_text,
+                      action_taken: (msg.action as EngineAction) || updatedTurns[existingIdx].action_taken,
                     };
                     return { isInterviewerSpeaking: true, turns: updatedTurns };
                   }

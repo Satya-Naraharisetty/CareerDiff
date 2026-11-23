@@ -57,7 +57,7 @@ export class BrowserSpeechSynthesizer {
     );
   }
 
-  static getBestVoice(): SpeechSynthesisVoice | null {
+  static getBestVoice(preferredVoiceOrGender?: string): SpeechSynthesisVoice | null {
     if (!this.isSupported()) return null;
     if (this.cachedVoices.length === 0) {
       this.loadVoices();
@@ -65,47 +65,65 @@ export class BrowserSpeechSynthesizer {
     const voices = this.cachedVoices;
     if (voices.length === 0) return null;
 
-    // 1. Check user-selected preferred voice from localStorage
-    const savedVoiceName =
+    // 1. Resolve voice preference (Puck = Male/Alex, Aoede = Female/Maya)
+    const storedVoice =
       typeof localStorage !== 'undefined'
-        ? localStorage.getItem('careerdiff_interviewer_voice')
+        ? localStorage.getItem('careerdiff_gemini_voice') || localStorage.getItem('careerdiff_interviewer_voice')
         : null;
-    if (savedVoiceName) {
-      const matchedSaved = voices.find((v) => v.name === savedVoiceName);
-      if (matchedSaved) return matchedSaved;
-    }
+    const target = (preferredVoiceOrGender || storedVoice || 'Puck').toLowerCase();
+    const isMale = target.includes('puck') || target.includes('alex') || target.includes('male') || target.includes('guy') || target.includes('andrew');
 
-    // 2. High-Fidelity Neural / Natural voices (ElevenLabs / Edge Natural & Chrome Google Neural)
-    const neuralPriorityNames = [
-      'natural',
-      'neural',
-      'online (natural)',
+    // 2. High-Fidelity Neural / Natural voices categorized by gender
+    const maleNeuralKeywords = [
       'andrew online',
+      'guy online',
       'brian online',
-      'ava online',
-      'emma online',
-      'google us english',
-      'google uk english female',
-      'microsoft jenny',
+      'christopher online',
       'microsoft guy',
-      'microsoft aria',
       'microsoft christopher',
-      'samantha (enhanced)',
-      'ava (premium)',
-      'serena',
+      'microsoft andrew',
+      'google us english (male)',
+      'male',
     ];
 
-    for (const needle of neuralPriorityNames) {
+    const femaleNeuralKeywords = [
+      'ava online',
+      'jenny online',
+      'aria online',
+      'emma online',
+      'microsoft jenny',
+      'microsoft aria',
+      'microsoft ava',
+      'samantha (enhanced)',
+      'serena',
+      'google us english',
+      'female',
+    ];
+
+    const prioritizedKeywords = isMale
+      ? [...maleNeuralKeywords, ...femaleNeuralKeywords]
+      : [...femaleNeuralKeywords, ...maleNeuralKeywords];
+
+    for (const needle of prioritizedKeywords) {
       const match = voices.find(
         (v) =>
           v.lang.toLowerCase().startsWith('en') &&
           v.name.toLowerCase().includes(needle) &&
           !v.name.toLowerCase().includes('desktop') &&
-          !v.name.toLowerCase().includes('zira') &&
-          !v.name.toLowerCase().includes('david')
+          !v.name.toLowerCase().includes('zira')
       );
       if (match) return match;
     }
+
+    // 3. Any English voice matching gender preference
+    const genderMatch = voices.find(
+      (v) =>
+        v.lang.toLowerCase().startsWith('en') &&
+        (isMale
+          ? v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('mark')
+          : v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('zira'))
+    );
+    if (genderMatch) return genderMatch;
 
     // 3. Any English voice that is NOT an old robotic desktop synthesizer
     const nonRoboticEn = voices.find(

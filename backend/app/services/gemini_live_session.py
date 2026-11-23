@@ -277,10 +277,14 @@ class GeminiLiveBridge:
                                 audio_bytes=part.inline_data.data,
                             )
 
-                # 4. Turn Completion
-                if getattr(server_content, "turn_complete", False):
+                # 4. Turn Completion & Extended Thinking Lifecycle Check
+                status_str = str(getattr(response, "interaction_status", "") or getattr(server_content, "interaction_status", "")).upper()
+                is_turn_complete = getattr(server_content, "turn_complete", False)
+                is_idle = "IDLE" in status_str or not status_str or not is_extended_thinking
+
+                if is_turn_complete and is_idle:
                     full_output = "".join(self._output_transcript_buffer).strip()
-                    logger.info("Gemini Live: Turn completed (%d chars)", len(full_output))
+                    logger.info("Gemini Live: Turn completed (%d chars, status: %s)", len(full_output), status_str or "IDLE")
                     self._input_transcript_buffer.clear()
                     self._output_transcript_buffer.clear()
                     yield GeminiLiveEvent(

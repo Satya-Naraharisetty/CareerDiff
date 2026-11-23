@@ -150,10 +150,8 @@ async def interview_voice_gateway(
                 )
                 logger.info("[VOICE GATEWAY] Emitted Turn 0 WARMUP greeting to UI for interview %s", interview_id)
             elif interview.state == InterviewState.WARMUP.value and len(interview.turns) >= 1:
-                # Reconnection / refresh sync: emit existing Turn 0 so client state synchronizes
+                # Reconnection / refresh sync: emit existing Turn 0 text for UI sync, but do NOT re-synthesize initial TTS audio
                 turn_0 = interview.turns[0]
-                if len(interview.turns) == 1:
-                    initial_tts_text = turn_0.transcript
                 await websocket.send_json(
                     {
                         "type": "interviewer_speaking",
@@ -178,7 +176,11 @@ async def interview_voice_gateway(
 
         # 4. Initialize Stream Handlers
         vad = AudioVadProcessor()
-        active_interviewer_turn_index: int = 0
+        # Restore active interviewer turn index from loaded turns to prevent DB collisions on reconnection
+        interviewer_turns = [t for t in interview.turns if t.speaker == "INTERVIEWER"]
+        active_interviewer_turn_index: int = (
+            max(t.turn_index for t in interviewer_turns) if interviewer_turns else 0
+        )
 
         # Enable Gemini Live API (gemini-3.8-live-extended-thinking) when configured outside test suite
         if settings.gemini_api_key and settings.environment != "testing":
@@ -192,10 +194,13 @@ async def interview_voice_gateway(
             nonlocal active_interviewer_turn_index
             if not live_bridge:
                 return
+            last_cand_transcript = ""
+            last_interviewer_transcript = ""
             try:
                 async for event in live_bridge.connect():
                     if event.event_type == "input_transcript":
                         if event.text:
+                            last_cand_transcript = event.text
                             await websocket.send_json(
                                 {
                                     "type": "transcript_partial",
@@ -205,6 +210,7 @@ async def interview_voice_gateway(
                             )
                     elif event.event_type == "output_transcript":
                         if event.text:
+                            last_interviewer_transcript = event.text
                             await websocket.send_json(
                                 {
                                     "type": "interviewer_speaking",
@@ -226,7 +232,49 @@ async def interview_voice_gateway(
                             }
                         )
                     elif event.event_type == "turn_complete":
+                        # Finalize candidate turn in UI if transcript exists
+                        if last_cand_transcript:
+                            await websocket.send_json(
+                                {
+                                    "type": "transcript_final",
+                                    "turn_index": active_interviewer_turn_index + 1,
+                                    "speaker": "CANDIDATE",
+                                    "text": last_cand_transcript,
+                                }
+                            )
+                        # Notify client that interviewer finished speaking so mic auto-activates
+                        await websocket.send_json(
+                            {
+                                "type": "interviewer_audio_done",
+                                "turn_index": active_interviewer_turn_index,
+                            }
+                        )
+                        # Persist turns to PostgreSQL
+                        try:
+                            from app.models.interview import InterviewTurn
+                            async with async_session_factory() as db:
+                                if last_cand_transcript:
+                                    db.add(InterviewTurn(
+                                        interview_id=interview_id,
+                                        turn_index=active_interviewer_turn_index + 1,
+                                        speaker="CANDIDATE",
+                                        transcript=last_cand_transcript,
+                                    ))
+                                if last_interviewer_transcript or event.text:
+                                    db.add(InterviewTurn(
+                                        interview_id=interview_id,
+                                        turn_index=active_interviewer_turn_index + 2,
+                                        speaker="INTERVIEWER",
+                                        transcript=event.text or last_interviewer_transcript,
+                                        action_taken="QUESTION",
+                                    ))
+                                await db.commit()
+                        except Exception as persist_err:
+                            logger.warning("Error persisting Gemini Live turns: %s", persist_err)
+
                         active_interviewer_turn_index += 2
+                        last_cand_transcript = ""
+                        last_interviewer_transcript = ""
             except asyncio.CancelledError:
                 pass
             except Exception as exc:
@@ -475,11 +523,11 @@ async def interview_voice_gateway(
                             )
                             dur_ms = int((len(raw_audio) / 32000) * 1000) if raw_audio else 1000
 
+                            if not transcript.strip() and client_transcript:
+                                transcript = str(client_transcript).strip()
+
                             if not transcript.strip():
-                                transcript = (
-                                    "I have been designing and building scalable distributed backend systems, "
-                                    "focusing on low-latency microservices, Kafka event streaming, and resilient data architectures."
-                                )
+                                continue
 
                             logger.info("Finalizing turn from speech_stopped event (%d chars, %dms)", len(transcript or ""), dur_ms)
                             await websocket.send_json(

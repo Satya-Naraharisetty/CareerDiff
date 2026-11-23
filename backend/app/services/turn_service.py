@@ -327,8 +327,8 @@ class TurnService:
                 )
                 claim_text = claim_res.scalar_one_or_none()
 
-            # Live Semantic Interpretation (bounded context <= 600ms)
-            interpreted = LiveAnswerInterpreter.interpret(
+            # Live Semantic Interpretation with Gemini AI
+            interpreted = await LiveAnswerInterpreter.interpret_with_gemini(
                 candidate_transcript=request.transcript,
                 active_topic_name=active_topic.topic_name,
                 consecutive_probes=fsm.consecutive_probes,

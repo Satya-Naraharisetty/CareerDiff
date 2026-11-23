@@ -516,6 +516,14 @@ export const DeviceCheckModal: React.FC<DeviceCheckModalProps> = ({
   };
 
   const handleEnterInterview = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('careerdiff_camera_enabled', isCameraEnabled ? 'true' : 'false');
+        if (selectedCameraDeviceId) {
+          localStorage.setItem('careerdiff_preferred_video_device', selectedCameraDeviceId);
+        }
+      }
+    } catch {}
     cleanupStreams();
     onProceedToInterview();
   };

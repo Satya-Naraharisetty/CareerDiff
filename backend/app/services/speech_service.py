@@ -25,10 +25,11 @@ class STTService:
         if duration_sec < 0.25:
             return ""
 
-        hint = word_hint or "I am explaining the system architecture"
-        words = hint.split()
-        visible_words = min(len(words), max(1, int(duration_sec * 2.5)))
-        return " ".join(words[:visible_words]) + "..."
+        if word_hint:
+            words = word_hint.split()
+            visible_words = min(len(words), max(1, int(duration_sec * 2.5)))
+            return " ".join(words[:visible_words]) + "..."
+        return ""
 
     @classmethod
     async def transcribe_final(
@@ -72,14 +73,6 @@ class STTService:
                                 return transcript
             except Exception as exc:
                 logger.warning("Deepgram transcription call encountered exception: %s", exc)
-
-        if allow_mock_fallback or settings.environment in ("development", "testing"):
-            fallback_text = (
-                "We used Kafka partition keys to preserve order, configured min.insync.replicas=2, "
-                "and mitigated consumer group rebalance latency using cooperative sticky assignors."
-            )
-            logger.info("STT transcribe_final: falling back to simulated development transcript")
-            return fallback_text
 
         return ""
 
