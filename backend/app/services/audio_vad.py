@@ -24,10 +24,14 @@ class AudioVadProcessor:
     FRAME_DURATION_MS: int = 50
     FRAME_SIZE_BYTES: int = 1600  # 800 samples * 2 bytes = 1600 bytes
 
-    # Silence threshold: 2,200 ms of trailing silence = 44 consecutive 50ms frames (aligns with natural speech pauses)
-    TRAILING_SILENCE_FRAMES_REQUIRED: int = 44
-    MIN_SPEECH_FRAMES_REQUIRED: int = 4  # At least 200ms of speech before finalization
-    DEFAULT_ENERGY_THRESHOLD_RMS: float = 180.0
+    # Silence threshold: 1,500 ms of trailing silence (natural conversation cadence)
+    TRAILING_SILENCE_MS: float = 1500.0
+    MIN_SPEECH_DURATION_MS: float = 400.0  # At least 400ms of speech before finalization
+    MAX_CONTINUOUS_SPEECH_MS: float = 60000.0  # 60s max continuous speech cap before auto-finalization
+    TRAILING_SILENCE_FRAMES_REQUIRED: int = 30  # Preserved for backward compatibility
+    MIN_SPEECH_FRAMES_REQUIRED: int = 3
+    MAX_CONTINUOUS_SPEECH_FRAMES: int = 1200
+    DEFAULT_ENERGY_THRESHOLD_RMS: float = 60.0
 
     def __init__(
         self,
@@ -38,7 +42,9 @@ class AudioVadProcessor:
         self.trailing_silence_frames_required = trailing_silence_frames
         self.is_candidate_speaking: bool = False
         self.speech_frames_count: int = 0
+        self.speech_duration_ms: float = 0.0
         self.trailing_silence_frames: int = 0
+        self.trailing_silence_ms: float = 0.0
         self.audio_buffer: bytearray = bytearray()
 
     @staticmethod
@@ -59,35 +65,50 @@ class AudioVadProcessor:
         return math.sqrt(sum_squares / num_samples)
 
     def process_frame(self, pcm_bytes: bytes) -> VadFrameResult:
-        """Analyze a 50ms (or arbitrary length) PCM chunk and evaluate turn boundaries."""
+        """Analyze a PCM chunk and evaluate turn boundaries based on RMS and wall-clock duration."""
         rms = self.compute_rms(pcm_bytes)
         is_speech = rms >= self.energy_threshold_rms
         speech_started = False
         speech_finalized = False
+        chunk_ms = len(pcm_bytes) / 32.0 if pcm_bytes else 0.0
 
         if is_speech:
             self.audio_buffer.extend(pcm_bytes)
             self.trailing_silence_frames = 0
+            self.trailing_silence_ms = 0.0
             self.speech_frames_count += 1
+            self.speech_duration_ms += chunk_ms
 
             if not self.is_candidate_speaking:
                 self.is_candidate_speaking = True
                 speech_started = True
 
+            # Safety cap: force finalization if candidate speaks continuously for >= 60 seconds
+            if self.speech_duration_ms >= 60000.0:
+                speech_finalized = True
+                self.is_candidate_speaking = False
+                self.speech_frames_count = 0
+                self.speech_duration_ms = 0.0
+                self.trailing_silence_frames = 0
+                self.trailing_silence_ms = 0.0
+
         else:
             if self.is_candidate_speaking:
                 self.audio_buffer.extend(pcm_bytes)
                 self.trailing_silence_frames += 1
+                self.trailing_silence_ms += chunk_ms
 
-                # If trailing silence limit reached and candidate spoke enough
+                # Trailing silence (1.5 seconds) reached and candidate spoke at least 400ms
                 if (
-                    self.trailing_silence_frames >= self.trailing_silence_frames_required
-                    and self.speech_frames_count >= self.MIN_SPEECH_FRAMES_REQUIRED
+                    self.trailing_silence_ms >= 1500.0
+                    and self.speech_duration_ms >= 400.0
                 ):
                     speech_finalized = True
                     self.is_candidate_speaking = False
                     self.speech_frames_count = 0
+                    self.speech_duration_ms = 0.0
                     self.trailing_silence_frames = 0
+                    self.trailing_silence_ms = 0.0
 
         return VadFrameResult(
             is_speech=is_speech,
@@ -105,10 +126,7 @@ class AudioVadProcessor:
     def get_and_reset_buffer(self) -> bytes:
         """Retrieve collected turn audio and clear internal accumulator."""
         buffer = bytes(self.audio_buffer)
-        self.audio_buffer.clear()
-        self.is_candidate_speaking = False
-        self.speech_frames_count = 0
-        self.trailing_silence_frames = 0
+        self.reset()
         return buffer
 
     def reset(self) -> None:
@@ -116,4 +134,6 @@ class AudioVadProcessor:
         self.audio_buffer.clear()
         self.is_candidate_speaking = False
         self.speech_frames_count = 0
+        self.speech_duration_ms = 0.0
         self.trailing_silence_frames = 0
+        self.trailing_silence_ms = 0.0
