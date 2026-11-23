@@ -21,7 +21,7 @@ class STTService:
         cls, audio_bytes: bytes | bytearray, word_hint: str | None = None
     ) -> str:
         """Produce streaming partial transcript feedback as candidate speaks."""
-        duration_sec = len(audio_bytes) / (16000 * 2)
+        duration_sec = len(audio_bytes) / (16000 * 2) if audio_bytes else 0.0
         if duration_sec < 0.25:
             return ""
 
@@ -29,6 +29,7 @@ class STTService:
             words = word_hint.split()
             visible_words = min(len(words), max(1, int(duration_sec * 2.5)))
             return " ".join(words[:visible_words]) + "..."
+
         return ""
 
     @classmethod
@@ -44,7 +45,7 @@ class STTService:
             return simulated_transcript.strip()
 
         duration_sec = len(audio_bytes) / (16000 * 2) if audio_bytes else 0.0
-        if duration_sec < 0.3 and not simulated_transcript:
+        if duration_sec < 0.3:
             logger.info("STT transcribe_final: audio duration too short (%.2fs), returning empty", duration_sec)
             return ""
 
@@ -73,6 +74,91 @@ class STTService:
                                 return transcript
             except Exception as exc:
                 logger.warning("Deepgram transcription call encountered exception: %s", exc)
+
+        # Attempt Gemini multimodal audio transcription if gemini_api_key is configured
+        if settings.gemini_api_key and audio_bytes and len(audio_bytes) >= 6400:
+            try:
+                import io, wave
+                from app.core.llm import make_genai_client
+                from google.genai import types
+
+                wav_io = io.BytesIO()
+                with wave.open(wav_io, "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(16000)
+                    wf.writeframes(audio_bytes)
+                wav_bytes = wav_io.getvalue()
+
+                client = make_genai_client(timeout_ms=10_000)
+                turn_model = getattr(settings, "gemini_turn_model", None) or "gemini-3.8-flash"
+                prompt = (
+                    "Transcribe the candidate's spoken response verbatim in English. "
+                    "Return ONLY the spoken words. If only silence, background noise, or no words, return empty string."
+                )
+                try:
+                    resp = await client.aio.models.generate_content(
+                        model=turn_model,
+                        contents=[
+                            types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
+                            prompt,
+                        ],
+                    )
+                except Exception as model_exc:
+                    if turn_model != "gemini-3.5-flash":
+                        logger.warning(
+                            "Gemini audio transcription failed on %s (%s), falling back to gemini-3.5-flash",
+                            turn_model,
+                            model_exc,
+                        )
+                        resp = await client.aio.models.generate_content(
+                            model="gemini-3.5-flash",
+                            contents=[
+                                types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
+                                prompt,
+                            ],
+                        )
+                    else:
+                        raise
+
+                resp_text: str | None = None
+                try:
+                    resp_text = getattr(resp, "text", None) if resp is not None else None
+                except Exception:
+                    resp_text = None
+
+                if resp_text and resp_text.strip():
+                    raw_txt = resp_text.strip()
+                    if raw_txt.startswith("```") and raw_txt.endswith("```"):
+                        raw_txt = raw_txt.strip("`").strip()
+                        if raw_txt.startswith("text\n") or raw_txt.startswith("json\n"):
+                            raw_txt = raw_txt.split("\n", 1)[1].strip()
+                    raw_txt = raw_txt.strip('"').strip("'").strip()
+                    if raw_txt.lower() in (
+                        "empty string",
+                        '""',
+                        "''",
+                        "[silence]",
+                        "(silence)",
+                        "none",
+                        "no words",
+                        "no speech detected",
+                        "silence",
+                    ):
+                        raw_txt = ""
+
+                    if raw_txt:
+                        logger.info("STT transcribe_final: Gemini recognized %d chars: '%s'", len(raw_txt), raw_txt[:60])
+                        return raw_txt
+            except Exception as exc:
+                logger.warning("Gemini audio transcription error: %s", exc)
+
+        if allow_mock_fallback and duration_sec >= 0.35:
+            logger.info("STT transcribe_final: mock fallback activated for %.2fs audio", duration_sec)
+            return (
+                "I have been designing and building scalable distributed backend systems, "
+                "focusing on low-latency microservices, Kafka event streaming, and resilient data architectures."
+            )
 
         return ""
 
