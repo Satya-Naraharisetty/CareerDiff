@@ -84,7 +84,7 @@ class AudioVadProcessor:
                 speech_started = True
 
             # Safety cap: force finalization if candidate speaks continuously for >= 60 seconds
-            if self.speech_duration_ms >= 60000.0:
+            if self.speech_duration_ms >= self.MAX_CONTINUOUS_SPEECH_MS:
                 speech_finalized = True
                 self.is_candidate_speaking = False
                 self.speech_frames_count = 0
@@ -98,17 +98,18 @@ class AudioVadProcessor:
                 self.trailing_silence_frames += 1
                 self.trailing_silence_ms += chunk_ms
 
-                # Trailing silence (1.5 seconds) reached and candidate spoke at least 400ms
-                if (
-                    self.trailing_silence_ms >= 1500.0
-                    and self.speech_duration_ms >= 400.0
-                ):
-                    speech_finalized = True
-                    self.is_candidate_speaking = False
-                    self.speech_frames_count = 0
-                    self.speech_duration_ms = 0.0
-                    self.trailing_silence_frames = 0
-                    self.trailing_silence_ms = 0.0
+                # Trailing silence reached
+                if self.trailing_silence_ms >= self.TRAILING_SILENCE_MS:
+                    if self.speech_duration_ms >= self.MIN_SPEECH_DURATION_MS:
+                        speech_finalized = True
+                        self.is_candidate_speaking = False
+                        self.speech_frames_count = 0
+                        self.speech_duration_ms = 0.0
+                        self.trailing_silence_frames = 0
+                        self.trailing_silence_ms = 0.0
+                    else:
+                        # Accidental noise/click < 400ms followed by silence: reject noise and reset state
+                        self.reset()
 
         return VadFrameResult(
             is_speech=is_speech,

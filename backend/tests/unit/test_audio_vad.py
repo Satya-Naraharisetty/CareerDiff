@@ -145,6 +145,40 @@ def test_small_chunk_variable_rate_vad() -> None:
     assert len(buffer) > 0
 
 
+def test_short_noise_rejection_on_trailing_silence() -> None:
+    """Verify that brief noise <400ms (e.g. click/breath) followed by 1500ms silence resets VAD without finalization."""
+    vad = AudioVadProcessor(energy_threshold_rms=400.0)
+    loud_frame = generate_pcm_frame(amplitude=4000)  # 50ms per frame
+    silence_frame = generate_pcm_frame(amplitude=0)   # 50ms per frame
+
+    # Candidate makes a brief sound for 3 frames (150ms < 400ms MIN_SPEECH_DURATION_MS)
+    res1 = vad.process_frame(loud_frame)
+    assert res1.is_speech is True
+    assert res1.speech_started is True
+    assert vad.is_candidate_speaking is True
+
+    vad.process_frame(loud_frame)
+    vad.process_frame(loud_frame)
+    assert vad.speech_duration_ms == 150.0
+    assert len(vad.audio_buffer) == 4800
+
+    # Followed by 29 frames of silence (1450ms < 1500ms)
+    for _ in range(29):
+        res = vad.process_frame(silence_frame)
+        assert res.is_speech is False
+        assert res.speech_finalized is False
+        assert vad.is_candidate_speaking is True
+
+    # 30th frame of silence reaches 1500ms trailing silence
+    res_final = vad.process_frame(silence_frame)
+    # Since speech duration was only 150ms (< 400ms), it should reject the noise
+    assert res_final.speech_finalized is False
+    assert vad.is_candidate_speaking is False
+    assert len(vad.audio_buffer) == 0
+    assert vad.speech_duration_ms == 0.0
+    assert vad.trailing_silence_ms == 0.0
+
+
 def test_force_finalize() -> None:
     """Verify force_finalize clears accumulator and returns collected audio."""
     vad = AudioVadProcessor()
@@ -172,9 +206,15 @@ def test_conversational_rms_speech_detection() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stt_transcribe_final_mock_fallback() -> None:
+async def test_stt_transcribe_final_mock_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify STTService returns mock fallback for >=1.0s audio in development/testing."""
+    from unittest.mock import MagicMock
     from app.services.speech_service import STTService
+
+    mock_settings = MagicMock()
+    mock_settings.deepgram_api_key = None
+    mock_settings.gemini_api_key = None
+    monkeypatch.setattr("app.services.speech_service.get_settings", lambda: mock_settings)
 
     # 1.5 seconds of 16kHz audio = 48000 bytes
     dummy_audio = generate_pcm_frame(amplitude=500, num_samples=24000)
