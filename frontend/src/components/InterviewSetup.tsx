@@ -297,6 +297,78 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
     setIsDraggingFile(false);
   };
 
+  const analyzeResumeFile = async (file: File) => {
+    if (!isAuthed) {
+      onOpenAuth();
+      return;
+    }
+
+    setIsAnalyzingResume(true);
+    setError(null);
+    setResumeSuccessMsg(null);
+
+    try {
+      const analysis = await resumesApi.uploadFile(file);
+      setAnalyzedResumeText('');
+      setResumeAnalysis(analysis);
+      setSeniority(analysis.detected_seniority);
+      setResumeSuccessMsg(
+        `Resume parsed successfully! Extracted ${analysis.claims.length} technical claims and ${analysis.verified_skills.length} skills.`
+      );
+
+      if (analysis.recommended_role_id) {
+        const matched = roles.find((r) => r.id === analysis.recommended_role_id);
+        if (matched) setSelectedRole(matched);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to analyze resume';
+      setError(msg);
+      setResumeAnalysis(null);
+    } finally {
+      setIsAnalyzingResume(false);
+    }
+  };
+
+  const analyzeResumeTextContent = async (text: string) => {
+    if (!isAuthed) {
+      onOpenAuth();
+      return;
+    }
+
+    if (!text.trim()) {
+      setError('Please provide candidate resume text before analyzing.');
+      return;
+    }
+
+    setIsAnalyzingResume(true);
+    setError(null);
+    setResumeSuccessMsg(null);
+
+    try {
+      const analysis = await resumesApi.uploadText({
+        raw_text: text.trim(),
+        filename: 'candidate_resume.txt',
+      });
+      setAnalyzedResumeText(text.trim());
+      setResumeAnalysis(analysis);
+      setSeniority(analysis.detected_seniority);
+      setResumeSuccessMsg(
+        `Resume parsed successfully! Extracted ${analysis.claims.length} technical claims and ${analysis.verified_skills.length} skills.`
+      );
+
+      if (analysis.recommended_role_id) {
+        const matched = roles.find((r) => r.id === analysis.recommended_role_id);
+        if (matched) setSelectedRole(matched);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to analyze resume';
+      setError(msg);
+      setResumeAnalysis(null);
+    } finally {
+      setIsAnalyzingResume(false);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -308,58 +380,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       if (validExts.includes(fileExt)) {
         setSelectedFile(file);
         setError(null);
+        void analyzeResumeFile(file);
       } else {
         setError('Please drop a valid resume file (.pdf, .docx, or .txt).');
       }
-    }
-  };
-
-  const handleAnalyzeResume = async () => {
-    if (!isAuthed) {
-      onOpenAuth();
-      return;
-    }
-
-    setIsAnalyzingResume(true);
-    setError(null);
-    setResumeSuccessMsg(null);
-
-    try {
-      let analysis: ResumeAnalysisResponse;
-      if (resumeTab === 'upload') {
-        if (!selectedFile) {
-          setError('Please select a PDF, DOCX, or TXT resume file to upload.');
-          setIsAnalyzingResume(false);
-          return;
-        }
-        analysis = await resumesApi.uploadFile(selectedFile);
-        setAnalyzedResumeText('');
-      } else {
-        if (!resumeText.trim()) {
-          setError('Please paste resume text before analyzing.');
-          setIsAnalyzingResume(false);
-          return;
-        }
-        analysis = await resumesApi.uploadText({
-          raw_text: resumeText.trim(),
-          filename: 'candidate_resume.txt',
-        });
-        setAnalyzedResumeText(resumeText.trim());
-      }
-
-      setResumeAnalysis(analysis);
-      setSeniority(analysis.detected_seniority);
-      setResumeSuccessMsg(`Resume parsed successfully! Extracted ${analysis.claims.length} technical claims and ${analysis.verified_skills.length} skills.`);
-
-      if (analysis.recommended_role_id) {
-        const matched = roles.find((r) => r.id === analysis.recommended_role_id);
-        if (matched) setSelectedRole(matched);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to analyze resume';
-      setError(msg);
-    } finally {
-      setIsAnalyzingResume(false);
     }
   };
 
@@ -418,6 +442,11 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
   const handleCreate = async () => {
     if (!isAuthed) {
       onOpenAuth();
+      return;
+    }
+    if (!resumeAnalysis) {
+      setError('Please upload and calibrate your resume before initializing an interview.');
+      setCurrentPhase(1);
       return;
     }
     if (!selectedRole) {
@@ -547,18 +576,30 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
           ].map((item) => {
             const isActive = currentPhase === item.phase;
             const isCompleted = currentPhase > item.phase;
+            const isLocked = item.phase > 1 && !resumeAnalysis;
             return (
               <button
                 key={item.phase}
                 type="button"
-                onClick={() => setCurrentPhase(item.phase)}
+                disabled={isLocked}
+                onClick={() => {
+                  if (isLocked) {
+                    setError('Please upload and extract your resume before proceeding to subsequent calibration phases.');
+                    return;
+                  }
+                  setError(null);
+                  setCurrentPhase(item.phase);
+                }}
                 className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
                   isActive
                     ? 'border-emerald-500/80 bg-emerald-950/40 text-white shadow-sm ring-1 ring-emerald-500/40'
                     : isCompleted
                     ? 'border-zinc-800 bg-zinc-950/80 text-zinc-300 hover:border-zinc-700 hover:text-white'
+                    : isLocked
+                    ? 'border-transparent text-zinc-600 opacity-50 cursor-not-allowed'
                     : 'border-transparent text-zinc-500 hover:text-zinc-400'
                 }`}
+                title={isLocked ? 'Upload resume first to unlock' : undefined}
               >
                 <div
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
@@ -566,20 +607,34 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                       ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
                       : isCompleted
                       ? 'border-emerald-700/80 bg-emerald-950/80 text-emerald-400'
+                      : isLocked
+                      ? 'border-zinc-900 bg-zinc-950 text-zinc-600'
                       : 'border-zinc-800 bg-zinc-950 text-zinc-500'
                   }`}
                 >
-                  {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : item.num}
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : isLocked ? (
+                    <Lock className="h-3 w-3 text-zinc-600" />
+                  ) : (
+                    item.num
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div
                     className={`font-semibold truncate ${
-                      isActive ? 'text-white' : isCompleted ? 'text-zinc-200' : 'text-zinc-400'
+                      isActive
+                        ? 'text-white'
+                        : isCompleted
+                        ? 'text-zinc-200'
+                        : isLocked
+                        ? 'text-zinc-600'
+                        : 'text-zinc-400'
                     }`}
                   >
                     {item.title}
                   </div>
-                  <div className="text-[10px] text-zinc-500 truncate hidden sm:block">
+                  <div className={`text-[10px] truncate hidden sm:block ${isLocked ? 'text-zinc-700' : 'text-zinc-500'}`}>
                     {item.subtitle}
                   </div>
                 </div>
@@ -672,8 +727,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                       accept=".pdf,.docx,.txt"
                       onChange={(e) => {
                         if (e.target.files && e.target.files[0]) {
-                          setSelectedFile(e.target.files[0]);
+                          const file = e.target.files[0];
+                          setSelectedFile(file);
                           setError(null);
+                          void analyzeResumeFile(file);
                         }
                       }}
                       className="hidden"
@@ -692,6 +749,8 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFile(null);
+                          setResumeAnalysis(null);
+                          setResumeSuccessMsg(null);
                         }}
                         className="ml-1 text-zinc-500 hover:text-zinc-300 p-0.5"
                         title="Remove file"
@@ -708,7 +767,10 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                   <span>Candidate resume plain text / markdown:</span>
                   <button
                     type="button"
-                    onClick={() => setResumeText(SAMPLE_RESUME_TEXT)}
+                    onClick={() => {
+                      setResumeText(SAMPLE_RESUME_TEXT);
+                      void analyzeResumeTextContent(SAMPLE_RESUME_TEXT);
+                    }}
                     className="text-zinc-300 hover:text-white underline font-mono text-[11px] self-start sm:self-auto"
                   >
                     Load Sample Senior Resume
@@ -717,36 +779,44 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 <textarea
                   rows={6}
                   value={resumeText}
-                  onChange={(e) => setResumeText(e.target.value)}
+                  onChange={(e) => {
+                    setResumeText(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setResumeAnalysis(null);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text');
+                    if (pasted && pasted.trim().length > 30) {
+                      setResumeText(pasted);
+                      void analyzeResumeTextContent(pasted);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (resumeText.trim().length > 30 && resumeText.trim() !== analyzedResumeText) {
+                      void analyzeResumeTextContent(resumeText);
+                    }
+                  }}
                   placeholder="Paste candidate resume here (work history, technologies, achievements)..."
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs text-zinc-200 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600"
                 />
               </div>
             )}
 
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs text-zinc-500 font-mono">
-                Grounds interview questions and blueprint topics in your verified claims.
-              </span>
-              <button
-                type="button"
-                disabled={isAnalyzingResume}
-                onClick={handleAnalyzeResume}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-white py-2 px-4 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-[0.98] shrink-0 shadow-sm"
-              >
-                {isAnalyzingResume ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Extracting Provenance...
-                  </>
-                ) : (
-                  <>
-                    <Code2 className="h-3.5 w-3.5" />
-                    Analyze Resume &amp; Claims
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Automatic Extraction Status Indicator */}
+            {isAnalyzingResume ? (
+              <div className="mt-4 flex items-center gap-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 p-3 text-xs font-mono text-emerald-300 animate-pulse">
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-400 shrink-0" />
+                <span>Extracting candidate claims, skills, and provenance in background...</span>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-zinc-500 font-mono">
+                <span>Grounds interview questions and blueprint topics in your verified claims.</span>
+                <span className="text-[11px] text-zinc-400">
+                  {resumeAnalysis ? '✓ Resume analyzed & verified' : 'Extraction starts automatically on upload'}
+                </span>
+              </div>
+            )}
 
             {/* Resume Analysis Output Card */}
             {resumeAnalysis && (
@@ -800,6 +870,7 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
                 onClick={() => {
                   setResumeTab('paste');
                   setResumeText(SAMPLE_RESUME_TEXT);
+                  void analyzeResumeTextContent(SAMPLE_RESUME_TEXT);
                 }}
                 className="text-xs text-zinc-400 hover:text-emerald-400 underline transition-colors"
               >
@@ -807,12 +878,37 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
               </button>
               <button
                 type="button"
-                onClick={() => setCurrentPhase(2)}
-                disabled={isAnalyzingResume}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-all shadow-md active:scale-95"
+                onClick={() => {
+                  if (!resumeAnalysis) {
+                    setError('Please upload or paste your resume before proceeding to the job description phase.');
+                    return;
+                  }
+                  setError(null);
+                  setCurrentPhase(2);
+                }}
+                disabled={!resumeAnalysis || isAnalyzingResume}
+                className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold transition-all shadow-md ${
+                  !resumeAnalysis || isAnalyzingResume
+                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60'
+                    : 'bg-white text-zinc-950 hover:bg-zinc-200 active:scale-95'
+                }`}
               >
-                <span>Continue to Job Description</span>
-                <ArrowRight className="h-4 w-4" />
+                {isAnalyzingResume ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Extracting Resume...</span>
+                  </>
+                ) : !resumeAnalysis ? (
+                  <>
+                    <Lock className="h-3.5 w-3.5 text-zinc-500" />
+                    <span>Upload Resume to Proceed</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue to Job Description</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
             </div>
           </div>

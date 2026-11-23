@@ -580,7 +580,8 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       }
     }
 
-    const trimmed = spokenTranscript?.trim();
+    const currentPartial = get().partialTranscript?.trim();
+    const trimmed = (spokenTranscript && spokenTranscript.trim()) || currentPartial || undefined;
 
     if (activeWs && activeWs.readyState === WebSocket.OPEN) {
       activeWs.send(

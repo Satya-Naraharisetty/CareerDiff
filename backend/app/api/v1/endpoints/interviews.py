@@ -218,6 +218,36 @@ async def create_interview(
     blueprint = await generate_interview_blueprint(interview, db)
     await db.commit()
 
+    # 5. Pre-warm Turn 0 greeting audio in background so candidate hears interviewer speech immediately on room entry
+    try:
+        from app.services.turn_generator import TurnGenerator
+        from app.services.speech_service import TTSService
+
+        key_claim: str | None = None
+        if profile and getattr(profile, "resumes", None) and profile.resumes:
+            latest_res = sorted(profile.resumes, key=lambda r: getattr(r, "created_at", datetime.min), reverse=True)[0]
+            if getattr(latest_res, "claims", None) and latest_res.claims:
+                for c in latest_res.claims:
+                    if getattr(c, "category", "") == "EXPLICIT_FACT":
+                        key_claim = c.claim_text
+                        break
+                if not key_claim:
+                    key_claim = latest_res.claims[0].claim_text
+
+        greeting_text = TurnGenerator.generate_warmup_greeting(
+            candidate_name=current_user.full_name,
+            target_seniority=payload.target_seniority,
+            primary_discipline=profile.primary_discipline or "BACKEND",
+            top_skills=profile.verified_skills or [],
+            key_claim=key_claim,
+            company_name=payload.target_company,
+            interviewer_name="Alex",
+        )
+        asyncio.create_task(TTSService.prewarm(greeting_text, "Alex"))
+        asyncio.create_task(TTSService.prewarm(greeting_text, "Puck"))
+    except Exception as prewarm_err:
+        logger.warning("Could not prewarm Turn 0 TTS audio: %s", prewarm_err)
+
     # Eagerly load topics with selectinload to avoid lazy-loading MissingGreenlet
     stmt_bp = (
         select(InterviewBlueprint)

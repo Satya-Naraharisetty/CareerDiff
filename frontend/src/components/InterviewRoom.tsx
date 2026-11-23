@@ -1397,7 +1397,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
             })}
 
             {/* Real-Time Live Candidate Speaking Bubble on the Right */}
-            {Boolean(partialTranscript && partialTranscript.trim()) && (
+            {(Boolean(partialTranscript && partialTranscript.trim()) || (isRecording && !isInterviewerSpeaking)) && (
               <div className="flex justify-end gap-3 sm:gap-4 animate-in fade-in duration-150">
                 <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-none border border-emerald-500/50 bg-emerald-950/40 p-4 text-white shadow-lg shadow-emerald-950/20 font-sans">
                   <div className="flex items-center justify-between gap-3 mb-1.5 font-mono">
@@ -1410,8 +1410,14 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap">
-                    {partialTranscript}
-                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
+                    {partialTranscript ? (
+                      <>
+                        {partialTranscript}
+                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
+                      </>
+                    ) : (
+                      <span className="inline-block w-1.5 h-3.5 bg-cyan-400 animate-pulse align-baseline rounded-[1px]" />
+                    )}
                   </p>
                 </div>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-950 border border-cyan-600/50 text-cyan-300 shadow-sm ring-2 ring-emerald-500/40">

@@ -104,13 +104,16 @@ export class BrowserSpeechRecognizer {
 
     rec.onend = () => {
       if (!this.isListening) return;
-      const currentTotal = this.getFullTranscript();
-      if (currentTotal) {
-        this.confirmedPriorText = currentTotal;
+      // Preserve confirmed final text from finished sentence; drop volatile interim guesses
+      if (this.currentSessionFinal.trim()) {
+        this.confirmedPriorText = (
+          (this.confirmedPriorText ? this.confirmedPriorText.trim() + ' ' : '') +
+          this.currentSessionFinal.trim()
+        ).trim();
       }
       this.currentSessionFinal = '';
       this.currentInterimTranscript = '';
-      this.scheduleRestart(100);
+      this.scheduleRestart(80);
     };
 
     return rec;
@@ -126,9 +129,14 @@ export class BrowserSpeechRecognizer {
         if (rec) {
           rec.start();
           this.recognition = rec;
+          console.info('[SpeechRecognition] Active listening loop resumed.');
         }
       } catch (err) {
         console.warn('[SpeechRecognition] Restart attempt notice:', err);
+        // Exponential backoff retry so candidate speech recognition never dies mid-interview
+        if (this.isListening) {
+          this.scheduleRestart(Math.min(1200, Math.round(delayMs * 1.5 + 80)));
+        }
       }
     }, delayMs);
   }
@@ -181,9 +189,9 @@ export class BrowserSpeechRecognizer {
       this.recognition = rec;
       return true;
     } catch (err) {
-      console.warn('Failed to start SpeechRecognition:', err);
-      this.onErrorCallback?.('Failed to start speech recognition. Please check microphone permissions.');
-      return false;
+      console.warn('Initial SpeechRecognition start busy/delayed, scheduling auto-resume:', err);
+      this.scheduleRestart(150);
+      return true;
     }
   }
 

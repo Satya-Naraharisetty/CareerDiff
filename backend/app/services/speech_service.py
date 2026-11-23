@@ -93,6 +93,45 @@ class TTSService:
         "Maya": "en-US-AvaMultilingualNeural",
     }
 
+    _PCM_CACHE: dict[str, bytes] = {}
+
+    @classmethod
+    async def prewarm(cls, text: str, voice_name: str | None = None) -> bytes | None:
+        """Asynchronously pre-synthesize neural speech and cache raw PCM bytes for instant zero-latency playback."""
+        clean_text = text.strip()
+        if not clean_text:
+            return None
+
+        neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
+        cache_key = f"{neural_voice}:{clean_text}"
+        if cache_key in cls._PCM_CACHE:
+            return cls._PCM_CACHE[cache_key]
+
+        try:
+            import edge_tts
+            import miniaudio
+
+            communicate = edge_tts.Communicate(clean_text, neural_voice)
+            audio_chunks: list[bytes] = []
+            async for chunk in communicate.stream():
+                if chunk.get("type") == "audio" and chunk.get("data"):
+                    audio_chunks.append(chunk["data"])
+
+            if audio_chunks:
+                mp3_bytes = b"".join(audio_chunks)
+                decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
+                pcm_raw = decoded.samples.tobytes()
+                cls._PCM_CACHE[cache_key] = pcm_raw
+                logger.info(
+                    "[TTS] Prewarmed and cached %d neural PCM bytes for key '%s'",
+                    len(pcm_raw),
+                    cache_key[:50],
+                )
+                return pcm_raw
+        except Exception as exc:
+            logger.warning("[TTS] Prewarm error: %s", exc)
+        return None
+
     @classmethod
     async def synthesize_pcm_stream(
         cls,
@@ -104,12 +143,32 @@ class TTSService:
         """Stream studio-quality neural PCM chunks representing lifelike synthesized speech.
 
         Uses Microsoft Neural Edge TTS (Andrew/Ava) decoded via miniaudio to 24kHz Linear PCM.
+        Serves instantly from in-memory cache when prewarmed to eliminate startup latency.
         """
         clean_text = text.strip()
         if not clean_text:
             return
 
         neural_voice = cls.VOICE_MAP.get(voice_name or "Puck", "en-US-AndrewMultilingualNeural")
+        cache_key = f"{neural_voice}:{clean_text}"
+
+        # 1. Instant Cache Hit: Yield prewarmed PCM chunks immediately (0ms delay)
+        if cache_key in cls._PCM_CACHE:
+            pcm_raw = cls._PCM_CACHE[cache_key]
+            chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
+            total_len = len(pcm_raw)
+            logger.info(
+                "[TTS] Instant cache hit: streaming %d neural PCM bytes (~%.1fs audio) for voice '%s'",
+                total_len,
+                total_len / (cls.SAMPLE_RATE * cls.BYTES_PER_SAMPLE),
+                neural_voice,
+            )
+            for offset in range(0, total_len, chunk_size):
+                if realtime_delay:
+                    await asyncio.sleep(chunk_duration_ms / 1000)
+                yield pcm_raw[offset : offset + chunk_size]
+            return
+
         logger.info(
             "[TTS] Synthesizing neural speech with voice '%s' (%d chars)",
             neural_voice,
@@ -130,6 +189,7 @@ class TTSService:
                 mp3_bytes = b"".join(audio_chunks)
                 decoded = miniaudio.decode(mp3_bytes, nchannels=1, sample_rate=cls.SAMPLE_RATE)
                 pcm_raw = decoded.samples.tobytes()
+                cls._PCM_CACHE[cache_key] = pcm_raw
 
                 chunk_size = int(cls.SAMPLE_RATE * (chunk_duration_ms / 1000) * cls.BYTES_PER_SAMPLE)
                 total_len = len(pcm_raw)
