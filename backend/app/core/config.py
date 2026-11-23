@@ -110,6 +110,9 @@ class Settings(BaseModel):
     gemini_live_voice: str = Field(
         default_factory=lambda: os.getenv("GEMINI_LIVE_VOICE", "Puck")
     )
+    enable_gemini_live: bool = Field(
+        default_factory=lambda: os.getenv("ENABLE_GEMINI_LIVE", "false").lower() == "true"
+    )
     gemini_eval_model: str = Field(
         default_factory=lambda: os.getenv("GEMINI_EVAL_MODEL", "gemini-4-argon")
     )

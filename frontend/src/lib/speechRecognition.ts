@@ -52,14 +52,17 @@ export class BrowserSpeechRecognizer {
 
     rec.onaudiostart = () => {
       console.info('[SpeechRecognition] Mic audio stream connected to speech recognition.');
+      this.clearSilenceTimer();
     };
 
     rec.onsoundstart = () => {
       console.info('[SpeechRecognition] Sound wave detected on mic.');
+      this.clearSilenceTimer();
     };
 
     rec.onspeechstart = () => {
       console.info('[SpeechRecognition] Speech onset detected.');
+      this.clearSilenceTimer();
     };
 
     rec.onresult = (event: any) => {
@@ -99,6 +102,7 @@ export class BrowserSpeechRecognizer {
       this.clearSilenceTimer();
       if (fullText.length >= 6 && this.onSilenceCallback) {
         this.silenceTimer = window.setTimeout(() => {
+          this.silenceTimer = null;
           if (this.isListening && this.getFullTranscript().length >= 6) {
             this.onSilenceCallback?.();
           }
@@ -130,6 +134,7 @@ export class BrowserSpeechRecognizer {
     };
 
     rec.onend = () => {
+      this.clearSilenceTimer();
       if (!this.isListening) return;
 
       // Accumulate confirmed text before restarting
@@ -228,7 +233,7 @@ export class BrowserSpeechRecognizer {
     return parts.join(' ').trim();
   }
 
-  private clearSilenceTimer(): void {
+  clearSilenceTimer(): void {
     if (this.silenceTimer !== null) {
       window.clearTimeout(this.silenceTimer);
       this.silenceTimer = null;

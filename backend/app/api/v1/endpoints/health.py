@@ -148,6 +148,7 @@ async def check_outbox_health() -> tuple[bool, float, dict[str, Any]]:
     "/health",
     methods=["GET", "HEAD"],
     response_model=SystemHealthResponse,
+    operation_id="get_system_health_probe",
     summary="Comprehensive system & integration health check",
     description="Probes PostgreSQL (Supabase), Redis (Upstash), local storage, Gemini LLM, and Outbox backlog.",
 )

@@ -26,7 +26,7 @@ class AudioVadProcessor:
 
     # Silence threshold: 1,500 ms of trailing silence (natural conversation cadence)
     TRAILING_SILENCE_MS: float = 1500.0
-    MIN_SPEECH_DURATION_MS: float = 400.0  # At least 400ms of speech before finalization
+    MIN_SPEECH_DURATION_MS: float = 250.0  # At least 250ms of speech before finalization (permits monosyllabic 'yes'/'no')
     MAX_CONTINUOUS_SPEECH_MS: float = 60000.0  # 60s max continuous speech cap before auto-finalization
     TRAILING_SILENCE_FRAMES_REQUIRED: int = 30  # Preserved for backward compatibility
     MIN_SPEECH_FRAMES_REQUIRED: int = 3
@@ -108,7 +108,7 @@ class AudioVadProcessor:
                         self.trailing_silence_frames = 0
                         self.trailing_silence_ms = 0.0
                     else:
-                        # Accidental noise/click < 400ms followed by silence: reject noise and reset state
+                        # Accidental noise/click < 250ms followed by silence: reject noise and reset state
                         self.reset()
 
         return VadFrameResult(

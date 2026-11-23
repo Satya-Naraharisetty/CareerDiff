@@ -1794,8 +1794,41 @@ export const InterviewSetup: React.FC<InterviewSetupProps> = ({ onStartInterview
       <DeviceCheckModal
         isOpen={isDeviceCheckOpen}
         onClose={() => setIsDeviceCheckOpen(false)}
-        onProceedToInterview={() => {
+        onProceedToInterview={async () => {
           setIsDeviceCheckOpen(false);
+          const store = useInterviewStore.getState();
+          const storedId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_active_interview_id') : null;
+          const hasLiveSession = (store.interviewId || storedId) && store.state !== 'COMPLETED';
+
+          if (!hasLiveSession && !createdBlueprint) {
+            try {
+              const roleToUse = selectedRole || (roles.length > 0 ? roles[0] : null);
+              if (roleToUse) {
+                const res = await interviewsApi.create({
+                  role_id: roleToUse.id,
+                  target_seniority: seniority || 'SENIOR',
+                  duration_minutes: duration || 30,
+                  mode: mode || 'VOICE',
+                  preferred_language: preferredLanguage || 'Python',
+                  company_persona: companyPersona,
+                  target_company: targetCompany.trim() || undefined,
+                });
+                setInterview(
+                  res.interview_id,
+                  res.state,
+                  mode,
+                  seniority,
+                  res.blueprint,
+                  preferredLanguage
+                );
+              }
+            } catch (createErr) {
+              console.warn('Auto-initialize session notice:', createErr);
+            }
+          } else if (storedId && !store.interviewId) {
+            useInterviewStore.setState({ interviewId: storedId });
+          }
+
           onStartInterview();
         }}
         mode={mode}

@@ -501,8 +501,9 @@ async def interview_voice_gateway(
                     # Stream raw 16kHz audio frame directly to Gemini Live API
                     await live_bridge.send_audio_frame(pcm_bytes)
 
-                    # When candidate pauses for ~1200ms, signal audio_stream_end so Gemini Live knows candidate finished
+                    # When candidate pauses for trailing silence, signal audio_stream_end so Gemini Live knows candidate finished
                     if vad_result.speech_finalized:
+                        vad.reset()
                         logger.info("[VAD] Local VAD detected trailing silence; signaling audio_stream_end to Gemini Live")
                         await live_bridge.send_audio_stream_end()
                 else:
@@ -602,6 +603,10 @@ async def interview_voice_gateway(
                         await live_bridge.send_audio_stream_end()
                     else:
                         raw_audio = vad.force_finalize()
+                        if audio_chunks_received > 0 and len(raw_audio) == 0:
+                            logger.info("Ignoring trailing speech_stopped: audio buffer already finalized via VAD")
+                            continue
+
                         logger.info("Finalizing audio buffer on speech_stopped: %d bytes (%.2fs)", len(raw_audio), len(raw_audio) / 32000)
                         transcript = await STTService.transcribe_final(
                             raw_audio,

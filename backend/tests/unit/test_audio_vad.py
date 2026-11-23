@@ -58,7 +58,7 @@ def test_speech_onset_and_trailing_silence_finalization() -> None:
     assert res1.speech_started
     assert vad.is_candidate_speaking is True
 
-    # 3. Candidate speaks for 9 more frames (total 10 frames = 500ms >= 400ms required)
+    # 3. Candidate speaks for 9 more frames (total 10 frames = 500ms >= 250ms required)
     for _ in range(9):
         res = vad.process_frame(loud_frame)
         assert res.is_speech
@@ -100,7 +100,7 @@ def test_small_chunk_variable_rate_vad() -> None:
             assert res.speech_started is False
 
     assert vad.is_candidate_speaking is True
-    assert vad.speech_duration_ms >= 400.0
+    assert vad.speech_duration_ms >= 250.0
 
     # Phase 2: Candidate pauses for 200ms (~74 chunks) between syllables/words
     pause_chunks = int(200.0 / chunk_duration_ms)
@@ -146,12 +146,12 @@ def test_small_chunk_variable_rate_vad() -> None:
 
 
 def test_short_noise_rejection_on_trailing_silence() -> None:
-    """Verify that brief noise <400ms (e.g. click/breath) followed by 1500ms silence resets VAD without finalization."""
+    """Verify that brief noise <250ms (e.g. click/breath) followed by 1500ms silence resets VAD without finalization."""
     vad = AudioVadProcessor(energy_threshold_rms=400.0)
     loud_frame = generate_pcm_frame(amplitude=4000)  # 50ms per frame
     silence_frame = generate_pcm_frame(amplitude=0)   # 50ms per frame
 
-    # Candidate makes a brief sound for 3 frames (150ms < 400ms MIN_SPEECH_DURATION_MS)
+    # Candidate makes a brief sound for 3 frames (150ms < 250ms MIN_SPEECH_DURATION_MS)
     res1 = vad.process_frame(loud_frame)
     assert res1.is_speech is True
     assert res1.speech_started is True
@@ -171,12 +171,40 @@ def test_short_noise_rejection_on_trailing_silence() -> None:
 
     # 30th frame of silence reaches 1500ms trailing silence
     res_final = vad.process_frame(silence_frame)
-    # Since speech duration was only 150ms (< 400ms), it should reject the noise
+    # Since speech duration was only 150ms (< 250ms), it should reject the noise
     assert res_final.speech_finalized is False
     assert vad.is_candidate_speaking is False
     assert len(vad.audio_buffer) == 0
     assert vad.speech_duration_ms == 0.0
     assert vad.trailing_silence_ms == 0.0
+
+
+def test_monosyllabic_speech_finalization() -> None:
+    """Verify that short monosyllabic speech >= 250ms (e.g. 'Yes', 'No', 300ms) finalizes cleanly after trailing silence."""
+    vad = AudioVadProcessor(energy_threshold_rms=400.0)
+    loud_frame = generate_pcm_frame(amplitude=4000)  # 50ms per frame
+    silence_frame = generate_pcm_frame(amplitude=0)   # 50ms per frame
+
+    # Candidate says "Yes" lasting 6 frames (300ms >= 250ms MIN_SPEECH_DURATION_MS)
+    for i in range(6):
+        res = vad.process_frame(loud_frame)
+        assert res.is_speech is True
+        if i == 0:
+            assert res.speech_started is True
+
+    assert vad.is_candidate_speaking is True
+    assert vad.speech_duration_ms == 300.0
+
+    # Followed by 30 frames of silence (1500ms trailing silence)
+    final_res = None
+    for _ in range(30):
+        final_res = vad.process_frame(silence_frame)
+
+    assert final_res is not None
+    assert final_res.speech_finalized is True
+    assert vad.is_candidate_speaking is False
+    buffer = vad.get_and_reset_buffer()
+    assert len(buffer) > 0
 
 
 def test_force_finalize() -> None:

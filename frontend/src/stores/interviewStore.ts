@@ -593,6 +593,9 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
             }
           },
           (level) => {
+            if (level > 0.03 && speechRecognizer) {
+              speechRecognizer.clearSilenceTimer();
+            }
             set({ audioLevel: get().isMicMuted ? 0 : level });
           }
         );

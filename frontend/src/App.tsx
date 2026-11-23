@@ -43,7 +43,8 @@ const viewFromPath = (path: string): View | null => {
 };
 const isInterviewLive = () => {
   const { state, interviewId } = useInterviewStore.getState();
-  return Boolean(interviewId && state !== 'COMPLETED');
+  const storedId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_active_interview_id') : null;
+  return Boolean((interviewId || storedId) && state !== 'COMPLETED');
 };
 
 export const AppContent: React.FC = () => {
@@ -129,8 +130,19 @@ export const AppContent: React.FC = () => {
     ) {
       return;
     }
-    if (view === 'interview' && !useInterviewStore.getState().interviewId) {
-      view = 'setup';
+    if (view === 'interview') {
+      const storedId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_active_interview_id') : null;
+      const activeId = useInterviewStore.getState().interviewId || storedId;
+      if (!activeId) {
+        view = 'setup';
+      } else {
+        if (!useInterviewStore.getState().interviewId) {
+          useInterviewStore.setState({ interviewId: activeId });
+        }
+        if (useInterviewStore.getState().state === 'COMPLETED') {
+          useInterviewStore.setState({ state: 'WARMUP' });
+        }
+      }
     }
     applyView(view, 'push');
   };
@@ -140,11 +152,16 @@ export const AppContent: React.FC = () => {
     window.history.replaceState({ view: activeView }, '', VIEW_PATHS[activeView] + window.location.search);
     const onPopState = () => {
       const view = viewFromPath(window.location.pathname) ?? 'home';
-      if (view === 'interview' && !isInterviewLive()) {
-        // Never navigate back into a finished (or missing) interview room.
-        const fallback: View = useInterviewStore.getState().state === 'COMPLETED' ? 'dossier' : 'setup';
-        applyView(fallback, 'replace');
-        return;
+      if (view === 'interview') {
+        const storedId = typeof localStorage !== 'undefined' ? localStorage.getItem('careerdiff_active_interview_id') : null;
+        const activeId = useInterviewStore.getState().interviewId || storedId;
+        if (!activeId) {
+          applyView('setup', 'replace');
+          return;
+        }
+        if (!useInterviewStore.getState().interviewId) {
+          useInterviewStore.setState({ interviewId: activeId });
+        }
       }
       applyView(view, 'none');
     };

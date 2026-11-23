@@ -106,7 +106,7 @@ async def root() -> dict[str, str]:
     }
 
 
-@app.api_route("/health", methods=["GET", "HEAD"], summary="Top-level system health probe", tags=["Root"])
+@app.api_route("/health", methods=["GET", "HEAD"], summary="Top-level system health probe", tags=["Root"], include_in_schema=False)
 async def root_health(response: Response) -> Any:
     """Convenience endpoint routing root /health to system integration health probe."""
     from app.api.v1.endpoints.health import get_system_health

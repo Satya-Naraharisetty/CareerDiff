@@ -299,13 +299,32 @@ export class PcmPlayer {
   }
 }
 
+const pcmWorkletCode = `
+class PcmCaptureProcessor extends AudioWorkletProcessor {
+  process(inputs) {
+    const input = inputs[0];
+    if (input && input[0] && input[0].length > 0) {
+      // Send channel 0 audio data to main thread
+      this.port.postMessage(input[0]);
+    }
+    return true;
+  }
+}
+registerProcessor('pcm-capture-processor', PcmCaptureProcessor);
+`;
+
 export class PcmRecorder {
   private mediaStream: MediaStream | null = null;
   private audioCtx: AudioContext | null = null;
-  private scriptProcessor: ScriptProcessorNode | null = null;
+  private workletNode: AudioWorkletNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private onDataChunk: ((pcm16: ArrayBuffer) => void) | null = null;
   private onVolumeChange: ((level: number) => void) | null = null;
+
+  /** Returns the acquired MediaStream so other consumers (e.g. SpeechRecognition) can share it. */
+  getStream(): MediaStream | null {
+    return this.mediaStream;
+  }
 
   async start(
     onChunk: (pcm16: ArrayBuffer) => void,
@@ -321,7 +340,6 @@ export class PcmRecorder {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -332,7 +350,6 @@ export class PcmRecorder {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -344,40 +361,73 @@ export class PcmRecorder {
     registerActiveStream(stream);
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.audioCtx = new AudioContextClass();
+    if (this.audioCtx.state === 'suspended') {
+      await this.audioCtx.resume().catch(() => {});
+    }
+    const unlockRecorderCtx = () => {
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+    };
+    ['click', 'keydown', 'touchstart', 'pointerdown'].forEach((evt) => {
+      window.addEventListener(evt, unlockRecorderCtx, { once: false, passive: true });
+    });
     const sampleRate = this.audioCtx.sampleRate;
 
     this.sourceNode = this.audioCtx.createMediaStreamSource(stream);
-    // Buffer size 2048 is ~46ms at 44.1kHz or ~128ms at 16kHz
-    this.scriptProcessor = this.audioCtx.createScriptProcessor(2048, 1, 1);
 
-    this.scriptProcessor.onaudioprocess = (e) => {
-      const inputBuffer = e.inputBuffer.getChannelData(0);
+    // Modern AudioWorkletNode: runs in audio thread without ScriptProcessorNode deprecation
+    // and without connecting to destination (prevents loopback AEC mic silencing)
+    if (this.audioCtx.audioWorklet) {
+      const blob = new Blob([pcmWorkletCode], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      try {
+        await this.audioCtx.audioWorklet.addModule(workletUrl);
+        const workletNode = new AudioWorkletNode(this.audioCtx, 'pcm-capture-processor');
+        // Accumulate 16kHz samples into standard 50ms (800 samples = 1600 bytes) frames
+        const frameSizeSamples = 800;
+        const chunkAccumulator = new Int16Array(frameSizeSamples);
+        let chunkAccumulatorCount = 0;
 
-      // 1. Calculate RMS volume level for UI visualizer
-      let sum = 0;
-      for (let i = 0; i < inputBuffer.length; i++) {
-        sum += inputBuffer[i] * inputBuffer[i];
+        workletNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
+          const inputBuffer = e.data;
+          if (!inputBuffer || inputBuffer.length === 0) return;
+
+          // 1. Calculate RMS volume level for UI visualizer
+          let sum = 0;
+          for (let i = 0; i < inputBuffer.length; i++) {
+            sum += inputBuffer[i] * inputBuffer[i];
+          }
+          const rms = Math.sqrt(sum / inputBuffer.length);
+          const normalizedLevel = Math.min(1, rms * 15);
+          if (this.onVolumeChange) {
+            this.onVolumeChange(normalizedLevel);
+          }
+
+          // 2. Resample to 16kHz and accumulate into standard 50ms (1600-byte) frames
+          const pcm16 = this.downsampleToPcm16(inputBuffer, sampleRate, 16000);
+          if (pcm16.byteLength > 0) {
+            const int16Samples = new Int16Array(pcm16);
+            for (let i = 0; i < int16Samples.length; i++) {
+              chunkAccumulator[chunkAccumulatorCount++] = int16Samples[i];
+              if (chunkAccumulatorCount === frameSizeSamples) {
+                if (this.onDataChunk) {
+                  this.onDataChunk(chunkAccumulator.slice().buffer);
+                }
+                chunkAccumulatorCount = 0;
+              }
+            }
+          }
+        };
+
+        this.sourceNode.connect(workletNode);
+        this.workletNode = workletNode;
+      } catch (workletErr) {
+        console.warn('AudioWorklet module init notice:', workletErr);
+      } finally {
+        URL.revokeObjectURL(workletUrl);
       }
-      const rms = Math.sqrt(sum / inputBuffer.length);
-      const normalizedLevel = Math.min(1, rms * 5); // amplify for visual display
-      if (this.onVolumeChange) {
-        this.onVolumeChange(normalizedLevel);
-      }
-
-      // 2. Resample to 16kHz if needed and convert to Linear PCM 16-bit
-      const pcm16 = this.downsampleToPcm16(inputBuffer, sampleRate, 16000);
-      if (this.onDataChunk && pcm16.byteLength > 0) {
-        this.onDataChunk(pcm16);
-      }
-    };
-
-    this.sourceNode.connect(this.scriptProcessor);
-    // Connect through a zero-gain node to keep the ScriptProcessor running in Chromium
-    // without leaking candidate microphone audio into output speakers (prevents feedback loop & hum)
-    const silentSink = this.audioCtx.createGain();
-    silentSink.gain.value = 0.0;
-    this.scriptProcessor.connect(silentSink);
-    silentSink.connect(this.audioCtx.destination);
+    }
   }
 
   private downsampleToPcm16(
@@ -419,9 +469,9 @@ export class PcmRecorder {
   }
 
   stop(): void {
-    if (this.scriptProcessor) {
-      this.scriptProcessor.disconnect();
-      this.scriptProcessor = null;
+    if (this.workletNode) {
+      this.workletNode.disconnect();
+      this.workletNode = null;
     }
     if (this.sourceNode) {
       this.sourceNode.disconnect();
