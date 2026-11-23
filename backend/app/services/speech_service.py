@@ -91,28 +91,31 @@ class STTService:
                 wav_bytes = wav_io.getvalue()
 
                 client = make_genai_client(timeout_ms=10_000)
-                turn_model = getattr(settings, "gemini_turn_model", None) or "gemini-3.8-flash"
+                # Use gemini-3.5-flash as primary for audio transcription: ultra-fast, robust, avoids 503 spikes
+                stt_primary_model = "gemini-3.5-flash"
+                stt_fallback_model = getattr(settings, "gemini_turn_model", None) or "gemini-3.8-flash"
                 prompt = (
                     "Transcribe the candidate's spoken response verbatim in English. "
                     "Return ONLY the spoken words. If only silence, background noise, or no words, return empty string."
                 )
                 try:
                     resp = await client.aio.models.generate_content(
-                        model=turn_model,
+                        model=stt_primary_model,
                         contents=[
                             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
                             prompt,
                         ],
                     )
                 except Exception as model_exc:
-                    if turn_model != "gemini-3.5-flash":
+                    if stt_fallback_model != stt_primary_model:
                         logger.warning(
-                            "Gemini audio transcription failed on %s (%s), falling back to gemini-3.5-flash",
-                            turn_model,
+                            "Gemini audio transcription failed on %s (%s), falling back to %s",
+                            stt_primary_model,
                             model_exc,
+                            stt_fallback_model,
                         )
                         resp = await client.aio.models.generate_content(
-                            model="gemini-3.5-flash",
+                            model=stt_fallback_model,
                             contents=[
                                 types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
                                 prompt,

@@ -79,8 +79,8 @@ async def test_stt_gemini_model_fallback(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert res == "I have built high-throughput microservices in Go."
     assert generate_mock.call_count == 2
-    assert generate_mock.call_args_list[0].kwargs["model"] == "gemini-3.8-flash"
-    assert generate_mock.call_args_list[1].kwargs["model"] == "gemini-3.5-flash"
+    assert generate_mock.call_args_list[0].kwargs["model"] == "gemini-3.5-flash"
+    assert generate_mock.call_args_list[1].kwargs["model"] == "gemini-3.8-flash"
 
 
 @pytest.mark.asyncio

@@ -41,9 +41,8 @@ export class BrowserSpeechRecognizer {
     const rec = new SpeechRecognitionClass();
     rec.continuous = true;
     rec.interimResults = true;
-    // Support user browser locale if English, otherwise fallback to en-US
-    const userLocale = typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
-    rec.lang = userLocale.toLowerCase().startsWith('en') ? userLocale : 'en-US';
+    // Always default to en-US for maximum universal compatibility with Google Cloud speech recognition
+    rec.lang = 'en-US';
     rec.maxAlternatives = 1;
 
     rec.onstart = () => {
@@ -117,15 +116,25 @@ export class BrowserSpeechRecognizer {
       if (error === 'not-allowed') {
         this.onErrorCallback?.('Microphone access blocked. Please allow microphone permissions in your browser address bar.');
       } else if (error === 'network' || error === 'service-not-allowed') {
-        // Stop rapid thrashing: Google Cloud Speech recognition endpoint is unreachable or blocked
-        console.warn('[SpeechRecognition] Google speech recognition network/service unreachable; falling back to backend STT.');
+        console.warn('[SpeechRecognition] Google speech recognition network/service temporary notice; scheduling reconnect.');
         this.clearRestartTimer();
         this.clearSilenceTimer();
-        this.isListening = false;
         try {
           this.recognition?.abort();
         } catch {}
         this.recognition = null;
+        if (this.isListening) {
+          this.restartTimer = window.setTimeout(() => {
+            if (this.isListening) {
+              try {
+                this.recognition = this.initFreshInstance();
+                this.recognition?.start();
+              } catch (retryErr) {
+                console.warn('[SpeechRecognition] Reconnect notice:', retryErr);
+              }
+            }
+          }, 2000);
+        }
       } else if (error === 'audio-capture') {
         this.onErrorCallback?.('No microphone input detected. Please verify your microphone is plugged in.');
       } else {

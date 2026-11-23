@@ -1589,20 +1589,6 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
 
             {/* Ambient Conversational Status & Preemption Controls */}
             <div className="flex items-center gap-2">
-              {isRecording && (
-                <button
-                  type="button"
-                  onClick={handleDoneSpeaking}
-                  title="Done Speaking (Enter)"
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-500/50 hover:bg-emerald-500/30 text-xs font-semibold shadow-sm transition-colors"
-                >
-                  <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>Done Speaking</span>
-                  <kbd className="hidden md:inline-block px-1 py-0.2 text-[10px] font-mono bg-zinc-900 text-emerald-300 rounded border border-emerald-500/40">
-                    Enter
-                  </kbd>
-                </button>
-              )}
               {(isInterviewerSpeaking || typingTurnIndex !== null) && (
                 <button
                   type="button"
