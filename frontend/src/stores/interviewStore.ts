@@ -318,17 +318,6 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       ws.onopen = () => {
         reconnectAttempts = 0;
         set({ wsStatus: 'connected', error: null });
-        // Race-condition prevention: If interviewer is already done speaking and candidate mic is not active, auto-start
-        const { isInterviewerSpeaking, isRecording, turns, mode } = get();
-        if (
-          mode === 'VOICE' &&
-          !isInterviewerSpeaking &&
-          !isRecording &&
-          turns.length > 0 &&
-          turns[turns.length - 1].speaker === 'INTERVIEWER'
-        ) {
-          get().startVoiceRecording().catch(() => {});
-        }
       };
 
       ws.onmessage = (event) => {
@@ -387,38 +376,61 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
                 }
                 break;
               case 'transcript_partial':
-                if (msg.text) {
-                  set({ partialTranscript: msg.text });
+                if (msg.text && msg.text.trim()) {
+                  set({ partialTranscript: msg.text.trim() });
                 }
                 break;
               case 'transcript_final':
+                if (speechRecognizer) {
+                  speechRecognizer.stop();
+                }
+                if (pcmRecorder) {
+                  pcmRecorder.stop();
+                }
                 set((s) => {
-                  const existingIdx = s.turns.findIndex(
+                  let existingIdx = s.turns.findIndex(
                     (t) => t.turn_index === msg.turn_index && t.speaker === 'CANDIDATE'
                   );
+                  if (existingIdx === -1 && s.turns.length > 0) {
+                    const lastTurn = s.turns[s.turns.length - 1];
+                    if (lastTurn.speaker === 'CANDIDATE') {
+                      existingIdx = s.turns.length - 1;
+                    }
+                  }
                   if (existingIdx !== -1) {
                     const updatedTurns = [...s.turns];
                     updatedTurns[existingIdx] = {
                       ...updatedTurns[existingIdx],
+                      turn_index: msg.turn_index,
                       transcript: msg.text,
                     };
-                    return { turns: updatedTurns, partialTranscript: '' };
+                    return {
+                      turns: updatedTurns,
+                      partialTranscript: '',
+                      isRecording: false,
+                      audioLevel: 0,
+                    };
                   }
                   return {
                     turns: [
                       ...s.turns,
                       {
                         turn_index: msg.turn_index,
-                        speaker: msg.speaker as 'CANDIDATE',
+                        speaker: (msg.speaker || 'CANDIDATE') as 'CANDIDATE',
                         transcript: msg.text,
                         created_at: new Date().toISOString(),
                       },
                     ],
                     partialTranscript: '',
+                    isRecording: false,
+                    audioLevel: 0,
                   };
                 });
                 break;
               case 'interviewer_speaking':
+                if (get().isRecording) {
+                  get().stopVoiceRecording();
+                }
                 if (pcmPlayer) {
                   const estDurationSec = msg.duration_ms
                     ? msg.duration_ms / 1000
@@ -531,8 +543,44 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     }
 
     try {
+      // 1. Start browser-native speech recognition FIRST — gets first claim on the mic.
+      //    Chrome's Web Speech pipeline must register before ScriptProcessorNode takes the track,
+      //    otherwise it fires onend immediately without producing any results.
+      if (!BrowserSpeechRecognizer.isSupported()) {
+        // Audio still streams to the server; only the in-browser live caption is unavailable.
+        set({ notice: 'Live captions are not supported in this browser (use Chrome or Edge). Your voice is still sent to the interviewer.' });
+      } else {
+        if (!speechRecognizer) {
+          speechRecognizer = new BrowserSpeechRecognizer();
+        }
+
+        speechRecognizer.start(
+          (liveTranscript) => {
+            if (!get().isMicMuted) {
+              set({ partialTranscript: liveTranscript });
+            }
+          },
+          undefined,
+          () => {
+            // Automatic 2s silence detection -> hands-free auto-commit candidate turn (only if not muted)
+            if (!get().isMicMuted) {
+              get().stopVoiceRecording();
+            }
+          },
+          (errorMsg) => {
+            // Only show fatal permission errors in banner, not transient background status
+            if (!errorMsg.includes('no-speech') && !errorMsg.includes('aborted')) {
+              set({ error: errorMsg });
+            }
+          },
+          () => get().isMicMuted
+        );
+      }
+
+      // 2. THEN start PCM Recorder for raw audio streaming to backend (slight delay so Chrome
+      //    registers the speech recognition session before the AudioContext node starts).
       let micCaptureOk = true;
-      // 1. Initialize PCM Recorder for raw audio streaming & volume metering (if mic permission is granted)
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
       try {
         if (!pcmRecorder) {
           pcmRecorder = new PcmRecorder();
@@ -554,48 +602,11 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
       }
 
       if (!micCaptureOk) {
-        set({
-          isRecording: false,
-          audioLevel: 0,
-          error:
-            'Microphone unavailable. Allow microphone access in your browser settings, or type your answer instead.',
-        });
-        return;
+        // Speech recognition is still running for captions; just warn about backend stream
+        console.warn('PcmRecorder unavailable — live captions only, no backend audio stream.');
       }
 
-      if (!BrowserSpeechRecognizer.isSupported()) {
-        // Audio still streams to the server; only the in-browser live caption is unavailable.
-        set({ notice: 'Live captions are not supported in this browser (use Chrome or Edge). Your voice is still sent to the interviewer.' });
-      }
-
-      // 2. Start browser-native speech recognition to capture actual words candidate speaks in real time
-      if (!speechRecognizer) {
-        speechRecognizer = new BrowserSpeechRecognizer();
-      }
-
-      speechRecognizer.start(
-        (liveTranscript) => {
-          if (!get().isMicMuted) {
-            set({ partialTranscript: liveTranscript });
-          }
-        },
-        undefined,
-        () => {
-          // Automatic 2.2s silence detection -> hands-free auto-commit candidate turn (only if not muted)
-          if (!get().isMicMuted) {
-            get().stopVoiceRecording();
-          }
-        },
-        (errorMsg) => {
-          // Only show fatal permission errors in banner, not transient background status
-          if (!errorMsg.includes('no-speech') && !errorMsg.includes('aborted')) {
-            set({ error: errorMsg });
-          }
-        },
-        () => get().isMicMuted
-      );
-
-      set({ isRecording: true, error: null });
+      set({ isRecording: true, partialTranscript: '', error: null });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Microphone access denied';
       set({ isRecording: false, error: message });
@@ -616,7 +627,70 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
     }
 
     const currentPartial = get().partialTranscript?.trim();
-    const trimmed = (spokenTranscript && spokenTranscript.trim()) || currentPartial || undefined;
+    // Choose the most complete transcript between browser-recognized and backend partial
+    let trimmed: string | undefined = undefined;
+    if (spokenTranscript && currentPartial) {
+      trimmed = spokenTranscript.length >= currentPartial.length ? spokenTranscript : currentPartial;
+    } else {
+      trimmed = spokenTranscript || currentPartial || undefined;
+    }
+
+    if (trimmed) {
+      // Optimistically show candidate turn in chat so spoken text never vanishes from screen
+      set((s) => {
+        const lastTurn = s.turns[s.turns.length - 1];
+        if (lastTurn && lastTurn.speaker === 'CANDIDATE') {
+          // If candidate turn was already committed for this round, update transcript if empty
+          if (!lastTurn.transcript && trimmed) {
+            const updated = [...s.turns];
+            updated[updated.length - 1] = {
+              ...lastTurn,
+              transcript: trimmed,
+            };
+            return {
+              turns: updated,
+              isRecording: false,
+              audioLevel: 0,
+              partialTranscript: '',
+            };
+          }
+          return {
+            isRecording: false,
+            audioLevel: 0,
+            partialTranscript: '',
+          };
+        }
+
+        const nextTurnIdx = lastTurn ? lastTurn.turn_index + 1 : 1;
+        const alreadyExists = s.turns.some(
+          (t) => t.turn_index === nextTurnIdx && t.speaker === 'CANDIDATE'
+        );
+        if (alreadyExists) {
+          return {
+            isRecording: false,
+            audioLevel: 0,
+            partialTranscript: '',
+          };
+        }
+
+        return {
+          turns: [
+            ...s.turns,
+            {
+              turn_index: nextTurnIdx,
+              speaker: 'CANDIDATE',
+              transcript: trimmed,
+              created_at: new Date().toISOString(),
+            },
+          ],
+          isRecording: false,
+          audioLevel: 0,
+          partialTranscript: '',
+        };
+      });
+    } else {
+      set({ isRecording: false, audioLevel: 0, partialTranscript: '' });
+    }
 
     if (activeWs && activeWs.readyState === WebSocket.OPEN) {
       activeWs.send(
@@ -632,7 +706,6 @@ export const useInterviewStore = create<InterviewStoreState>((set, get) => ({
         console.warn('Fallback turn submission failed:', err);
       });
     }
-    set({ isRecording: false, audioLevel: 0 });
   },
 
   bargeIn: () => {

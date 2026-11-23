@@ -527,7 +527,7 @@ const AudioEqualizer: React.FC<{
 }> = ({ audioLevel, isRecording, isInterviewerSpeaking }) => {
   const bars = 16;
   return (
-    <div className="flex items-center gap-2.5 h-9 px-3 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800/80 backdrop-blur-md shrink-0 shadow-sm">
+    <div className="flex items-center gap-2.5 h-9 px-3 py-1 rounded-xl bg-black/35 border border-zinc-800/60 backdrop-blur-md shrink-0 shadow-sm">
       <div className="flex items-end gap-[3px] h-5 w-24 sm:w-28">
         {Array.from({ length: bars }).map((_, i) => {
           let heightPercent = 15;
@@ -685,8 +685,11 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({ onConclude }) => {
 
   // Smooth WhatsApp auto-scroll as new messages, words, or transcripts arrive
   useEffect(() => {
-    chatScrollBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turns.length, typedText, partialTranscript, isRecording]);
+    const frameId = requestAnimationFrame(() => {
+      chatScrollBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [turns, typedText, partialTranscript, isRecording]);
 
   const setRoomVideoRef = useCallback((node: HTMLVideoElement | null) => {
     roomVideoRef.current = node;
@@ -1405,13 +1408,13 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                 <span>{showCamera ? 'Connecting Camera Stream...' : 'Camera Disabled'}</span>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/60 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/35 pointer-events-none" />
           </div>
 
           {/* TOP HUD: Ambient Badges (Overlaid on Video) */}
           <div className="relative z-10 flex items-center justify-between p-3 sm:p-4 pointer-events-auto">
             {/* AI Interviewer Badge */}
-            <div className="flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-sky-500/30 px-3 py-1.5 rounded-full shadow-lg">
+            <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md border border-sky-500/25 px-3 py-1.5 rounded-full shadow-lg">
               <Bot className="h-4 w-4 text-sky-400" />
               <div className="flex flex-col text-[11px] leading-tight">
                 <span className="font-bold text-sky-300 font-mono">
@@ -1441,7 +1444,7 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
             <div className="flex flex-col space-y-3.5 justify-end min-h-full">
               {turns.length === 0 && (
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/25 bg-slate-950/85 p-3.5 sm:p-4.5 backdrop-blur-xl shadow-2xl text-zinc-100">
+                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/20 bg-black/40 p-3.5 sm:p-4.5 backdrop-blur-md shadow-lg text-zinc-100">
                     <div className="flex items-center gap-2 mb-1.5 font-mono text-[11px] text-sky-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
                       <span className="font-bold uppercase tracking-wider">
@@ -1464,7 +1467,7 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                 if (isInterviewer) {
                   return (
                     <div key={`turn-${turn.turn_index}-${idx}`} className="flex justify-start animate-in fade-in duration-200">
-                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/30 bg-slate-950/85 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100">
+                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tl-sm border border-sky-500/25 bg-black/40 p-3.5 sm:p-4 backdrop-blur-md shadow-lg text-zinc-100">
                         <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
                           <span className="font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
                             <span className={`h-1.5 w-1.5 rounded-full bg-sky-400 ${isInterviewerSpeaking && isLatestTurn ? 'animate-ping' : ''}`} />
@@ -1500,7 +1503,7 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                 } else {
                   return (
                     <div key={`turn-${turn.turn_index}-${idx}`} className="flex justify-end animate-in fade-in duration-200">
-                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/35 bg-slate-950/85 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100">
+                      <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/25 bg-black/40 p-3.5 sm:p-4 backdrop-blur-md shadow-lg text-zinc-100">
                         <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
                           <span className="text-zinc-500 text-[10px]">
                             Turn #{turn.turn_index}
@@ -1520,9 +1523,9 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
               })}
 
               {/* CANDIDATE LIVE STREAMING SPEECH BUBBLE (Overlaid in WhatsApp flow) */}
-              {isRecording && (
+              {(isRecording || (partialTranscript && partialTranscript.trim())) && (
                 <div className="flex justify-end animate-in fade-in duration-150">
-                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/50 bg-slate-950/90 p-3.5 sm:p-4 backdrop-blur-xl shadow-2xl text-zinc-100 ring-1 ring-emerald-500/20">
+                  <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm border border-emerald-500/35 bg-black/40 p-3.5 sm:p-4 backdrop-blur-md shadow-xl text-zinc-100 ring-1 ring-emerald-500/20">
                     <div className="flex items-center justify-between gap-3 mb-1.5 font-mono text-[11px]">
                       <span className="text-emerald-400 font-mono text-[10px] animate-pulse flex items-center gap-1.5">
                         <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
@@ -1538,6 +1541,12 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                           {partialTranscript}
                           <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
                         </>
+                      ) : audioLevel > 0.006 ? (
+                        <span className="text-emerald-400 font-mono text-xs flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                          Listening: voice detected...
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-emerald-400 animate-pulse align-baseline rounded-[1px]" />
+                        </span>
                       ) : (
                         <span className="text-zinc-400 italic font-mono text-xs flex items-center gap-2">
                           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
@@ -1578,8 +1587,22 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
               )}
             </div>
 
-            {/* Barge-In Action */}
+            {/* Ambient Conversational Status & Preemption Controls */}
             <div className="flex items-center gap-2">
+              {isRecording && (
+                <button
+                  type="button"
+                  onClick={handleDoneSpeaking}
+                  title="Done Speaking (Enter)"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-500/50 hover:bg-emerald-500/30 text-xs font-semibold shadow-sm transition-colors"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Done Speaking</span>
+                  <kbd className="hidden md:inline-block px-1 py-0.2 text-[10px] font-mono bg-zinc-900 text-emerald-300 rounded border border-emerald-500/40">
+                    Enter
+                  </kbd>
+                </button>
+              )}
               {(isInterviewerSpeaking || typingTurnIndex !== null) && (
                 <button
                   type="button"
@@ -1594,8 +1617,20 @@ print("Triage Recommendation: Increase read-replica offloading & apply circuit b
                   </kbd>
                 </button>
               )}
-              <span className="text-[11px] font-mono text-zinc-400 hidden lg:inline">
-                Natural Voice Active · Speak to respond
+              <span className="text-[11px] font-mono text-zinc-400 hidden sm:inline-flex items-center gap-1.5">
+                {isRecording ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-emerald-400 font-semibold">Listening · Speak naturally</span>
+                  </>
+                ) : isInterviewerSpeaking ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
+                    <span className="text-sky-300 font-semibold">Interviewer speaking...</span>
+                  </>
+                ) : (
+                  <span>Natural Voice Active · Speak to respond</span>
+                )}
               </span>
             </div>
           </div>
